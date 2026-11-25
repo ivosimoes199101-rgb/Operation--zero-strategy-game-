@@ -181,8 +181,7 @@ function renderMissions() {
     d.querySelector("button").onclick = () => startMission(i);
     el.appendChild(d);
   });
-   }
-let battle = {
+    let battle = {
   units: [],
   enemies: [],
   selected: 0,
@@ -255,7 +254,7 @@ function getCoverPenalty(tx, ty, ax, ay) {
   return bestPenalty;
 }
 
-function calcHitChance(unit, enemy) {
+function calcHitChance(unit, enemy, isOverwatch = false) {
   if (!unit || !enemy || enemy.hp <= 0 || unit.hp <= 0) return 0;
   if (!hasLineOfSight(unit.x, unit.y, enemy.x, enemy.y)) return 0;
   const stats = OPERATIVES[unit.id][3];
@@ -264,7 +263,8 @@ function calcHitChance(unit, enemy) {
   const base = stats[0] * 0.45 + stats[1] * 0.55;
   const rangeLoss = Math.abs(dist - wpn.optRange) * 6;
   const coverLoss = getCoverPenalty(enemy.x, enemy.y, unit.x, unit.y);
-  return Math.max(5, Math.min(95, Math.round(base - rangeLoss - coverLoss)));
+  const reactionLoss = isOverwatch ? 10 : 0;
+  return Math.max(5, Math.min(95, Math.round(base - rangeLoss - coverLoss - reactionLoss)));
 }
 
 function canMoveTo(unit, x, y) {
@@ -290,7 +290,8 @@ function startMission(i) {
         hp: 100,
         ap: 2,
         ammo: wpn.mag,
-        maxAmmo: wpn.mag
+        maxAmmo: wpn.mag,
+        overwatch: false
       };
     }),
     enemies: [
@@ -333,6 +334,7 @@ function renderBattle() {
       } else if (uIdx >= 0) {
         tile.textContent = "♟";
         if (uIdx === battle.selected) tile.classList.add("selected");
+        if (battle.units[uIdx].overwatch) tile.classList.add("overwatch");
       } else if (eIdx >= 0) {
         tile.textContent = "◆";
         tile.classList.add("enemy");
@@ -347,19 +349,21 @@ function renderBattle() {
   }
 
   if (unit) {
+    const vigLabel = unit.overwatch ? " · VIGILÂNCIA" : "";
     document.getElementById("selected-unit").textContent = OPERATIVES[unit.id][0].toUpperCase();
     document.getElementById("unit-hp").textContent = unit.hp + " HP";
     document.getElementById("unit-ap").textContent = unit.ap + " PA";
-    document.getElementById("unit-ammo").textContent = unit.ammo + "/" + unit.maxAmmo + " MUN";
+    document.getElementById("unit-ammo").textContent = unit.ammo + "/" + unit.maxAmmo + " MUN" + vigLabel;
   }
 
   const enemy = battle.enemies[battle.targetEnemy];
   const fireBtn = document.getElementById("fire-btn");
   const reloadBtn = document.getElementById("reload-btn");
+  const overwatchBtn = document.getElementById("overwatch-btn");
   const medBtn = document.getElementById("medkit");
 
   if (enemy && enemy.hp > 0 && unit && unit.hp > 0) {
-    const chance = calcHitChance(unit, enemy);
+    const chance = calcHitChance(unit, enemy, false);
     const covPen = getCoverPenalty(enemy.x, enemy.y, unit.x, unit.y);
     document.getElementById("target-info").textContent = `${enemy.name} (${enemy.hp} HP)`;
     document.getElementById("hit-chance").textContent = chance > 0
@@ -373,6 +377,9 @@ function renderBattle() {
   }
 
   reloadBtn.disabled = battle.finished || !unit || unit.hp <= 0 || unit.ap < 1 || unit.ammo >= unit.maxAmmo;
+  if (overwatchBtn) {
+    overwatchBtn.disabled = battle.finished || !unit || unit.hp <= 0 || unit.ap < 1 || unit.ammo <= 0 || unit.overwatch;
+  }
   medBtn.disabled = battle.finished || !unit || unit.hp <= 0 || unit.ap < 1 || unit.hp >= 100;
 }
 
@@ -414,7 +421,7 @@ document.getElementById("fire-btn").onclick = () => {
   const enemy = battle.enemies[battle.targetEnemy];
   if (!unit || !enemy || enemy.hp <= 0 || unit.ap < 1 || unit.ammo <= 0) return;
 
-  const chance = calcHitChance(unit, enemy);
+  const chance = calcHitChance(unit, enemy, false);
   if (chance <= 0) {
     battleLog("Sem linha de visão para o alvo.");
     return;
@@ -451,6 +458,19 @@ document.getElementById("reload-btn").onclick = () => {
   renderBattle();
 };
 
+const overwatchBtnEl = document.getElementById("overwatch-btn");
+if (overwatchBtnEl) {
+  overwatchBtnEl.onclick = () => {
+    if (battle.finished) return;
+    const unit = battle.units[battle.selected];
+    if (!unit || unit.hp <= 0 || unit.ap < 1 || unit.ammo <= 0 || unit.overwatch) return;
+    unit.ap = Math.max(0, unit.ap - 1);
+    unit.overwatch = true;
+    battleLog(`${OPERATIVES[unit.id][0]} entrou em VIGILÂNCIA (-1 PA).`);
+    renderBattle();
+  };
+}
+
 document.getElementById("medkit").onclick = () => {
   if (battle.finished) return;
   const unit = battle.units[battle.selected];
@@ -460,6 +480,31 @@ document.getElementById("medkit").onclick = () => {
   battleLog(`Kit médico aplicado a ${OPERATIVES[unit.id][0]}: +25 HP (-1 PA).`);
   renderBattle();
 };
+
+function triggerOverwatchForEnemyMove(enemy, logs) {
+  if (!enemy || enemy.hp <= 0) return;
+  for (const u of battle.units) {
+    if (u.hp <= 0 || !u.overwatch || u.ammo <= 0) continue;
+    if (!hasLineOfSight(u.x, u.y, enemy.x, enemy.y)) continue;
+
+    u.overwatch = false;
+    u.ammo = Math.max(0, u.ammo - 1);
+    const chance = calcHitChance(u, enemy, true);
+    const wpn = getWeapon(u.id);
+    const opName = OPERATIVES[u.id][0];
+
+    if (Math.random() * 100 <= chance) {
+      enemy.hp = Math.max(0, enemy.hp - wpn.dmg);
+      logs.push(`VIGILÂNCIA: ${opName} acertou em ${enemy.name} em movimento (${chance}%): -${wpn.dmg} HP!`);
+      if (enemy.hp <= 0) {
+        logs.push(`${enemy.name} abatido em vigilância!`);
+        break;
+      }
+    } else {
+      logs.push(`VIGILÂNCIA: ${opName} disparou contra ${enemy.name} em movimento (${chance}%) e falhou.`);
+    }
+  }
+}
 
 function scoreEnemyTile(enemy, target, nx, ny) {
   const dist = Math.abs(target.x - nx) + Math.abs(target.y - ny);
@@ -514,9 +559,10 @@ function runEnemyTurn() {
       e.y = best.y;
       const hasCov = getCoverPenalty(e.x, e.y, target.x, target.y) > 0;
       logs.push(`${e.name} manobrou${hasCov ? " para cobertura" : ""}.`);
+      triggerOverwatchForEnemyMove(e, logs);
     }
 
-    if (hasLineOfSight(e.x, e.y, target.x, target.y)) {
+    if (e.hp > 0 && hasLineOfSight(e.x, e.y, target.x, target.y)) {
       const dist = Math.abs(target.x - e.x) + Math.abs(target.y - e.y);
       const targetCovPen = getCoverPenalty(target.x, target.y, e.x, e.y);
       const hitProb = Math.max(15, Math.min(85, 72 - Math.max(0, dist - 4) * 6 - targetCovPen));
@@ -526,7 +572,7 @@ function runEnemyTurn() {
       } else {
         logs.push(`${e.name} falhou contra ${OPERATIVES[target.id][0]} (${hitProb}%).`);
       }
-    } else {
+    } else if (e.hp > 0) {
       logs.push(`${e.name} sem linha de visão para disparar.`);
     }
   });
@@ -546,13 +592,22 @@ document.getElementById("end-turn").onclick = () => {
     return;
   }
 
+  const nextAliveEnemy = battle.enemies.findIndex(e => e.hp > 0);
+  if (nextAliveEnemy >= 0 && (!battle.enemies[battle.targetEnemy] || battle.enemies[battle.targetEnemy].hp <= 0)) {
+    battle.targetEnemy = nextAliveEnemy;
+  }
+
   battle.turn += 1;
   battle.units.forEach(u => {
-    if (u.hp > 0) u.ap = 2;
+    if (u.hp > 0) {
+      u.ap = 2;
+      u.overwatch = false;
+    }
   });
   document.getElementById("turn-label").textContent = "TURNO " + battle.turn;
   battleLog(`${enemyLogs.join(" ")} — Turno ${battle.turn}: PA renovados.`.trim());
   renderBattle();
+  checkWin();
 };
 
 function checkWin() {
@@ -580,3 +635,4 @@ document.getElementById("retreat").onclick = () => {
 renderResources();
 renderRoster();
 document.getElementById("clock").textContent = "2089";
+}
