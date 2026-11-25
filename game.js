@@ -98,6 +98,7 @@ function renderResources() {
 
 function renderRoster() {
   const el = document.getElementById("roster");
+  if (!el) return;
   el.innerHTML = "";
   OPERATIVES.forEach((o, i) => {
     const selected = state.selected.includes(i);
@@ -123,7 +124,8 @@ function renderRoster() {
     d.ondblclick = () => showOperator(i);
     el.appendChild(d);
   });
-  document.getElementById("team-count").textContent = `EQUIPA ${state.selected.length}/5`;
+  const countEl = document.getElementById("team-count");
+  if (countEl) countEl.textContent = `EQUIPA ${state.selected.length}/5`;
 }
 
 function showOperator(i) {
@@ -144,6 +146,7 @@ document.getElementById("close-modal").onclick = () => {
 
 function renderBuildings() {
   const el = document.getElementById("buildings");
+  if (!el) return;
   el.innerHTML = "";
   BUILDINGS.forEach((b, i) => {
     const built = state.built.includes(i);
@@ -167,6 +170,7 @@ function renderBuildings() {
 
 function renderMissions() {
   const el = document.getElementById("mission-list");
+  if (!el) return;
   el.innerHTML = "";
   MISSIONS.forEach((m, i) => {
     const done = state.completed.includes(i);
@@ -177,8 +181,7 @@ function renderMissions() {
     d.querySelector("button").onclick = () => startMission(i);
     el.appendChild(d);
   });
-}
-
+   }
 let battle = {
   units: [],
   enemies: [],
@@ -234,9 +237,7 @@ function hasLineOfSight(x0, y0, x1, y1) {
 }
 
 function getCoverPenalty(tx, ty, ax, ay) {
-  const dirs = [
-    [1, 0], [-1, 0], [0, 1], [0, -1]
-  ];
+  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
   let bestPenalty = 0;
   const toAttackerX = ax - tx;
   const toAttackerY = ay - ty;
@@ -275,7 +276,7 @@ function canMoveTo(unit, x, y) {
 }
 
 function startMission(i) {
-  if (state.selected.length === 0) {
+  if (!state.selected || state.selected.length === 0) {
     logModal("EQUIPA NÃO SELECIONADA", "Vai a Operacionais e escolhe até cinco elementos antes de iniciar.");
     return;
   }
@@ -304,7 +305,7 @@ function startMission(i) {
   state.mission = i;
   document.getElementById("battle-title").textContent = MISSIONS[i][0];
   document.getElementById("turn-label").textContent = "TURNO 1";
-  document.getElementById("battle-log").textContent = "Turno 1: Escolhe uma casa destacada para mover (1 PA) ou seleciona um alvo para disparar (1 PA).";
+  document.getElementById("battle-log").textContent = "Turno 1: Escolhe uma casa destacada para mover (-1 PA) ou seleciona um alvo para disparar (-1 PA).";
   go("tactical");
   renderBattle();
 }
@@ -394,12 +395,12 @@ function tileAction(x, y, uIdx, eIdx) {
   if (canMoveTo(unit, x, y)) {
     unit.x = x;
     unit.y = y;
-    unit.ap -= 1;
+    unit.ap = Math.max(0, unit.ap - 1);
     battleLog(`${OPERATIVES[unit.id][0]} moveu-se para (${x + 1},${y + 1}) (-1 PA).`);
     renderBattle();
     checkWin();
   } else {
-    battleLog("Movimento indisponível: verifica os PA (1 PA para até 2 casas) ou bloqueios.");
+    battleLog("Movimento indisponível: verifica os PA (-1 PA para até 2 casas) ou bloqueios.");
   }
 }
 
@@ -419,8 +420,8 @@ document.getElementById("fire-btn").onclick = () => {
     return;
   }
 
-  unit.ap -= 1;
-  unit.ammo -= 1;
+  unit.ap = Math.max(0, unit.ap - 1);
+  unit.ammo = Math.max(0, unit.ammo - 1);
   const wpn = getWeapon(unit.id);
   const roll = Math.random() * 100;
 
@@ -444,7 +445,7 @@ document.getElementById("reload-btn").onclick = () => {
   if (battle.finished) return;
   const unit = battle.units[battle.selected];
   if (!unit || unit.ap < 1 || unit.ammo >= unit.maxAmmo) return;
-  unit.ap -= 1;
+  unit.ap = Math.max(0, unit.ap - 1);
   unit.ammo = unit.maxAmmo;
   battleLog(`${OPERATIVES[unit.id][0]} recarregou a arma (-1 PA).`);
   renderBattle();
@@ -454,7 +455,7 @@ document.getElementById("medkit").onclick = () => {
   if (battle.finished) return;
   const unit = battle.units[battle.selected];
   if (!unit || unit.ap < 1 || unit.hp >= 100) return;
-  unit.ap -= 1;
+  unit.ap = Math.max(0, unit.ap - 1);
   unit.hp = Math.min(100, unit.hp + 25);
   battleLog(`Kit médico aplicado a ${OPERATIVES[unit.id][0]}: +25 HP (-1 PA).`);
   renderBattle();
@@ -556,4 +557,26 @@ document.getElementById("end-turn").onclick = () => {
 
 function checkWin() {
   const reachedExit = battle.units.some(u => u.hp > 0 && u.x === 7 && u.y === 5);
-  const allEnemiesDown = battle.enemies.e
+  const allEnemiesDown = battle.enemies.every(e => e.hp <= 0);
+  if (reachedExit || allEnemiesDown) {
+    battle.finished = true;
+    battleLog("OBJETIVO CUMPRIDO. A equipa regressa à base.");
+    if (!state.completed.includes(state.mission)) state.completed.push(state.mission);
+    state.credits += 500;
+    state.materials += 15;
+    state.alien += 1;
+    save();
+    setTimeout(() => {
+      logModal("OPERAÇÃO CONCLUÍDA", "A equipa regressou à base. Recompensa: 500 créditos, 15 materiais e 1 tecnologia alienígena.");
+      renderMissions();
+    }, 250);
+  }
+}
+
+document.getElementById("retreat").onclick = () => {
+  if (confirm("Queres mesmo abortar esta operação?")) go("missions");
+};
+
+renderResources();
+renderRoster();
+document.getElementById("clock").textContent = "2089";
