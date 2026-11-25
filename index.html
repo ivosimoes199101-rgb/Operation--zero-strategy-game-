@@ -46,7 +46,7 @@
 
     <section id="squad" class="screen">
       <div class="section-head"><div><div class="eyebrow">PESSOAL // 02</div><h2>OPERACIONAIS</h2></div><span class="tag" id="team-count">EQUIPA 0/5</span></div>
-      <p class="muted">Seleciona até cinco operacionais para a próxima missão. Toca num elemento para ver os seus dados.</p>
+      <p class="muted">Seleciona até cinco operacionais para a próxima missão. Toca duas vezes num elemento para ver os seus dados.</p>
       <div id="roster" class="roster"></div>
       <div class="sticky-actions"><button class="secondary" data-go="command">VOLTAR</button><button class="primary" data-go="missions">CONTINUAR →</button></div>
     </section>
@@ -66,10 +66,29 @@
 
     <section id="tactical" class="screen">
       <div class="section-head"><div><div class="eyebrow">TEATRO DE OPERAÇÕES // AO VIVO</div><h2 id="battle-title">FIRST CONTACT</h2></div><span class="tag danger">COMBATE ATIVO</span></div>
-      <div class="battle-info"><span>OBJETIVO: ALCANÇAR O PONTO DE EXTRAÇÃO</span><span id="turn-label">TURNO 1</span></div>
+      <div class="battle-info"><span>OBJETIVO: NEUTRALIZAR AMEAÇAS OU EXTRAÇÃO</span><span id="turn-label">TURNO 1</span></div>
       <div class="battle-layout">
         <div id="battle-grid" class="battle-grid" aria-label="Grelha tática"></div>
-        <div class="battle-side"><div class="side-panel"><small>OPERACIONAL SELECIONADO</small><b id="selected-unit">ALEX MORGAN</b><span id="unit-hp">100 HP</span></div><div class="side-panel"><small>ORDENS</small><button id="end-turn" class="primary full">TERMINAR TURNO</button><button id="medkit" class="secondary full">USAR KIT MÉDICO</button></div><div id="battle-log" class="battle-log">A equipa entrou na zona de operações.</div></div>
+        <div class="battle-side">
+          <div class="side-panel">
+            <small>OPERACIONAL SELECIONADO</small>
+            <b id="selected-unit">ALEX MORGAN</b>
+            <span id="unit-hp">100 HP</span> · <span id="unit-ap">2 PA</span> · <span id="unit-ammo">12/12 MUN</span>
+          </div>
+          <div class="side-panel">
+            <small>ALVO / PRECISÃO</small>
+            <b id="target-info">NENHUM ALVO</b>
+            <span id="hit-chance">CHANCE: --%</span>
+          </div>
+          <div class="side-panel">
+            <small>ORDENS</small>
+            <button id="fire-btn" class="primary full">DISPARAR (1 PA)</button>
+            <button id="reload-btn" class="secondary full">RECARREGAR (1 PA)</button>
+            <button id="medkit" class="secondary full">KIT MÉDICO (1 PA)</button>
+            <button id="end-turn" class="primary full">TERMINAR TURNO</button>
+          </div>
+          <div id="battle-log" class="battle-log">A equipa entrou na zona de operações.</div>
+        </div>
       </div>
       <button class="secondary full" id="retreat">ABORTAR OPERAÇÃO</button>
     </section>
