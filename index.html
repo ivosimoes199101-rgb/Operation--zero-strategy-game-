@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#090e13">
+  <meta name="description" content="OPERATION ZERO — jogo tático de ficção científica">
+  <title>OPERATION ZERO</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="scanlines"></div>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">Ø</span><div><b>OPERATION ZERO</b><small>TACTICAL COMMAND SYSTEM</small></div></div>
+    <div class="status"><span class="live-dot"></span> SISTEMA ONLINE <span id="clock">2089</span></div>
+  </header>
+
+  <main>
+    <section id="home" class="screen active">
+      <div class="hero">
+        <div class="eyebrow">ANO 2089 // A HUMANIDADE ESTÁ EM GUERRA</div>
+        <h1>A ÚLTIMA LINHA<br><em>DE DEFESA.</em></h1>
+        <p>Uma força extraterrestre chegou à Terra. Reúne a tua equipa, prepara a base e impede a extinção da humanidade.</p>
+        <button class="primary" data-go="command">ENTRAR NO COMANDO <span>↗</span></button>
+        <div class="hero-foot"><span>CLASSIFICAÇÃO: ULTRASSECRETO</span><span>UNIDADE ZERO // 12 OPERACIONAIS</span></div>
+      </div>
+      <div class="briefing"><span class="brief-icon">!</span><div><b>COMUNICADO DE EMERGÊNCIA</b><p>Perda de contacto com várias instalações militares. Atividade não identificada detetada em território europeu. A Unidade ZERO foi ativada.</p></div></div>
+    </section>
+
+    <section id="command" class="screen">
+      <div class="section-head"><div><div class="eyebrow">QUARTEL-GENERAL // 01</div><h2>ZERO COMMAND</h2></div><span class="tag">NÍVEL 01 — POSTO AVANÇADO</span></div>
+      <div class="resource-grid">
+        <div class="resource"><small>CRÉDITOS</small><b id="credits">2500</b></div>
+        <div class="resource"><small>ENERGIA</small><b id="energy">100</b></div>
+        <div class="resource"><small>MATERIAIS</small><b id="materials">80</b></div>
+        <div class="resource"><small>TEC. ALIENÍGENA</small><b id="alien">0</b></div>
+      </div>
+      <div class="command-grid">
+        <button class="module-card" data-go="squad"><span class="module-icon">♟</span><b>OPERACIONAIS</b><small>Gerir unidade e equipa</small><span class="arrow">→</span></button>
+        <button class="module-card" data-go="base"><span class="module-icon">▦</span><b>INSTALAÇÕES</b><small>Expandir a base ZERO</small><span class="arrow">→</span></button>
+        <button class="module-card" data-go="missions"><span class="module-icon">◎</span><b>OPERAÇÕES</b><small>Escolher missão disponível</small><span class="arrow">→</span></button>
+        <button class="module-card" data-go="brief"><span class="module-icon">⌁</span><b>INTELIGÊNCIA</b><small>Relatórios e situação global</small><span class="arrow">→</span></button>
+      </div>
+      <div class="bottom-note"><span class="live-dot"></span> UNIDADE ZERO DISPONÍVEL <span>—</span> AGUARDAM-SE ORDENS</div>
+    </section>
+
+    <section id="squad" class="screen">
+      <div class="section-head"><div><div class="eyebrow">PESSOAL // 02</div><h2>OPERACIONAIS</h2></div><span class="tag" id="team-count">EQUIPA 0/5</span></div>
+      <p class="muted">Seleciona até cinco operacionais para a próxima missão. Toca num elemento para ver os seus dados.</p>
+      <div id="roster" class="roster"></div>
+      <div class="sticky-actions"><button class="secondary" data-go="command">VOLTAR</button><button class="primary" data-go="missions">CONTINUAR →</button></div>
+    </section>
+
+    <section id="base" class="screen">
+      <div class="section-head"><div><div class="eyebrow">INFRAESTRUTURA // 03</div><h2>INSTALAÇÕES</h2></div><span class="tag">POSTO AVANÇADO</span></div>
+      <p class="muted">Constrói instalações para desbloquear novas capacidades. Os custos são debitados dos recursos da base.</p>
+      <div id="buildings" class="building-list"></div>
+      <button class="secondary full" data-go="command">← VOLTAR AO COMANDO</button>
+    </section>
+
+    <section id="missions" class="screen">
+      <div class="section-head"><div><div class="eyebrow">MAPA DE OPERAÇÕES // 04</div><h2>MISSÕES</h2></div><span class="tag">CAPÍTULO I — PRIMEIRO CONTACTO</span></div>
+      <div id="mission-list" class="mission-list"></div>
+      <button class="secondary full" data-go="command">← VOLTAR AO COMANDO</button>
+    </section>
+
+    <section id="tactical" class="screen">
+      <div class="section-head"><div><div class="eyebrow">TEATRO DE OPERAÇÕES // AO VIVO</div><h2 id="battle-title">FIRST CONTACT</h2></div><span class="tag danger">COMBATE ATIVO</span></div>
+      <div class="battle-info"><span>OBJETIVO: ALCANÇAR O PONTO DE EXTRAÇÃO</span><span id="turn-label">TURNO 1</span></div>
+      <div class="battle-layout">
+        <div id="battle-grid" class="battle-grid" aria-label="Grelha tática"></div>
+        <div class="battle-side"><div class="side-panel"><small>OPERACIONAL SELECIONADO</small><b id="selected-unit">ALEX MORGAN</b><span id="unit-hp">100 HP</span></div><div class="side-panel"><small>ORDENS</small><button id="end-turn" class="primary full">TERMINAR TURNO</button><button id="medkit" class="secondary full">USAR KIT MÉDICO</button></div><div id="battle-log" class="battle-log">A equipa entrou na zona de operações.</div></div>
+      </div>
+      <button class="secondary full" id="retreat">ABORTAR OPERAÇÃO</button>
+    </section>
+
+    <section id="brief" class="screen">
+      <div class="section-head"><div><div class="eyebrow">CENTRO DE INTELIGÊNCIA // 05</div><h2>RELATÓRIO</h2></div><span class="tag">ULTRASSECRETO</span></div>
+      <div class="report"><h3>CONTACTO NÃO IDENTIFICADO</h3><p>Às 03:17 UTC, sensores de longo alcance detetaram múltiplas assinaturas atmosféricas. Os objetos não correspondem a qualquer tecnologia humana conhecida.</p><p>As primeiras unidades enviadas para investigar perderam contacto. A origem e as intenções da força invasora permanecem desconhecidas.</p><div class="report-stamp">OPERATION ZERO // 2089</div></div>
+      <button class="secondary full" data-go="command">← VOLTAR AO COMANDO</button>
+    </section>
+  </main>
+
+  <nav class="nav">
+    <button data-go="home"><span>⌂</span>INÍCIO</button>
+    <button data-go="command"><span>▦</span>COMANDO</button>
+    <button data-go="squad"><span>♟</span>EQUIPA</button>
+    <button data-go="missions"><span>◎</span>MISSÕES</button>
+  </nav>
+  <div id="modal" class="modal hidden"><div class="modal-card"><button class="close" id="close-modal">×</button><div id="modal-content"></div></div></div>
+  <script src="game.js"></script>
+</body>
+</html>
