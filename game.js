@@ -118,6 +118,7 @@ const defaults = {
 
 let state = load();
 let pendingReturnScreen = null;
+let selectedTrainOpIndex = 0;
 
 function load() {
   try {
@@ -244,31 +245,41 @@ function trainOpStat(opIndex, statIdx, fromAcademy = false) {
   return false;
 }
 
-function trainClassRole(roleName, statIdx) {
+function trainSelectedOperative(opIndex, statIdx) {
+  const idx = Number(opIndex);
+  if (Number.isNaN(idx) || !OPERATIVES[idx]) return;
+  const op = OPERATIVES[idx];
+  const prog = getOpProgress(idx);
+  const currentStats = getEffectiveStats(idx);
+
+  if (currentStats[statIdx] >= 99) {
+    logModal("ATRIBUTO NO MÁXIMO", `${op[0]} já atingiu o máximo (99) em ${STAT_NAMES[statIdx]}.`);
+    return;
+  }
+
+  if (prog.trainPts > 0) {
+    prog.trainPts -= 1;
+    prog.bonusStats[statIdx] = (prog.bonusStats[statIdx] || 0) + 1;
+    save();
+    renderBuildings();
+    renderRoster();
+    logModal("TREINO CONCLUÍDO", `${op[0]} usou 1 PT livre e ganhou +1 em <b>${STAT_NAMES[statIdx]}</b> (${getEffectiveStats(idx)[statIdx]}).`);
+    return;
+  }
+
   const academyBuilt = state.built.includes(6);
   const cost = academyBuilt ? 160 : 250;
   if (state.credits < cost) {
-    logModal("CRÉDITOS INSUFICIENTES", `Precisas de ${cost} créditos para treinar a classe ${roleName}.`);
+    logModal("CRÉDITOS INSUFICIENTES", `Precisas de ${cost} créditos para treinar ${op[0]}.`);
     return;
   }
 
-  const matchingIndices = OPERATIVES
-    .map((o, idx) => ({ o, idx }))
-    .filter(item => item.o[2] === roleName && getEffectiveStats(item.idx)[statIdx] < 99);
-
-  if (!matchingIndices.length) {
-    logModal("TREINO INDISPONÍVEL", `Nenhum operacional da classe ${roleName} pode subir ${STAT_NAMES[statIdx]}.`);
-    return;
-  }
-
-  const targetItem = matchingIndices.sort((a, b) => getEffectiveStats(a.idx)[statIdx] - getEffectiveStats(b.idx)[statIdx])[0];
-  const prog = getOpProgress(targetItem.idx);
   state.credits -= cost;
   prog.bonusStats[statIdx] = (prog.bonusStats[statIdx] || 0) + 1;
   save();
   renderBuildings();
   renderRoster();
-  logModal("TREINO DE CLASSE CONCLUÍDO", `${targetItem.o[0]} (${roleName}) ganhou +1 em <b>${STAT_NAMES[statIdx]}</b> (${getEffectiveStats(targetItem.idx)[statIdx]}).`);
+  logModal("TREINO CONCLUÍDO", `${op[0]} (${op[2]}) ganhou +1 em <b>${STAT_NAMES[statIdx]}</b> (${getEffectiveStats(idx)[statIdx]}).`);
 }
 
 function showOperator(i) {
@@ -350,41 +361,64 @@ function renderBuildings() {
 
   const academyBuilt = state.built.includes(6);
   const trainCost = academyBuilt ? 160 : 250;
+  if (!OPERATIVES[selectedTrainOpIndex]) selectedTrainOpIndex = 0;
+
+  const currentOp = OPERATIVES[selectedTrainOpIndex];
+  const currentProg = getOpProgress(selectedTrainOpIndex);
+  const currentStats = getEffectiveStats(selectedTrainOpIndex);
+  const profile = CLASS_TRAINING_PROFILES.find(
+    p => p.role === currentOp[2] || (currentOp[2] === "Batedor" && p.role === "Batedora")
+  ) || CLASS_TRAINING_PROFILES[0];
+
+  const focusName = STAT_NAMES[profile.focusStat];
+  const altName = STAT_NAMES[profile.altStat];
+  const ptHint = currentProg.trainPts > 0
+    ? `<span style="color:var(--lime)">${currentProg.trainPts} PT livre disponível (custo 0 cr)</span>`
+    : `Custo: ${trainCost} cr${academyBuilt ? " · desconto da Academia militar ativo" : ""}`;
+
+  const opOptionsHtml = OPERATIVES.map((o, idx) => {
+    const p = getOpProgress(idx);
+    const ptTag = p.trainPts > 0 ? ` [+${p.trainPts} PT]` : "";
+    return `<option value="${idx}" ${idx === selectedTrainOpIndex ? "selected" : ""}>${o[0]} · ${o[2]} (NV.${p.level})${ptTag}</option>`;
+  }).join("");
+
   const trainingBox = document.createElement("div");
   trainingBox.className = "building";
   trainingBox.style.flexDirection = "column";
   trainingBox.style.alignItems = "stretch";
   trainingBox.style.gap = "10px";
 
-  const uniqueRoles = [];
-  CLASS_TRAINING_PROFILES.forEach(p => {
-    const baseRole = p.role === "Batedor" ? "Batedora" : p.role;
-    if (!uniqueRoles.includes(baseRole)) uniqueRoles.push(baseRole);
-  });
-
-  const rowsHtml = uniqueRoles.map(role => {
-    const profile = CLASS_TRAINING_PROFILES.find(p => p.role === role) || CLASS_TRAINING_PROFILES[0];
-    const focusName = STAT_NAMES[profile.focusStat];
-    const altName = STAT_NAMES[profile.altStat];
-    const opsCount = OPERATIVES.filter(o => o[2] === role || (role === "Batedora" && o[2] === "Batedor")).length;
-    return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:1px solid rgba(255,255,255,.07)">
-      <div style="min-width:0;flex:1">
-        <b>${role}</b> <small>(${opsCount} operacionais)</small><br>
-        <small>${profile.label}</small>
+  trainingBox.innerHTML = `
+    <div>
+      <b>TREINO POR CLASSE — BASE MILITAR</b><br>
+      <small>${ptHint}</small>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.07)">
+      <label style="font-size:11px;color:var(--muted)">Seleciona o operacional:</label>
+      <select id="train-op-select" style="width:100%;padding:9px;background:#0e161d;color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:6px;font-size:12px">
+        ${opOptionsHtml}
+      </select>
+      <small style="color:var(--muted)">
+        Classe <b>${currentOp[2]}</b> (${profile.label}) · ${focusName}: <b>${currentStats[profile.focusStat]}</b> · ${altName}: <b>${currentStats[profile.altStat]}</b>
+      </small>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" id="train-focus-btn" style="flex:1;min-width:140px;padding:8px 10px;font-size:10px">+1 ${focusName} (${currentProg.trainPts > 0 ? "1 PT" : trainCost + " cr"})</button>
+        <button type="button" id="train-alt-btn" class="secondary" style="flex:1;min-width:140px;padding:8px 10px;font-size:10px">+1 ${altName} (${currentProg.trainPts > 0 ? "1 PT" : trainCost + " cr"})</button>
       </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button type="button" data-role-train="${role}" data-stat-idx="${profile.focusStat}" style="padding:7px 9px;font-size:9px">+1 ${focusName} (${trainCost}cr)</button>
-        <button type="button" data-role-train="${role}" data-stat-idx="${profile.altStat}" class="secondary" style="padding:7px 9px;font-size:9px">+1 ${altName} (${trainCost}cr)</button>
-      </div>
-    </div>`;
-  }).join("");
+    </div>
+  `;
 
-  trainingBox.innerHTML = `<div><b>TREINO POR CLASSE — BASE MILITAR</b><small>Treina operacionais por função (${trainCost} cr por treino${academyBuilt ? " · desconto da Academia militar ativo" : ""}).</small></div>${rowsHtml}`;
-  trainingBox.querySelectorAll("[data-role-train]").forEach(btn => {
-    btn.onclick = () => {
-      trainClassRole(btn.dataset.roleTrain, Number(btn.dataset.statIdx));
-    };
-  });
+  trainingBox.querySelector("#train-op-select").onchange = ev => {
+    selectedTrainOpIndex = Number(ev.target.value);
+    renderBuildings();
+  };
+  trainingBox.querySelector("#train-focus-btn").onclick = () => {
+    trainSelectedOperative(selectedTrainOpIndex, profile.focusStat);
+  };
+  trainingBox.querySelector("#train-alt-btn").onclick = () => {
+    trainSelectedOperative(selectedTrainOpIndex, profile.altStat);
+  };
+
   el.appendChild(trainingBox);
 }
 
@@ -401,7 +435,7 @@ function renderMissions() {
     d.querySelector("button").onclick = () => startMission(i);
     el.appendChild(d);
   });
-      }
+   }
 let battle = {
   units: [],
   enemies: [],
@@ -595,7 +629,7 @@ function startMission(i) {
   document.getElementById("battle-log").textContent = `Turno 1 · Secundário: ${m.secondaryLabel}. Escolhe mover, disparar, vigiar ou Hunker Down (-1 PA).`;
   go("tactical");
   renderBattle();
-    }
+  }
 function renderBattle() {
   const grid = document.getElementById("battle-grid");
   grid.innerHTML = "";
