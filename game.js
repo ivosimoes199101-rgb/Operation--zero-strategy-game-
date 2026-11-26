@@ -2170,6 +2170,227 @@ renderMissions();
         syncExpansionState();
         state.facilities.medProphylaxis = {};
         save();
+        (function initCommandCenterModule() {
+  if (!state.commandCenter || typeof state.commandCenter !== "object") {
+    state.commandCenter = {
+      built: false,
+      level: 0,
+      reconReady: false
+    };
+  }
+
+  function syncCommandCenter() {
+    if (!state.commandCenter || typeof state.commandCenter !== "object") {
+      state.commandCenter = { built: false, level: 0, reconReady: false };
+    }
+    state.commandCenter.built = Boolean(state.commandCenter.built);
+    state.commandCenter.level = Math.max(0, Math.min(2, Number(state.commandCenter.level) || 0));
+    state.commandCenter.reconReady = Boolean(state.commandCenter.reconReady);
+  }
+
+  function buildCommandCenter() {
+    syncCommandCenter();
+    if (state.commandCenter.built) {
+      logModal("JÁ CONSTRUÍDO", "O <b>Centro de Comando</b> já está operacional na base.");
+      return;
+    }
+    const costCr = 850;
+    const costMat = 18;
+    if (state.credits < costCr || state.materials < costMat) {
+      logModal("RECURSOS INSUFICIENTES", `Construir o Centro de Comando custa <b>${costCr} CR</b> e <b>${costMat} MAT</b>.`);
+      return;
+    }
+    state.credits -= costCr;
+    state.materials -= costMat;
+    state.commandCenter.built = true;
+    state.commandCenter.level = 1;
+    save();
+    renderResources();
+    renderBuildings();
+    logModal("CENTRO DE COMANDO ATIVO", "Instalação concluída no <b>Nível 1</b>. Reconhecimento e drones de extração desbloqueados.");
+  }
+
+  function upgradeCommandCenter() {
+    syncCommandCenter();
+    if (!state.commandCenter.built) {
+      buildCommandCenter();
+      return;
+    }
+    if (state.commandCenter.level >= 2) {
+      logModal("NÍVEL MÁXIMO", "O Centro de Comando já está no <b>Nível 2</b>.");
+      return;
+    }
+    const costCr = 950;
+    const costMat = 24;
+    if (state.credits < costCr || state.materials < costMat) {
+      logModal("RECURSOS INSUFICIENTES", `Melhorar para o Nível 2 custa <b>${costCr} CR</b> e <b>${costMat} MAT</b>.`);
+      return;
+    }
+    state.credits -= costCr;
+    state.materials -= costMat;
+    state.commandCenter.level = 2;
+    save();
+    renderResources();
+    renderBuildings();
+    logModal("CENTRO DE COMANDO MELHORADO", "Agora no <b>Nível 2</b>: maior rendimento de extração e apoio de reconhecimento.");
+  }
+
+  function runReconSweep() {
+    syncCommandCenter();
+    if (!state.commandCenter.built) {
+      logModal("CENTRO EM FALTA", "Constrói primeiro o <b>Centro de Comando</b>.");
+      return;
+    }
+    if (state.commandCenter.reconReady) {
+      logModal("RECONHECIMENTO PRONTO", "A varredura já está preparada para a próxima missão.");
+      return;
+    }
+    const costCr = 200;
+    if (state.credits < costCr) {
+      logModal("CRÉDITOS INSUFICIENTES", `A varredura de reconhecimento custa <b>${costCr} CR</b>.`);
+      return;
+    }
+    state.credits -= costCr;
+    state.commandCenter.reconReady = true;
+    save();
+    renderResources();
+    renderBuildings();
+    logModal("RECONHECIMENTO CONCLUÍDO", "Dados de setor carregados: <b>+15% de precisão</b> no Turno 1 da próxima missão.");
+  }
+
+  const origStartMission = typeof startMission === "function" ? startMission : null;
+  if (origStartMission) {
+    startMission = function(i) {
+      syncCommandCenter();
+      const hadRecon = state.commandCenter.reconReady;
+      origStartMission(i);
+      if (hadRecon && battle && !battle.finished) {
+        state.commandCenter.reconReady = false;
+        battle.commandReconTurn1 = true;
+        save();
+        renderBuildings();
+        if (typeof battleLog === "function") {
+          battleLog(`${document.getElementById("battle-log") ? document.getElementById("battle-log").textContent : ""} · Reconhecimento ativo (+15% precisão no Turno 1).`);
+        }
+      }
+    };
+  }
+
+  const origCalcHit = typeof calcHitChance === "function" ? calcHitChance : null;
+  if (origCalcHit) {
+    calcHitChance = function(unit, enemy, isOverwatch = false) {
+      let chance = origCalcHit(unit, enemy, isOverwatch);
+      if (battle && battle.commandReconTurn1 && battle.turn === 1) {
+        chance += 15;
+      }
+      return Math.max(5, Math.min(98, Math.round(chance)));
+    };
+  }
+
+  const origCheckWin = typeof checkWin === "function" ? checkWin : null;
+  if (origCheckWin) {
+    checkWin = function() {
+      syncCommandCenter();
+      const wasFinished = battle && battle.finished;
+      const allEnemiesDownBefore = battle && Array.isArray(battle.enemies) && battle.enemies.every(e => e.hp <= 0);
+      const creditsBefore = state.credits;
+      const matBefore = state.materials;
+
+      origCheckWin();
+
+      if (!wasFinished && battle && battle.finished && allEnemiesDownBefore && state.commandCenter.built) {
+        const lv = state.commandCenter.level || 1;
+        const extraCr = lv === 2 ? 180 : 90;
+        const extraMat = lv === 2 ? 6 : 3;
+        state.credits += extraCr;
+        state.materials += extraMat;
+
+        let alienBonus = 0;
+        if (lv >= 2 && Math.random() < 0.65) {
+          state.alien = (state.alien || 0) + 1;
+          alienBonus = 1;
+        }
+        save();
+        renderResources();
+        if (typeof renderBuildings === "function") renderBuildings();
+
+        const modalBody = document.getElementById("modal-body");
+        if (modalBody && state.credits > creditsBefore) {
+          const droneNote = alienBonus > 0 ? ` · <b>+1 Tec. Alienígena</b>` : "";
+          modalBody.innerHTML += `<br><small style="color:#6ef7ff">Centro de Comando (Nv.${lv}): +${extraCr} CR · +${extraMat} MAT${droneNote}</small>`;
+        } else if (state.materials > matBefore) {
+          renderResources();
+        }
+      }
+    };
+  }
+
+  function renderCommandCenterCard() {
+    syncCommandCenter();
+    const el = document.getElementById("buildings");
+    if (!el) return;
+
+    const existing = document.getElementById("oz-command-center-card");
+    if (existing) existing.remove();
+
+    const cc = state.commandCenter;
+    const card = document.createElement("div");
+    card.id = "oz-command-center-card";
+    card.className = "building";
+    card.style.flexDirection = "column";
+    card.style.alignItems = "stretch";
+    card.style.gap = "8px";
+    card.style.marginTop = "10px";
+
+    card.innerHTML = `
+      <div>
+        <b>CENTRO DE COMANDO · ${cc.built ? `NÍVEL ${cc.level}/2` : "POR CONSTRUIR"}</b><br>
+        <small style="color:var(--muted)">
+          Coordena reconhecimento pré-missão, bónus de extração e drones de apoio.
+          ${cc.reconReady ? `<span style="color:var(--lime)">· Reconhecimento pronto para Turno 1</span>` : ""}
+        </small>
+      </div>
+      ${!cc.built ? `
+        <button class="btn" id="cc-btn-build" style="width:100%">CONSTRUIR CENTRO DE COMANDO (850 CR / 18 MAT)</button>
+      ` : `
+        <button class="btn" id="cc-btn-recon" ${cc.reconReady ? "disabled" : ""} style="width:100%">
+          ${cc.reconReady ? "RECONHECIMENTO ATIVO PARA PRÓXIMA MISSÃO ✓" : "VARREDURA DE RECONHECIMENTO (200 CR · +15% PRECISÃO T1)"}
+        </button>
+        <button class="btn" id="cc-btn-upgrade" ${cc.level >= 2 ? "disabled" : ""} style="width:100%">
+          ${cc.level >= 2 ? "CENTRO DE COMANDO NO NÍVEL MÁXIMO (2/2)" : "MELHORAR PARA NÍVEL 2 (950 CR / 24 MAT)"}
+        </button>
+      `}
+    `;
+
+    const buildBtn = card.querySelector("#cc-btn-build");
+    if (buildBtn) buildBtn.onclick = buildCommandCenter;
+
+    const reconBtn = card.querySelector("#cc-btn-recon");
+    if (reconBtn) reconBtn.onclick = runReconSweep;
+
+    const upgBtn = card.querySelector("#cc-btn-upgrade");
+    if (upgBtn) upgBtn.onclick = upgradeCommandCenter;
+
+    const resetBtn = Array.from(el.querySelectorAll("button")).find(b => b.textContent.includes("RESET PROGRESSO"));
+    if (resetBtn) {
+      el.insertBefore(card, resetBtn);
+    } else {
+      el.appendChild(card);
+    }
+  }
+
+  const origRenderBld = typeof renderBuildings === "function" ? renderBuildings : null;
+  if (origRenderBld) {
+    renderBuildings = function() {
+      origRenderBld();
+      renderCommandCenterCard();
+    };
+  }
+
+  if (typeof renderBuildings === "function") {
+    renderBuildings();
+  }
+})();
         if (typeof renderBuildings === "function") renderBuildings();
       }
     };
