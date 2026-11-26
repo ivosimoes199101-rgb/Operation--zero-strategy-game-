@@ -1,7 +1,7 @@
 // ============================================================================
 // OPERATION ZERO — TACTICAL COMMAND SYSTEM (game.js)
 // Compatível com index.html, 12 Operacionais, Base ZERO, Combate 8x6,
-// Campanha de 8 Missões (4 Capítulos), Inimigos Xeno, Granadas e 4 Finais.
+// Campanha de 12 Missões (4 Capítulos), Inimigos Xeno, Granadas e 4 Finais.
 // ============================================================================
 
 const STORAGE_KEY = "operation_zero_save_v1";
@@ -244,9 +244,31 @@ const CAMPAIGN_MISSIONS = [
     }
   },
   {
-    id: "m05_the_hive",
-    chapter: "III — A Verdade",
+    id: "m05_orbital_echo",
+    chapter: "II — Zona de Quarentena",
     number: 5,
+    title: "Eco Orbital",
+    type: "Interceção / Recuperação",
+    objective: "Intercetar o sinal da baliza caída e neutralizar a patrulha de contenção.",
+    secondaryObjective: "Impedir a transmissão completa das coordenadas.",
+    enemies: ["scout", "stalker", "psycher", "scout"],
+    rewards: { credits: 520, materials: 32, alien: 2, research: 18, xp: 52 },
+    choice: {
+      prompt: "A baliza contém telemetria orbital valiosa mas ativa um farol de alerta.",
+      optionA: {
+        label: "Descarregar telemetria completa (+18 Investigação, +10 Ameaça)",
+        effects: { research: 18, threat: 10, alien: 1 }
+      },
+      optionB: {
+        label: "Cortar o sinal e recolher apenas o núcleo (+8 Confiança, -5 Ameaça)",
+        effects: { trust: 8, threat: -5, resources: 8 }
+      }
+    }
+  },
+  {
+    id: "m06_the_hive",
+    chapter: "III — A Verdade",
+    number: 6,
     title: "A Colmeia",
     type: "Sabotagem / Eliminação",
     objective: "Destruir o núcleo biológico e eliminar a guarda da colmeia.",
@@ -266,9 +288,9 @@ const CAMPAIGN_MISSIONS = [
     }
   },
   {
-    id: "m06_ghost_protocol",
+    id: "m07_ghost_protocol",
     chapter: "III — A Verdade",
-    number: 6,
+    number: 7,
     title: "Protocolo Fantasma",
     type: "Infiltração / Resgate",
     objective: "Resgatar o especialista ligado ao Projeto ZERO e neutralizar o setor.",
@@ -288,9 +310,31 @@ const CAMPAIGN_MISSIONS = [
     }
   },
   {
-    id: "m07_last_stand",
+    id: "m08_sunken_citadel",
+    chapter: "III — A Verdade",
+    number: 8,
+    title: "Cidadela Submersa",
+    type: "Infiltração / Recuperação",
+    objective: "Infiltrar a instalação subterrânea e extrair os registos do Projeto ZERO.",
+    secondaryObjective: "Neutralizar as forças pesadas sem perder a rota de extração.",
+    enemies: ["stalker", "psycher", "brute", "brute"],
+    rewards: { credits: 700, materials: 45, alien: 3, research: 22, xp: 65 },
+    choice: {
+      prompt: "Nos arquivos submersos, encontras o registo original da chegada em 2089.",
+      optionA: {
+        label: "Tornar a verdade pública à coligação (+14 Confiança, +12 Investigação)",
+        effects: { trust: 14, research: 12, threat: 4 }
+      },
+      optionB: {
+        label: "Selar o arquivo e reforçar a defesa militar (+14 Recursos, -6 Ameaça)",
+        effects: { resources: 14, threat: -6, trust: -5 }
+      }
+    }
+  },
+  {
+    id: "m09_last_stand",
     chapter: "IV — Operation Zero",
-    number: 7,
+    number: 9,
     title: "Última Defesa",
     type: "Defesa Crítica",
     objective: "Resistir ao assalto coordenado e eliminar os comandantes de campo.",
@@ -310,15 +354,59 @@ const CAMPAIGN_MISSIONS = [
     }
   },
   {
-    id: "m08_operation_zero",
+    id: "m10_eclipse_operation",
     chapter: "IV — Operation Zero",
-    number: 8,
+    number: 10,
+    title: "Operação Eclipse",
+    type: "Sabotagem / Ataque",
+    objective: "Cortar a rede energética das defesas inimigas e abrir passagem ao núcleo.",
+    secondaryObjective: "Eliminação cirúrgica das unidades de guarda.",
+    enemies: ["psycher", "brute", "stalker", "psycher"],
+    rewards: { credits: 820, materials: 55, alien: 4, research: 18, xp: 75 },
+    choice: {
+      prompt: "Ao desligar a rede principal, podes redirecionar energia para a equipa ou desativar sensores.",
+      optionA: {
+        label: "Desativar sensores de alerta (-10 Ameaça, +10 Investigação)",
+        effects: { threat: -10, research: 10 }
+      },
+      optionB: {
+        label: "Sobrecarregar linhas para enfraquecer a guarda (+10 Confiança, +10 Recursos)",
+        effects: { trust: 10, resources: 10, threat: 4 }
+      }
+    }
+  },
+  {
+    id: "m11_vanguard_breach",
+    chapter: "IV — Operation Zero",
+    number: 11,
+    title: "Rompimento da Vanguarda",
+    type: "Assalto / Contenção",
+    objective: "Romper a linha defensiva avançada antes da câmara do comando supremo.",
+    secondaryObjective: "Concluir o assalto sem perder operacionais.",
+    enemies: ["brute", "psycher", "stalker", "brute"],
+    rewards: { credits: 900, materials: 58, alien: 4, research: 20, xp: 82 },
+    choice: {
+      prompt: "A vanguarda alienígena tenta recuar para reforçar o núcleo central.",
+      optionA: {
+        label: "Avançar sem tréguas para cortar a retirada (+12 Confiança, +6 Ameaça)",
+        effects: { trust: 12, threat: 6, resources: -8 }
+      },
+      optionB: {
+        label: "Reagrupar e reabastecer antes do assalto final (+15 Recursos, -6 Ameaça)",
+        effects: { resources: 15, threat: -6 }
+      }
+    }
+  },
+  {
+    id: "m12_operation_zero",
+    chapter: "IV — Operation Zero",
+    number: 12,
     title: "Operation Zero",
     type: "Assalto Final / Boss",
     objective: "Derrotar o Overlord Omega e a guarda de elite para decidir o destino da Terra.",
     secondaryObjective: "Manter todos os operacionais ativos até ao confronto final.",
     enemies: ["brute", "psycher", "overlord"],
-    rewards: { credits: 1000, materials: 60, alien: 5, research: 25, xp: 90 },
+    rewards: { credits: 1200, materials: 70, alien: 6, research: 25, xp: 100 },
     choice: {
       prompt: "Núcleo exposto e Overlord neutralizado: qual é a diretiva final da ZERO?",
       optionA: {
@@ -414,6 +502,9 @@ function loadState() {
     if (!raw) return createDefaultState();
     const parsed = JSON.parse(raw);
     const def = createDefaultState();
+    const safeIdx = typeof parsed.currentMissionIndex === "number"
+      ? Math.max(0, Math.min(CAMPAIGN_MISSIONS.length - 1, parsed.currentMissionIndex))
+      : 0;
     return {
       ...def,
       ...parsed,
@@ -422,7 +513,7 @@ function loadState() {
       buildings: Array.isArray(parsed.buildings) && parsed.buildings.length ? parsed.buildings : def.buildings,
       metrics: { ...def.metrics, ...(parsed.metrics || {}) },
       completedMissions: Array.isArray(parsed.completedMissions) ? parsed.completedMissions : [],
-      currentMissionIndex: typeof parsed.currentMissionIndex === "number" ? parsed.currentMissionIndex : 0
+      currentMissionIndex: safeIdx
     };
   } catch (_) {
     return createDefaultState();
@@ -640,8 +731,12 @@ function renderIntelligence() {
 }
 
 // ---------------------------------------------------------------------------
-// 5. RENDERIZAÇÃO DAS 8 MISSÕES DA CAMPANHA
+// 5. RENDERIZAÇÃO DAS 12 MISSÕES DA CAMPANHA
 // ---------------------------------------------------------------------------
+
+function formatMissionNumber(num) {
+  return num < 10 ? `0${num}` : `${num}`;
+}
 
 function renderCampaignMissions() {
   const listEl = document.getElementById("mission-list");
@@ -668,10 +763,11 @@ function renderCampaignMissions() {
       .join(", ");
 
     const statusBadge = isCompleted ? "CONCLUÍDA" : isUnlocked ? "DISPONÍVEL" : "BLOQUEADA";
+    const numLabel = formatMissionNumber(m.number);
 
     card.innerHTML = `
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
-        <b>0${m.number}. ${m.title.toUpperCase()}</b>
+        <b>${numLabel}. ${m.title.toUpperCase()}</b>
         <small>${m.chapter} · ${statusBadge}</small>
       </div>
       <div style="margin:6px 0;font-size:0.9em;">${m.objective}</div>
@@ -707,7 +803,6 @@ const GRID_H = 6;
 function createMissionMap(missionIndex) {
   const grid = Array.from({ length: GRID_H }, () => Array(GRID_W).fill(0));
 
-  // Coberturas e obstáculos variados conforme o capítulo
   grid[1][3] = 1;
   grid[2][3] = 2;
   grid[3][3] = 1;
@@ -722,9 +817,13 @@ function createMissionMap(missionIndex) {
     grid[0][4] = 3;
     grid[5][4] = 3;
   }
-  if (missionIndex >= 4) {
+  if (missionIndex >= 5) {
     grid[2][4] = 2;
     grid[3][4] = 2;
+  }
+  if (missionIndex >= 8) {
+    grid[1][4] = 1;
+    grid[4][4] = 1;
   }
 
   return grid;
@@ -788,7 +887,7 @@ function startMission(mission, missionIndex = 0) {
   const enemies = mission.enemies.map((archId, idx) => {
     const arch = ENEMY_ARCHETYPES[archId] || ENEMY_ARCHETYPES.scout;
     const pos = enemyPositions[idx] || [7, idx % GRID_H];
-    const scaleFactor = 1 + missionIndex * 0.06;
+    const scaleFactor = 1 + missionIndex * 0.05;
     const maxHp = Math.round(arch.maxHp * scaleFactor);
     return {
       id: `en-${mission.id}-${idx}`,
@@ -800,7 +899,7 @@ function startMission(mission, missionIndex = 0) {
       y: pos[1],
       hp: maxHp,
       maxHp,
-      damage: Math.round(arch.damage * (1 + missionIndex * 0.04)),
+      damage: Math.round(arch.damage * (1 + missionIndex * 0.035)),
       armor: arch.armor,
       aim: arch.aim,
       moveRange: arch.moveRange,
@@ -817,14 +916,14 @@ function startMission(mission, missionIndex = 0) {
     missionIndex,
     turn: 1,
     phase: "player",
-    mode: "normal", // "normal" | "frag" | "smoke"
+    mode: "normal",
     grid: createMissionMap(missionIndex),
-    smokes: [], // { x, y, turns }
+    smokes: [],
     units,
     enemies,
     selectedUnitId: units[0] ? units[0].id : null,
     selectedTargetId: enemies[0] ? enemies[0].id : null,
-    log: `Missão 0${mission.number}: ${mission.title} — ${mission.objective}`
+    log: `Missão ${formatMissionNumber(mission.number)}: ${mission.title} — ${mission.objective}`
   };
 
   goToScreen("tactical");
@@ -921,7 +1020,7 @@ function renderBattle() {
   ensureTacticalExtras();
 
   const titleEl = document.getElementById("battle-title");
-  if (titleEl) titleEl.textContent = `0${b.mission.number}. ${b.mission.title.toUpperCase()}`;
+  if (titleEl) titleEl.textContent = `${formatMissionNumber(b.mission.number)}. ${b.mission.title.toUpperCase()}`;
 
   const infoSpan = document.querySelector("#tactical .battle-info span:first-child");
   if (infoSpan) infoSpan.textContent = `OBJETIVO: ${b.mission.objective.toUpperCase()}`;
@@ -1276,7 +1375,6 @@ function endPlayerTurn() {
     const aliveUnits = b.units.filter((u) => u.hp > 0);
     if (!aliveUnits.length) return;
 
-    // Escolhe alvo mais próximo
     aliveUnits.sort((a, c) => (Math.abs(a.x - en.x) + Math.abs(a.y - en.y)) - (Math.abs(c.x - en.x) + Math.abs(c.y - en.y)));
     const target = aliveUnits[0];
     const dist = Math.abs(en.x - target.x) + Math.abs(en.y - target.y);
@@ -1289,7 +1387,6 @@ function endPlayerTurn() {
       }
     }
 
-    // Verifica reação de vigilância (Overwatch)
     const watcher = aliveUnits.find((u) => u.overwatch && u.ammo > 0);
     if (watcher) {
       watcher.overwatch = false;
@@ -1300,7 +1397,6 @@ function endPlayerTurn() {
       if (en.hp <= 0) return;
     }
 
-    // Disparo alienígena
     const cover = getTileCoverAt(b, target.x, target.y);
     let eChance = (en.aim || 65) - Math.max(0, Math.abs(en.x - target.x) + Math.abs(en.y - target.y) - 2) * 4;
     if (cover === 1) eChance -= target.hunker ? 40 : 25;
@@ -1320,7 +1416,6 @@ function endPlayerTurn() {
     }
   });
 
-  // Atualiza duração do fumo
   b.smokes = (b.smokes || [])
     .map((s) => ({ ...s, turns: s.turns - 1 }))
     .filter((s) => s.turns > 0);
@@ -1367,7 +1462,6 @@ function checkBattleOutcome() {
       state.currentMissionIndex = missionIndex + 1;
     }
 
-    // Atualiza HP e XP dos operacionais no roster
     b.units.forEach((bu) => {
       const ro = state.roster.find((r) => r.id === bu.id);
       if (ro) {
@@ -1411,6 +1505,8 @@ function checkBattleOutcome() {
 
 function presentMissionChoiceModal(mission, missionIndex) {
   const ch = mission.choice;
+  const numLabel = formatMissionNumber(mission.number);
+
   if (!ch) {
     openModal(`
       <h3>MISSÃO CONCLUÍDA — ${mission.title.toUpperCase()}</h3>
@@ -1433,7 +1529,7 @@ function presentMissionChoiceModal(mission, missionIndex) {
   }
 
   openModal(`
-    <h3>VITÓRIA — 0${mission.number}. ${mission.title.toUpperCase()}</h3>
+    <h3>VITÓRIA — ${numLabel}. ${mission.title.toUpperCase()}</h3>
     <p>Recompensas: +${mission.rewards.credits} Créditos · +${mission.rewards.materials} Materiais · +${mission.rewards.alien || 0} Tec. Alienígena</p>
     <hr style="border-color:rgba(255,255,255,0.12);margin:10px 0;">
     <p><b>DECISÃO ESTRATÉGICA:</b> ${ch.prompt}</p>
