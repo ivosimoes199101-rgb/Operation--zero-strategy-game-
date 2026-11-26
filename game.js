@@ -1135,6 +1135,21 @@ function renderFloatingUnitOrders(battle, selUnit, gridEl) {
   });
 }
 
+function ensureEndTurnVisible(battle) {
+  const endTurnBtn = document.getElementById("end-turn");
+  const battleSide = document.querySelector("#tactical .battle-side");
+  if (!endTurnBtn || !battleSide) return;
+
+  if (endTurnBtn.parentElement !== battleSide) {
+    endTurnBtn.style.marginTop = "8px";
+    battleSide.appendChild(endTurnBtn);
+  }
+
+  const isPlayerTurn = Boolean(battle && battle.phase === "player");
+  endTurnBtn.style.display = "";
+  endTurnBtn.disabled = !isPlayerTurn;
+}
+
 function renderBattle() {
   const b = state.battle;
   if (!b) return;
@@ -1243,6 +1258,7 @@ function renderBattle() {
   if (ordersPanel) {
     ordersPanel.style.display = canShowOrders ? "" : "none";
   }
+  ensureEndTurnVisible(b);
 
   if (selUnit) {
     setText("selected-unit", `${selUnit.name} (${selUnit.role})`);
