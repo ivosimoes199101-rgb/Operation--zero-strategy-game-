@@ -182,8 +182,8 @@ function renderMissions() {
     d.querySelector("button").onclick = () => startMission(i);
     el.appendChild(d);
   });
-}
-let battle = {
+               }
+ let battle = {
   units: [],
   enemies: [],
   selected: 0,
@@ -256,6 +256,14 @@ function getCoverPenalty(tx, ty, ax, ay) {
   return bestPenalty;
 }
 
+function isFlanked(tx, ty, ax, ay) {
+  const covPen = getCoverPenalty(tx, ty, ax, ay);
+  if (covPen > 0) return false;
+  return [[1, 0], [-1, 0], [0, 1], [0, -1]].some(
+    ([dx, dy]) => Boolean(getCoverAt(tx + dx, ty + dy))
+  );
+}
+
 function calcHitChance(unit, enemy, isOverwatch = false) {
   if (!unit || !enemy || enemy.hp <= 0 || unit.hp <= 0) return 0;
   if (!hasLineOfSight(unit.x, unit.y, enemy.x, enemy.y)) return 0;
@@ -265,8 +273,47 @@ function calcHitChance(unit, enemy, isOverwatch = false) {
   const base = stats[0] * 0.45 + stats[1] * 0.55;
   const rangeLoss = Math.abs(dist - wpn.optRange) * 6;
   const coverLoss = getCoverPenalty(enemy.x, enemy.y, unit.x, unit.y);
+  const flankBonus = coverLoss === 0 && isFlanked(enemy.x, enemy.y, unit.x, unit.y) ? 12 : 0;
   const reactionLoss = isOverwatch ? 10 : 0;
-  return Math.max(5, Math.min(95, Math.round(base - rangeLoss - coverLoss - reactionLoss)));
+  return Math.max(5, Math.min(98, Math.round(base - rangeLoss - coverLoss + flankBonus - reactionLoss)));
+}
+
+function calcCritChance(unit, enemy, isOverwatch = false) {
+  if (!unit || !enemy) return 0;
+  const flanked = isFlanked(enemy.x, enemy.y, unit.x, unit.y);
+  const baseCrit = flanked ? 30 : 8;
+  return isOverwatch ? Math.max(0, baseCrit - 5) : baseCrit;
+}
+
+function applyShotDamage(attackerUnit, enemy, chance, isOverwatch, logs = null) {
+  const wpn = getWeapon(attackerUnit.id);
+  const roll = Math.random() * 100;
+  const opName = OPERATIVES[attackerUnit.id][0];
+  const prefix = isOverwatch ? "VIGILÂNCIA: " : "";
+
+  if (roll <= chance) {
+    const critChance = calcCritChance(attackerUnit, enemy, isOverwatch);
+    const isCrit = Math.random() * 100 <= critChance;
+    const finalDmg = isCrit ? Math.round(wpn.dmg * 1.5) : wpn.dmg;
+    enemy.hp = Math.max(0, enemy.hp - finalDmg);
+    const msg = `${prefix}${opName} acertou em ${enemy.name} (${chance}%)${isCrit ? " [CRÍTICO]" : ""}: -${finalDmg} HP!`;
+    if (logs) logs.push(msg);
+    else battleLog(msg);
+
+    if (enemy.hp === 0) {
+      const downMsg = `${enemy.name} neutralizado!`;
+      if (logs) logs.push(downMsg);
+      else {
+        battleLog(downMsg);
+        const nextAlive = battle.enemies.findIndex(e => e.hp > 0);
+        if (nextAlive >= 0) battle.targetEnemy = nextAlive;
+      }
+    }
+  } else {
+    const missMsg = `${prefix}${opName} falhou contra ${enemy.name} (${chance}%).`;
+    if (logs) logs.push(missMsg);
+    else battleLog(missMsg);
+  }
 }
 
 function canMoveTo(unit, x, y) {
@@ -367,9 +414,10 @@ function renderBattle() {
   if (enemy && enemy.hp > 0 && unit && unit.hp > 0) {
     const chance = calcHitChance(unit, enemy, false);
     const covPen = getCoverPenalty(enemy.x, enemy.y, unit.x, unit.y);
+    const flanked = isFlanked(enemy.x, enemy.y, unit.x, unit.y);
     document.getElementById("target-info").textContent = `${enemy.name} (${enemy.hp} HP)`;
     document.getElementById("hit-chance").textContent = chance > 0
-      ? `CHANCE: ${chance}%${covPen ? ` (-${covPen}% COB)` : ""}`
+      ? `CHANCE: ${chance}%${covPen ? ` (-${covPen}% COB)` : flanked ? " [FLANCO]" : ""}`
       : "SEM LINHA DE VISÃO";
     fireBtn.disabled = battle.finished || unit.ap < 1 || unit.ammo <= 0 || chance <= 0;
   } else {
@@ -431,21 +479,7 @@ document.getElementById("fire-btn").onclick = () => {
 
   unit.ap = Math.max(0, unit.ap - 1);
   unit.ammo = Math.max(0, unit.ammo - 1);
-  const wpn = getWeapon(unit.id);
-  const roll = Math.random() * 100;
-
-  if (roll <= chance) {
-    enemy.hp = Math.max(0, enemy.hp - wpn.dmg);
-    battleLog(`Acertou em ${enemy.name} (${chance}%) com ${wpn.name}: -${wpn.dmg} HP!`);
-    if (enemy.hp === 0) {
-      battleLog(`${enemy.name} neutralizado!`);
-      const nextAlive = battle.enemies.findIndex(e => e.hp > 0);
-      if (nextAlive >= 0) battle.targetEnemy = nextAlive;
-    }
-  } else {
-    battleLog(`Disparo falhou contra ${enemy.name} (${chance}%).`);
-  }
-
+  applyShotDamage(unit, enemy, chance, false, null);
   renderBattle();
   checkWin();
 };
@@ -492,19 +526,8 @@ function triggerOverwatchForEnemyMove(enemy, logs) {
     u.overwatch = false;
     u.ammo = Math.max(0, u.ammo - 1);
     const chance = calcHitChance(u, enemy, true);
-    const wpn = getWeapon(u.id);
-    const opName = OPERATIVES[u.id][0];
-
-    if (Math.random() * 100 <= chance) {
-      enemy.hp = Math.max(0, enemy.hp - wpn.dmg);
-      logs.push(`VIGILÂNCIA: ${opName} acertou em ${enemy.name} em movimento (${chance}%): -${wpn.dmg} HP!`);
-      if (enemy.hp <= 0) {
-        logs.push(`${enemy.name} abatido em vigilância!`);
-        break;
-      }
-    } else {
-      logs.push(`VIGILÂNCIA: ${opName} disparou contra ${enemy.name} em movimento (${chance}%) e falhou.`);
-    }
+    applyShotDamage(u, enemy, chance, true, logs);
+    if (enemy.hp <= 0) break;
   }
 }
 
