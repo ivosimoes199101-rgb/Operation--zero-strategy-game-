@@ -2391,6 +2391,126 @@ renderMissions();
     renderBuildings();
   }
 })();
+        (function forceShowCommandCenter() {
+  function ensureCommandCenterVisible() {
+    const container = document.getElementById("buildings");
+    if (!container) return;
+
+    if (typeof state === "object" && state && !state.commandCenter) {
+      state.commandCenter = { built: false, level: 0, reconReady: false };
+    }
+
+    let card = document.getElementById("oz-command-center-card");
+    if (!card) {
+      card = document.createElement("div");
+      card.id = "oz-command-center-card";
+      card.className = "building";
+      card.style.flexDirection = "column";
+      card.style.alignItems = "stretch";
+      card.style.gap = "8px";
+      card.style.marginTop = "10px";
+      card.style.border = "1px solid var(--lime)";
+    }
+
+    const cc = (typeof state === "object" && state && state.commandCenter)
+      ? state.commandCenter
+      : { built: false, level: 0, reconReady: false };
+
+    card.innerHTML = `
+      <div>
+        <b>CENTRO DE COMANDO · ${cc.built ? `NÍVEL ${cc.level || 1}/2` : "POR CONSTRUIR"}</b><br>
+        <small style="color:var(--muted)">
+          Logística de missões, reconhecimento (+15% precisão no Turno 1) e extração de recursos.
+        </small>
+      </div>
+      ${!cc.built ? `
+        <button type="button" class="btn" id="cc-force-build" style="width:100%">
+          CONSTRUIR CENTRO DE COMANDO (850 CR / 18 MAT)
+        </button>
+      ` : `
+        <button type="button" class="btn" id="cc-force-recon" ${cc.reconReady ? "disabled" : ""} style="width:100%">
+          ${cc.reconReady ? "RECONHECIMENTO ATIVO ✓" : "VARREDURA DE RECONHECIMENTO (200 CR)"}
+        </button>
+        <button type="button" class="btn" id="cc-force-upg" ${(cc.level || 1) >= 2 ? "disabled" : ""} style="width:100%">
+          ${(cc.level || 1) >= 2 ? "CENTRO DE COMANDO NÍVEL MÁXIMO (2/2)" : "MELHORAR PARA NÍVEL 2 (950 CR / 24 MAT)"}
+        </button>
+      `}
+    `;
+
+    const resetBtn = Array.from(container.querySelectorAll("button")).find(b =>
+      b.textContent && b.textContent.toUpperCase().includes("RESET")
+    );
+    if (resetBtn && resetBtn.parentElement === container) {
+      container.insertBefore(card, resetBtn);
+    } else if (card.parentElement !== container) {
+      container.appendChild(card);
+    }
+
+    const buildBtn = card.querySelector("#cc-force-build");
+    if (buildBtn) {
+      buildBtn.onclick = () => {
+        if (state.credits < 850 || state.materials < 18) {
+          if (typeof logModal === "function") {
+            logModal("RECURSOS INSUFICIENTES", "Precisas de <b>850 CR</b> e <b>18 MAT</b>.");
+          }
+          return;
+        }
+        state.credits -= 850;
+        state.materials -= 18;
+        cc.built = true;
+        cc.level = 1;
+        if (typeof save === "function") save();
+        if (typeof renderResources === "function") renderResources();
+        ensureCommandCenterVisible();
+      };
+    }
+
+    const reconBtn = card.querySelector("#cc-force-recon");
+    if (reconBtn && !cc.reconReady) {
+      reconBtn.onclick = () => {
+        if (state.credits < 200) {
+          if (typeof logModal === "function") {
+            logModal("CRÉDITOS INSUFICIENTES", "Precisas de <b>200 CR</b>.");
+          }
+          return;
+        }
+        state.credits -= 200;
+        cc.reconReady = true;
+        if (typeof save === "function") save();
+        if (typeof renderResources === "function") renderResources();
+        ensureCommandCenterVisible();
+      };
+    }
+
+    const upgBtn = card.querySelector("#cc-force-upg");
+    if (upgBtn && (cc.level || 1) < 2) {
+      upgBtn.onclick = () => {
+        if (state.credits < 950 || state.materials < 24) {
+          if (typeof logModal === "function") {
+            logModal("RECURSOS INSUFICIENTES", "Precisas de <b>950 CR</b> e <b>24 MAT</b>.");
+          }
+          return;
+        }
+        state.credits -= 950;
+        state.materials -= 24;
+        cc.level = 2;
+        if (typeof save === "function") save();
+        if (typeof renderResources === "function") renderResources();
+        ensureCommandCenterVisible();
+      };
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", ensureCommandCenterVisible);
+  document.addEventListener("click", ev => {
+    const navBtn = ev.target && ev.target.closest ? ev.target.closest('[data-go="base"]') : null;
+    if (navBtn) {
+      setTimeout(ensureCommandCenterVisible, 30);
+    }
+  });
+  setInterval(ensureCommandCenterVisible, 600);
+  ensureCommandCenterVisible();
+})();
         if (typeof renderBuildings === "function") renderBuildings();
       }
     };
