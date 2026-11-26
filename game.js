@@ -194,7 +194,7 @@ function resolveScreenElement(screenName) {
     roster: ["roster", "equipa", "squad", "team", "operacionais"],
     base: ["base", "hq", "quartel"],
     missions: ["missions", "missoes", "missões", "ops"],
-    battle: ["battle", "combat", "combate", "mission-screen"]
+    battle: ["battle", "screen-battle", "combat", "combate", "mission-screen"]
   };
   const candidates = aliases[screenName] || [screenName];
   for (const id of candidates) {
@@ -204,7 +204,17 @@ function resolveScreenElement(screenName) {
   return null;
 }
 
+function hideModalImmediately() {
+  const modal = document.getElementById("modal");
+  if (modal) {
+    modal.classList.add("hidden");
+    modal.style.display = "none";
+  }
+}
+
 function go(screenName) {
+  hideModalImmediately();
+
   document.querySelectorAll(".screen").forEach(sec => {
     sec.classList.remove("active");
     sec.style.display = "none";
@@ -216,6 +226,8 @@ function go(screenName) {
     target.style.display = "block";
     target.style.opacity = "1";
     target.style.visibility = "visible";
+    target.style.position = "relative";
+    target.style.zIndex = "5";
   }
 
   if (screenName === "roster" || screenName === "equipa") renderRoster();
@@ -262,11 +274,7 @@ function logModal(title, htmlMessage, returnScreen = null) {
 }
 
 function closeModal() {
-  const modal = document.getElementById("modal");
-  if (modal) {
-    modal.classList.add("hidden");
-    modal.style.display = "none";
-  }
+  hideModalImmediately();
   if (modalReturnScreen) {
     const dest = modalReturnScreen;
     modalReturnScreen = null;
@@ -1388,7 +1396,6 @@ function ensureBattleElements(sec) {
     if (!statusEl) {
       statusEl = document.createElement("div");
       statusEl.id = "battle-status";
-      statusEl.style.cssText = "padding:8px 10px;margin-bottom:8px;border:1px solid rgba(255,255,255,.16);border-radius:6px;background:#0e161d;color:#f2f7fa;font-size:12px";
       sec.appendChild(statusEl);
     }
     if (!gridEl) {
@@ -1399,24 +1406,26 @@ function ensureBattleElements(sec) {
     if (!actEl) {
       actEl = document.createElement("div");
       actEl.id = "battle-actions";
-      actEl.style.cssText = "display:flex;flex-wrap:wrap;gap:6px;margin-top:10px";
       sec.appendChild(actEl);
     }
     if (!logEl) {
       logEl = document.createElement("div");
       logEl.id = "battle-log";
-      logEl.style.cssText = "margin-top:8px;padding:8px 10px;border:1px solid rgba(255,255,255,.14);border-radius:6px;background:#091016;color:#cbd8e2;font-size:12px";
       sec.appendChild(logEl);
     }
   }
 
+  if (statusEl) {
+    statusEl.style.cssText = "display:block;padding:8px 10px;margin-bottom:8px;border:1px solid rgba(255,255,255,.16);border-radius:6px;background:#0e161d;color:#f2f7fa;font-size:12px";
+  }
   if (gridEl) {
-    gridEl.style.display = "grid";
-    gridEl.style.gridTemplateColumns = "repeat(8, minmax(0, 1fr))";
-    gridEl.style.gap = "4px";
-    gridEl.style.background = "#091016";
-    gridEl.style.padding = "6px";
-    gridEl.style.borderRadius = "8px";
+    gridEl.style.cssText = "display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px;background:#091016;padding:6px;border-radius:8px;width:100%";
+  }
+  if (actEl) {
+    actEl.style.cssText = "display:flex;flex-wrap:wrap;gap:6px;margin-top:10px";
+  }
+  if (logEl) {
+    logEl.style.cssText = "display:block;margin-top:8px;padding:8px 10px;border:1px solid rgba(255,255,255,.14);border-radius:6px;background:#091016;color:#cbd8e2;font-size:12px";
   }
 
   return { statusEl, gridEl, actEl, logEl };
@@ -1976,6 +1985,7 @@ function checkWin() {
 }
 
 function initOperationZero() {
+  hideModalImmediately();
   bindNavigation();
   renderResources();
   renderRoster();
