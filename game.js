@@ -182,8 +182,8 @@ function renderMissions() {
     d.querySelector("button").onclick = () => startMission(i);
     el.appendChild(d);
   });
-               }
- let battle = {
+              }
+let battle = {
   units: [],
   enemies: [],
   selected: 0,
@@ -340,7 +340,8 @@ function startMission(i) {
         ap: 2,
         ammo: wpn.mag,
         maxAmmo: wpn.mag,
-        overwatch: false
+        overwatch: false,
+        hunker: false
       };
     }),
     enemies: [
@@ -384,6 +385,7 @@ function renderBattle() {
         tile.textContent = "♟";
         if (uIdx === battle.selected) tile.classList.add("selected");
         if (battle.units[uIdx].overwatch) tile.classList.add("overwatch");
+        if (battle.units[uIdx].hunker) tile.classList.add("hunker");
       } else if (eIdx >= 0) {
         tile.textContent = "◆";
         tile.classList.add("enemy");
@@ -398,17 +400,21 @@ function renderBattle() {
   }
 
   if (unit) {
-    const vigLabel = unit.overwatch ? " · VIGILÂNCIA" : "";
+    const flags = [];
+    if (unit.overwatch) flags.push("VIGILÂNCIA");
+    if (unit.hunker) flags.push("HUNKER");
+    const statusSuffix = flags.length ? " · " + flags.join(" + ") : "";
     document.getElementById("selected-unit").textContent = OPERATIVES[unit.id][0].toUpperCase();
     document.getElementById("unit-hp").textContent = unit.hp + " HP";
     document.getElementById("unit-ap").textContent = unit.ap + " PA";
-    document.getElementById("unit-ammo").textContent = unit.ammo + "/" + unit.maxAmmo + " MUN" + vigLabel;
+    document.getElementById("unit-ammo").textContent = unit.ammo + "/" + unit.maxAmmo + " MUN" + statusSuffix;
   }
 
   const enemy = battle.enemies[battle.targetEnemy];
   const fireBtn = document.getElementById("fire-btn");
   const reloadBtn = document.getElementById("reload-btn");
   const overwatchBtn = document.getElementById("overwatch-btn");
+  const hunkerBtn = document.getElementById("hunker-btn");
   const medBtn = document.getElementById("medkit");
 
   if (enemy && enemy.hp > 0 && unit && unit.hp > 0) {
@@ -429,6 +435,9 @@ function renderBattle() {
   reloadBtn.disabled = battle.finished || !unit || unit.hp <= 0 || unit.ap < 1 || unit.ammo >= unit.maxAmmo;
   if (overwatchBtn) {
     overwatchBtn.disabled = battle.finished || !unit || unit.hp <= 0 || unit.ap < 1 || unit.ammo <= 0 || unit.overwatch;
+  }
+  if (hunkerBtn) {
+    hunkerBtn.disabled = battle.finished || !unit || unit.hp <= 0 || unit.ap < 1 || unit.hunker;
   }
   medBtn.disabled = battle.finished || !unit || unit.hp <= 0 || unit.ap < 1 || unit.hp >= 100;
 }
@@ -453,6 +462,7 @@ function tileAction(x, y, uIdx, eIdx) {
     unit.x = x;
     unit.y = y;
     unit.ap = Math.max(0, unit.ap - 1);
+    unit.hunker = false;
     battleLog(`${OPERATIVES[unit.id][0]} moveu-se para (${x + 1},${y + 1}) (-1 PA).`);
     renderBattle();
     checkWin();
@@ -479,6 +489,7 @@ document.getElementById("fire-btn").onclick = () => {
 
   unit.ap = Math.max(0, unit.ap - 1);
   unit.ammo = Math.max(0, unit.ammo - 1);
+  unit.hunker = false;
   applyShotDamage(unit, enemy, chance, false, null);
   renderBattle();
   checkWin();
@@ -503,6 +514,19 @@ if (overwatchBtnEl) {
     unit.ap = Math.max(0, unit.ap - 1);
     unit.overwatch = true;
     battleLog(`${OPERATIVES[unit.id][0]} entrou em VIGILÂNCIA (-1 PA).`);
+    renderBattle();
+  };
+}
+
+const hunkerBtnEl = document.getElementById("hunker-btn");
+if (hunkerBtnEl) {
+  hunkerBtnEl.onclick = () => {
+    if (battle.finished) return;
+    const unit = battle.units[battle.selected];
+    if (!unit || unit.hp <= 0 || unit.ap < 1 || unit.hunker) return;
+    unit.ap = Math.max(0, unit.ap - 1);
+    unit.hunker = true;
+    battleLog(`${OPERATIVES[unit.id][0]} ativou HUNKER DOWN: defesa reforçada até ao próximo turno (-1 PA).`);
     renderBattle();
   };
 }
@@ -590,10 +614,11 @@ function runEnemyTurn() {
     if (e.hp > 0 && hasLineOfSight(e.x, e.y, target.x, target.y)) {
       const dist = Math.abs(target.x - e.x) + Math.abs(target.y - e.y);
       const targetCovPen = getCoverPenalty(target.x, target.y, e.x, e.y);
-      const hitProb = Math.max(15, Math.min(85, 72 - Math.max(0, dist - 4) * 6 - targetCovPen));
+      const hunkerExtra = target.hunker ? (targetCovPen > 0 ? 35 : 25) : 0;
+      const hitProb = Math.max(10, Math.min(85, 72 - Math.max(0, dist - 4) * 6 - targetCovPen - hunkerExtra));
       if (Math.random() * 100 <= hitProb) {
         target.hp = Math.max(0, target.hp - e.dmg);
-        logs.push(`${e.name} acertou em ${OPERATIVES[target.id][0]} (${hitProb}%): -${e.dmg} HP${targetCovPen ? " [cobertura]" : ""}.`);
+        logs.push(`${e.name} acertou em ${OPERATIVES[target.id][0]} (${hitProb}%): -${e.dmg} HP${targetCovPen ? " [cobertura]" : ""}${target.hunker ? " [hunker]" : ""}.`);
       } else {
         logs.push(`${e.name} falhou contra ${OPERATIVES[target.id][0]} (${hitProb}%).`);
       }
@@ -627,6 +652,7 @@ document.getElementById("end-turn").onclick = () => {
     if (u.hp > 0) {
       u.ap = 2;
       u.overwatch = false;
+      u.hunker = false;
     }
   });
   document.getElementById("turn-label").textContent = "TURNO " + battle.turn;
