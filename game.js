@@ -1022,6 +1022,119 @@ function ensureTacticalExtras() {
   }
 }
 
+function renderFloatingUnitOrders(battle, selUnit, gridEl) {
+  let pop = document.getElementById("floating-unit-orders");
+  if (!pop) {
+    pop = document.createElement("div");
+    pop.id = "floating-unit-orders";
+    pop.style.cssText = `
+      position:absolute;
+      z-index:25;
+      background:rgba(12,18,26,0.96);
+      border:1px solid #4ef2a1;
+      border-radius:8px;
+      padding:6px 8px;
+      box-shadow:0 8px 24px rgba(0,0,0,0.55);
+      display:none;
+      min-width:210px;
+      max-width:320px;
+    `;
+    const parent = gridEl && gridEl.parentElement ? gridEl.parentElement : document.getElementById("tactical");
+    if (parent) {
+      if (getComputedStyle(parent).position === "static") {
+        parent.style.position = "relative";
+      }
+      parent.appendChild(pop);
+    }
+  }
+
+  if (!battle || battle.phase !== "player" || !selUnit || !gridEl) {
+    pop.style.display = "none";
+    return;
+  }
+
+  const cellIndex = selUnit.y * GRID_W + selUnit.x;
+  const cellEl = gridEl.children[cellIndex];
+  const parent = pop.parentElement;
+  if (!cellEl || !parent) {
+    pop.style.display = "none";
+    return;
+  }
+
+  const parentRect = parent.getBoundingClientRect();
+  const cellRect = cellEl.getBoundingClientRect();
+
+  pop.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:5px;font-size:0.75em;color:#4ef2a1;">
+      <b>${selUnit.name} · ${selUnit.ap} PA</b>
+      <button type="button" id="close-floating-orders" style="background:none;border:none;color:#fff;cursor:pointer;font-size:1em;padding:0 2px;">✕</button>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:4px;">
+      <button type="button" data-float-act="fire" class="primary" style="font-size:0.72em;padding:4px 7px;">DISPARAR</button>
+      <button type="button" data-float-act="frag" class="secondary" style="font-size:0.72em;padding:4px 7px;">FRAG (${selUnit.frags})</button>
+      <button type="button" data-float-act="smoke" class="secondary" style="font-size:0.72em;padding:4px 7px;">FUMO (${selUnit.smokes})</button>
+      <button type="button" data-float-act="overwatch" class="secondary" style="font-size:0.72em;padding:4px 7px;">VIGILÂNCIA</button>
+      <button type="button" data-float-act="hunker" class="secondary" style="font-size:0.72em;padding:4px 7px;">HUNKER</button>
+      <button type="button" data-float-act="reload" class="secondary" style="font-size:0.72em;padding:4px 7px;">RECARREGAR</button>
+      <button type="button" data-float-act="medkit" class="secondary" style="font-size:0.72em;padding:4px 7px;">CURAR (${selUnit.medkits})</button>
+    </div>
+  `;
+
+  pop.style.display = "block";
+  pop.style.left = "0px";
+  pop.style.top = "0px";
+  const popRect = pop.getBoundingClientRect();
+
+  const centerX = cellRect.left - parentRect.left + cellRect.width / 2;
+  let left = centerX - popRect.width / 2;
+  left = Math.max(6, Math.min(parentRect.width - popRect.width - 6, left));
+
+  let top = cellRect.top - parentRect.top - popRect.height - 6;
+  if (top < 6) {
+    top = cellRect.bottom - parentRect.top + 6;
+  }
+
+  pop.style.left = `${Math.round(left)}px`;
+  pop.style.top = `${Math.round(top)}px`;
+
+  const closeBtn = pop.querySelector("#close-floating-orders");
+  if (closeBtn) {
+    closeBtn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      battle.selectedUnitId = null;
+      renderBattle();
+    });
+  }
+
+  pop.querySelectorAll("[data-float-act]").forEach((btn) => {
+    btn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const act = btn.getAttribute("data-float-act");
+      if (act === "fire") fireAtTarget();
+      else if (act === "frag") {
+        if (selUnit.ap < 1 || selUnit.frags <= 0) {
+          addBattleLog("Sem PA ou sem granadas de fragmentação disponíveis.");
+          return;
+        }
+        battle.mode = battle.mode === "frag" ? "normal" : "frag";
+        addBattleLog(battle.mode === "frag" ? "Modo GRANADA FRAG ativo: clica numa célula do mapa." : "Modo normal restaurado.");
+        renderBattle();
+      } else if (act === "smoke") {
+        if (selUnit.ap < 1 || selUnit.smokes <= 0) {
+          addBattleLog("Sem PA ou sem granadas de fumo disponíveis.");
+          return;
+        }
+        battle.mode = battle.mode === "smoke" ? "normal" : "smoke";
+        addBattleLog(battle.mode === "smoke" ? "Modo GRANADA FUMO ativo: clica numa célula do mapa." : "Modo normal restaurado.");
+        renderBattle();
+      } else if (act === "overwatch") overwatchSelectedUnit();
+      else if (act === "hunker") hunkerSelectedUnit();
+      else if (act === "reload") reloadSelectedUnit();
+      else if (act === "medkit") useMedkitSelectedUnit();
+    });
+  });
+}
+
 function renderBattle() {
   const b = state.battle;
   if (!b) return;
@@ -1118,6 +1231,8 @@ function renderBattle() {
   const selUnit = getSelectedUnit();
   const selEnemy = getSelectedEnemy();
 
+  renderFloatingUnitOrders(b, selUnit, gridEl);
+
   const setText = (id, txt) => {
     const el = document.getElementById(id);
     if (el) el.textContent = txt;
@@ -1184,9 +1299,16 @@ function handleCellClick(x, y) {
   }
 
   if (unitHere) {
-    b.selectedUnitId = unitHere.id;
-    unitHere.overwatch = false;
-    addBattleLog(`Operacional selecionado: ${unitHere.name}.`);
+    if (b.selectedUnitId === unitHere.id) {
+      b.selectedUnitId = null;
+      b.mode = "normal";
+      addBattleLog(`Ordens de ${unitHere.name} recolhidas.`);
+    } else {
+      b.selectedUnitId = unitHere.id;
+      b.mode = "normal";
+      unitHere.overwatch = false;
+      addBattleLog(`Operacional selecionado: ${unitHere.name}.`);
+    }
     renderBattle();
     return;
   }
