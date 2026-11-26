@@ -1,357 +1,299 @@
-const OPERATIVES = [
-  ["Kael Vance", "SECTOR 04", "Assalto", [76, 72, 68, 70], "Especialista em avanço rápido, flanqueamento e pressão a curta distância."],
-  ["Lyra Chen", "SECTOR 07", "Sniper", [84, 65, 62, 66], "Atiradora de precisão de longo alcance, ideal para eliminar alvos prioritários."],
-  ["Marcus Thorne", "SECTOR 02", "Médico", [68, 70, 74, 78], "Suporte vital em campo, estabiliza feridos e mantém a coesão da esquadra."],
-  ["Soraia Mendes", "SECTOR 09", "Engenheira", [72, 75, 72, 74], "Perita em demolição, coberturas, dispositivos táticos e controlo de área."],
-  ["Darius Kane", "SECTOR 01", "Armas pesadas", [70, 66, 82, 72], "Fogo de supressão e elevada resistência sob fogo inimigo."],
-  ["Elena Rostova", "SECTOR 05", "Batedora", [79, 78, 66, 75], "Reconhecimento avançado, mobilidade e ataques de oportunidade."]
-];
+const SAVE_KEY = "oz_save";
 
 const STAT_NAMES = ["Pontaria", "Mobilidade", "Blindagem", "Disciplina"];
 
-const ROLE_PERKS = {
-  "Assalto": "Perícia: +5% precisão a curta distância (<=4 casas).",
-  "Sniper": "Perícia: +6% precisão e +5% crítico a longo alcance (>=5 casas).",
-  "Médico": "Perícia: cura +10 HP extra em campo e com Kit de Saúde.",
-  "Engenheira": "Perícia: reduz em -5% o bónus de cobertura do alvo.",
-  "Armas pesadas": "Perícia: reduz em -2 o dano recebido em ataques diretos.",
-  "Batedora": "Perícia: +6% precisão ao flanquear e +5% em Vigilância."
-};
+const OPERATIVES = [
+  ["Kaelen Vance", "Rifle de Assalto", "Assalto", [78, 74, 70, 72], 100],
+  ["Lyra Mercer", "Rifle de Precisão", "Sniper", [86, 68, 62, 75], 85],
+  ["Ronan Thorne", "Metralhadora Pesada", "Armas pesadas", [72, 62, 84, 76], 115],
+  ["Soraia Lind", "Submetralhadora", "Batedora", [80, 84, 65, 70], 90],
+  ["Darius Kade", "Carabina Tática", "Engenheira", [76, 72, 72, 78], 95],
+  ["Elena Rostova", "Espingarda Médica", "Médico", [75, 76, 68, 82], 95]
+];
 
-const WEAPONS_BY_ROLE = {
-  "Assalto": { name: "RIFLE DE ASSALTO MK-II", mag: 24, dmg: 24, optRange: 4 },
-  "Sniper": { name: "CARABINA DE PRECISÃO X-9", mag: 8, dmg: 38, optRange: 6 },
-  "Médico": { name: "SUBMETRALHADORA MÉDICA", mag: 30, dmg: 18, optRange: 3 },
-  "Engenheira": { name: "ESPINGARDA TÁTICA BREACHER", mag: 12, dmg: 30, optRange: 3 },
-  "Armas pesadas": { name: "METRALHADORA PESADA SAW", mag: 40, dmg: 26, optRange: 4 },
-  "Batedora": { name: "RIFLE TÁTICO RECON", mag: 20, dmg: 22, optRange: 5 }
-};
+const BUILDINGS = [
+  ["Quartel", "Gestão da equipa, melhorias de nível, treino de atributos e descanso.", 0, 0],
+  ["Enfermaria", "Tratamento médico, cuidados urgentes e profilaxia para a esquadra.", 450, 12],
+  ["Arsenal", "Armamento, fardas, granadas, kits, reabastecimento e níveis de arma.", 500, 14],
+  ["Laboratório", "Pesquisa xeno, descodificação de amostras e munição perfurante.", 600, 16],
+  ["Centro de Comando", "Varredura de reconhecimento (+15% precisão T1) e extração avançada.", 850, 18]
+];
 
 const WEAPONS_SHOP = [
-  { id: "wpn_std", name: "Padrão da Classe", credits: 0, materials: 0, dmgBonus: 0, magBonus: 0, hitBonus: 0, desc: "Equipamento base de serviço." },
-  { id: "wpn_reflex", name: "Mira Reflex Tática", credits: 320, materials: 6, dmgBonus: 3, magBonus: 0, hitBonus: 6, desc: "+3 dano e +6% precisão." },
-  { id: "wpn_hv", name: "Munição Alta Velocidade", credits: 480, materials: 10, dmgBonus: 7, magBonus: 4, hitBonus: 3, desc: "+7 dano, +4 munições e +3% precisão." },
-  { id: "wpn_zero", name: "Cano Estriado ZERO-X", credits: 720, materials: 15, dmgBonus: 12, magBonus: 6, hitBonus: 8, desc: "+12 dano, +6 munições e +8% precisão." }
+  { id: "ar_mk1", name: "Rifle Padrão MK-I", dmg: 22, mag: 6, optRange: 5, hitBonus: 0, credits: 0, materials: 0, desc: "Equilibrado a média distância." },
+  { id: "ar_mk2", name: "Rifle Tático MK-II", dmg: 28, mag: 7, optRange: 5, hitBonus: 4, credits: 320, materials: 8, desc: "+6 dano e +4% precisão." },
+  { id: "sg_breach", name: "Espingarda de Assalto", dmg: 34, mag: 4, optRange: 3, hitBonus: 3, credits: 380, materials: 10, desc: "Alto impacto a curta distância." },
+  { id: "sr_long", name: "Carabina de Precisão", dmg: 38, mag: 4, optRange: 7, hitBonus: 6, credits: 460, materials: 12, desc: "Excelente a longa distância." }
 ];
 
 const OUTFITS_SHOP = [
-  { id: "out_std", name: "Farda Operacional Padrão", credits: 0, materials: 0, hpBonus: 0, dmgRed: 0, dodgeBonus: 0, desc: "Farda regulamentar sem blindagem extra." },
-  { id: "out_kevlar", name: "Farda Kevlar Leve", credits: 300, materials: 6, hpBonus: 10, dmgRed: 2, dodgeBonus: 4, desc: "+10 HP máx., -2 dano recebido e +4% esquiva." },
-  { id: "out_tactical", name: "Traje Tático Reforçado", credits: 520, materials: 11, hpBonus: 20, dmgRed: 4, dodgeBonus: 6, desc: "+20 HP máx., -4 dano recebido e +6% esquiva." },
-  { id: "out_aegis", name: "Exofarda AEGIS-01", credits: 780, materials: 16, hpBonus: 30, dmgRed: 6, dodgeBonus: 8, desc: "+30 HP máx., -6 dano recebido e +8% esquiva." }
+  { id: "fat_std", name: "Farda Operacional", hpBonus: 0, dmgRed: 0, dodgeBonus: 0, credits: 0, materials: 0, desc: "Equipamento padrão sem custo." },
+  { id: "kev_light", name: "Colete Leve Kevlar", hpBonus: 12, dmgRed: 2, dodgeBonus: 4, credits: 280, materials: 7, desc: "+12 HP, -2 dano, +4% evasão." },
+  { id: "exo_heavy", name: "Exoesqueleto Reforçado", hpBonus: 24, dmgRed: 5, dodgeBonus: 0, credits: 520, materials: 14, desc: "+24 HP e -5 dano recebido." }
 ];
 
 const CONSUMABLES_SHOP = {
   frag: [
-    { id: "frag_1", name: "Granada Fragmentação (x1)", qty: 1, credits: 140, materials: 3, desc: "Explosão 3x3 com 32 de dano (ignora cobertura)." },
-    { id: "frag_2", name: "Granadas Fragmentação (x2)", qty: 2, credits: 250, materials: 5, desc: "2 granadas de fragmentação (3x3, 32 dano cada)." }
+    { id: "frag_1", name: "Granada Fragmentação (x1)", qty: 1, credits: 120, materials: 3, desc: "Explosão 3x3 com 32 de dano." }
   ],
   smoke: [
-    { id: "smoke_1", name: "Granada de Fumo (x1)", qty: 1, credits: 120, materials: 2, desc: "Cortina 3x3 por 2 turnos (-30% precisão inimiga)." },
-    { id: "smoke_2", name: "Granadas de Fumo (x2)", qty: 2, credits: 215, materials: 4, desc: "2 granadas de fumo (3x3 por 2 turnos)." }
+    { id: "smoke_1", name: "Granada de Fumo (x1)", qty: 1, credits: 110, materials: 3, desc: "Cobertura visual 3x3 por 2 turnos." }
   ],
   medkit: [
-    { id: "med_1", name: "Kit de Saúde (x1)", qty: 1, credits: 130, materials: 3, desc: "Cura +40 HP em campo (+50 HP para Médico)." },
-    { id: "med_2", name: "Kits de Saúde (x2)", qty: 2, credits: 230, materials: 5, desc: "2 kits de saúde de campo." }
+    { id: "med_1", name: "Kit de Saúde (x1)", qty: 1, credits: 130, materials: 3, desc: "Recupera 40 HP (50 HP na classe Médico)." }
   ]
 };
 
-const BUILDINGS = [
-  ["Quartel", "Alojamento da equipa, seleção de esquadra, descanso e camaradagem.", 0, 0],
-  ["Enfermaria", "Tratamento médico e recuperação acelerada de operacionais.", 700, 15],
-  ["Arsenal", "Armamento avançado, fardas, granadas e kits táticos.", 900, 20],
-  ["Laboratório", "Pesquisa de amostras alienígenas, armamento e informação inimiga.", 1100, 25]
-];
-
 const MISSIONS = [
   {
-    title: "FIRST CONTACT",
-    desc: "Reconhecimento e contenção no perímetro norte.",
-    rewardCredits: 450,
-    rewardMaterials: 14,
-    bonusCredits: 200,
-    bonusMaterials: 6,
+    title: "SETOR 01 // PERÍMETRO ABANDONADO",
+    desc: "Elimina as patrulhas xeno na zona industrial e recolhe amostras ativas.",
+    rewardCredits: 320,
+    rewardMaterials: 10,
     xpBase: 35,
     secondaryType: "clear_all",
-    secondaryLabel: "Neutralizar todos os alvos"
+    secondaryLabel: "Eliminar todos os alvos",
+    bonusCredits: 130,
+    bonusMaterials: 5
   },
   {
-    title: "BLACKOUT",
-    desc: "Recuperar dados de comunicações sem baixas.",
-    rewardCredits: 650,
-    rewardMaterials: 20,
-    bonusCredits: 280,
-    bonusMaterials: 9,
+    title: "SETOR 02 // ESTAÇÃO DE RETRANSMISSÃO",
+    desc: "Limpa a torre de comunicações com oposição mais densa e amostras adicionais.",
+    rewardCredits: 460,
+    rewardMaterials: 14,
     xpBase: 45,
     secondaryType: "no_casualties",
-    secondaryLabel: "Terminar sem operacionais abatidos"
+    secondaryLabel: "Sem baixas na esquadra",
+    bonusCredits: 180,
+    bonusMaterials: 7
   },
   {
-    title: "ZERO HOUR",
-    desc: "Assalto final ao núcleo hostil em contenção rápida.",
-    rewardCredits: 900,
-    rewardMaterials: 28,
-    bonusCredits: 380,
-    bonusMaterials: 12,
+    title: "SETOR 03 // NÚCLEO DE CONTENÇÃO",
+    desc: "Enfrenta unidades pesadas e flanqueadores junto ao reator xeno.",
+    rewardCredits: 640,
+    rewardMaterials: 20,
     xpBase: 60,
     secondaryType: "fast_clear",
-    secondaryLabel: "Concluir em até 6 turnos"
+    secondaryLabel: "Concluir em até 6 turnos",
+    bonusCredits: 240,
+    bonusMaterials: 9
   }
 ];
 
 const COVERS = [
   { x: 2, y: 1, type: "half", blocksSight: false },
-  { x: 3, y: 2, type: "full", blocksSight: true },
-  { x: 4, y: 4, type: "half", blocksSight: false },
-  { x: 5, y: 3, type: "full", blocksSight: true }
+  { x: 2, y: 4, type: "half", blocksSight: false },
+  { x: 4, y: 2, type: "full", blocksSight: true },
+  { x: 5, y: 3, type: "half", blocksSight: false }
 ];
-let state = {
-  credits: 1800,
-  materials: 45,
-  alien: 2,
-  built: [0],
-  barracksLevel: 1,
-  lab: {
-    weaponTier: 0,
-    intelTier: 0,
-    armorTier: 0
-  },
-  completed: [],
-  selected: [0, 1, 2, 3],
-  mission: 0,
-  opHp: {},
-  opGear: {},
-  opProgress: {}
-};
 
+function createDefaultState() {
+  return {
+    credits: 1200,
+    materials: 35,
+    alien: 2,
+    selected: [0, 1, 2],
+    built: [0],
+    completed: [],
+    mission: 0,
+    barracksLevel: 1,
+    commandCenter: {
+      built: false,
+      level: 0,
+      reconReady: false
+    },
+    lab: {
+      weaponTier: 0,
+      intelTier: 0,
+      armorTier: 0,
+      intelDecoded: 0,
+      piercingAmmo: false
+    },
+    armoryTier: 0,
+    opHp: OPERATIVES.map(op => op[4]),
+    opGear: OPERATIVES.map(() => ({
+      weaponId: "ar_mk1",
+      outfitId: "fat_std",
+      frag: 1,
+      smoke: 1,
+      medkit: 1
+    })),
+    opProgress: OPERATIVES.map(() => ({
+      xp: 0,
+      level: 1,
+      trainPoints: 0
+    })),
+    medProphylaxis: {}
+  };
+}
+
+let state = loadState();
 let selectedOpIndex = 0;
 let selectedShopOpIndex = 0;
 let selectedShopCategory = "weapon";
-let selectedShopItemId = "wpn_reflex";
-let selectedTrainOpIndex = 0;
-let selectedTrainStatIndex = 0;
+let selectedShopItemId = "ar_mk2";
 let activeCombatMode = null;
 
-function save() {
-  localStorage.setItem("oz_save", JSON.stringify(state));
-}
-
-function load() {
-  const s = localStorage.getItem("oz_save");
-  if (!s) return;
+function loadState() {
+  const base = createDefaultState();
   try {
-    const parsed = JSON.parse(s);
-    if (parsed && typeof parsed === "object") {
-      state = {
-        ...state,
-        ...parsed,
-        lab: {
-          weaponTier: 0,
-          intelTier: 0,
-          armorTier: 0,
-          ...(parsed.lab && typeof parsed.lab === "object" ? parsed.lab : {})
-        }
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return base;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return base;
+
+    const merged = {
+      ...base,
+      ...parsed,
+      commandCenter: {
+        ...base.commandCenter,
+        ...(parsed.commandCenter && typeof parsed.commandCenter === "object" ? parsed.commandCenter : {})
+      },
+      lab: {
+        ...base.lab,
+        ...(parsed.lab && typeof parsed.lab === "object" ? parsed.lab : {})
+      },
+      medProphylaxis:
+        parsed.medProphylaxis && typeof parsed.medProphylaxis === "object"
+          ? { ...parsed.medProphylaxis }
+          : {}
+    };
+
+    if (!Array.isArray(merged.built) || merged.built.length === 0) merged.built = [0];
+    if (!merged.built.includes(0)) merged.built.unshift(0);
+    if (!Array.isArray(merged.selected)) merged.selected = [0, 1, 2];
+    if (!Array.isArray(merged.completed)) merged.completed = [];
+
+    merged.opHp = OPERATIVES.map((op, i) => {
+      const val = Array.isArray(parsed.opHp) ? Number(parsed.opHp[i]) : op[4];
+      return Number.isFinite(val) ? Math.max(0, val) : op[4];
+    });
+
+    merged.opGear = OPERATIVES.map((_, i) => {
+      const g = Array.isArray(parsed.opGear) && parsed.opGear[i] ? parsed.opGear[i] : {};
+      return {
+        weaponId: typeof g.weaponId === "string" ? g.weaponId : "ar_mk1",
+        outfitId: typeof g.outfitId === "string" ? g.outfitId : "fat_std",
+        frag: Number.isFinite(Number(g.frag)) ? Math.max(0, Number(g.frag)) : 1,
+        smoke: Number.isFinite(Number(g.smoke)) ? Math.max(0, Number(g.smoke)) : 1,
+        medkit: Number.isFinite(Number(g.medkit)) ? Math.max(0, Number(g.medkit)) : 1
       };
-    }
-  } catch (e) {
-    console.warn("Falha ao carregar oz_save:", e);
+    });
+
+    merged.opProgress = OPERATIVES.map((_, i) => {
+      const p = Array.isArray(parsed.opProgress) && parsed.opProgress[i] ? parsed.opProgress[i] : {};
+      return {
+        xp: Number.isFinite(Number(p.xp)) ? Math.max(0, Number(p.xp)) : 0,
+        level: Number.isFinite(Number(p.level)) ? Math.max(1, Number(p.level)) : 1,
+        trainPoints: Number.isFinite(Number(p.trainPoints)) ? Math.max(0, Number(p.trainPoints)) : 0
+      };
+    });
+
+    return merged;
+  } catch (_) {
+    return base;
   }
 }
 
-load();
-
-if (!Array.isArray(state.built)) state.built = [0];
-if (!state.built.includes(0)) state.built.unshift(0);
-if (!state.barracksLevel || typeof state.barracksLevel !== "number") state.barracksLevel = 1;
-if (!state.opHp || typeof state.opHp !== "object") state.opHp = {};
-if (!state.opGear || typeof state.opGear !== "object") state.opGear = {};
-if (!state.opProgress || typeof state.opProgress !== "object") state.opProgress = {};
-if (!Array.isArray(state.selected)) state.selected = [0, 1, 2, 3];
-
-function getBarracksLevel() {
-  return Math.max(1, Math.min(3, Number(state.barracksLevel) || 1));
+function save() {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+  } catch (_) {}
+                              }
+function go(screenName) {
+  document.querySelectorAll(".screen").forEach(sec => {
+    sec.classList.remove("active");
+  });
+  const target = document.getElementById(screenName);
+  if (target) {
+    target.classList.add("active");
+  }
+  if (screenName === "roster") renderRoster();
+  if (screenName === "base") renderBuildings();
+  if (screenName === "missions") renderMissions();
+  if (screenName === "battle") renderBattle();
 }
 
-function getBarracksUpgradeCost() {
-  const lv = getBarracksLevel();
-  if (lv === 1) return { credits: 650, materials: 15, nextLv: 2, hpBonus: 10, restHeal: 14 };
-  if (lv === 2) return { credits: 1050, materials: 25, nextLv: 3, hpBonus: 20, restHeal: 20 };
-  return null;
-}
-
-function getBarracksHpBonus() {
-  const lv = getBarracksLevel();
-  if (lv === 2) return 10;
-  if (lv === 3) return 20;
-  return 0;
-}
-
-function getBarracksRestHeal() {
-  const lv = getBarracksLevel();
-  if (lv === 1) return 8;
-  if (lv === 2) return 14;
-  return 20;
-}
-
-function getSquadSynergyBonus() {
-  const count = Array.isArray(state.selected) ? state.selected.length : 0;
-  if (count >= 4) return 6;
-  if (count >= 2) return 3;
-  return 0;
-}
-
-function getLabWeaponBonus() {
-  const t = Number(state.lab && state.lab.weaponTier) || 0;
-  if (t === 1) return { dmg: 5, hit: 3 };
-  if (t === 2) return { dmg: 10, hit: 6 };
-  return { dmg: 0, hit: 0 };
-}
-
-function getLabIntelDebuff() {
-  const t = Number(state.lab && state.lab.intelTier) || 0;
-  if (t === 1) return { aimPen: 8, dmgRed: 2 };
-  if (t === 2) return { aimPen: 15, dmgRed: 4 };
-  return { aimPen: 0, dmgRed: 0 };
-}
-
-function getLabArmorBonus() {
-  const t = Number(state.lab && state.lab.armorTier) || 0;
-  if (t === 1) return { hp: 10, dmgRed: 2 };
-  if (t === 2) return { hp: 20, dmgRed: 4 };
-  return { hp: 0, dmgRed: 0 };
-}
-
-function go(id) {
-  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
-  const target = document.getElementById(id);
-  if (target) target.classList.add("active");
-  document.querySelectorAll(".nav-btn").forEach(b => b.classList.toggle("active", b.dataset.go === id));
-  if (id === "roster") renderRoster();
-  if (id === "base") renderBuildings();
-  if (id === "missions") renderMissions();
-}
-
-document.querySelectorAll("[data-go]").forEach(b => {
-  b.onclick = () => go(b.dataset.go);
+document.querySelectorAll("[data-go]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const dest = btn.getAttribute("data-go");
+    if (dest) go(dest);
+  });
 });
-
-function renderResources() {
-  const c = document.getElementById("credits");
-  const m = document.getElementById("materials");
-  const a = document.getElementById("alien");
-  if (c) c.textContent = state.credits;
-  if (m) m.textContent = state.materials;
-  if (a) a.textContent = state.alien;
-}
 
 let modalReturnScreen = null;
 
-function logModal(title, body, returnScreen = null) {
-  modalReturnScreen = returnScreen;
+function logModal(title, htmlMessage, returnScreen = null) {
+  const modal = document.getElementById("modal");
   const titleEl = document.getElementById("modal-title");
   const bodyEl = document.getElementById("modal-body");
-  const modalEl = document.getElementById("modal");
+  modalReturnScreen = returnScreen;
+
   if (titleEl) titleEl.textContent = title;
-  if (bodyEl) bodyEl.innerHTML = body;
-  if (modalEl) modalEl.classList.add("open");
+  if (bodyEl) bodyEl.innerHTML = htmlMessage;
+  if (modal) modal.classList.remove("hidden");
+}
+
+function closeModal() {
+  const modal = document.getElementById("modal");
+  if (modal) modal.classList.add("hidden");
+  if (modalReturnScreen) {
+    const dest = modalReturnScreen;
+    modalReturnScreen = null;
+    go(dest);
+  }
 }
 
 const closeModalBtn = document.getElementById("close-modal");
 if (closeModalBtn) {
-  closeModalBtn.onclick = () => {
-    const modalEl = document.getElementById("modal");
-    if (modalEl) modalEl.classList.remove("open");
-    if (modalReturnScreen) {
-      const dest = modalReturnScreen;
-      modalReturnScreen = null;
-      go(dest);
-    }
-  };
-}
-function getMaxHp(opIndex) {
-  const op = OPERATIVES[opIndex];
-  const base = op ? op[3][2] : 70;
-  const outfit = getEquippedOutfitItem(opIndex);
-  return base + (outfit.hpBonus || 0) + getBarracksHpBonus() + getLabArmorBonus().hp;
+  closeModalBtn.addEventListener("click", closeModal);
 }
 
-function getOpHp(opIndex) {
-  const maxHp = getMaxHp(opIndex);
-  if (typeof state.opHp[opIndex] !== "number") {
-    state.opHp[opIndex] = maxHp;
-  }
-  return Math.max(0, Math.min(maxHp, state.opHp[opIndex]));
-}
-
-function setOpHp(opIndex, hp) {
-  const maxHp = getMaxHp(opIndex);
-  state.opHp[opIndex] = Math.max(0, Math.min(maxHp, Math.round(hp)));
-}
-
-function getInjurySeverity(hp, maxHp) {
-  if (hp >= maxHp) return { label: "Pronto", color: "var(--lime)", multiplier: 0, baseCost: 0 };
-  const ratio = hp / Math.max(1, maxHp);
-  if (ratio >= 0.7) {
-    return { label: "Ferimento Leve", color: "#ffd166", multiplier: 1.0, baseCost: 35 };
-  }
-  if (ratio >= 0.35) {
-    return { label: "Ferimento Grave", color: "#ff9e5e", multiplier: 1.45, baseCost: 65 };
-  }
-  return { label: "Ferimento Muito Grave", color: "#ff5c77", multiplier: 1.9, baseCost: 105 };
+function renderResources() {
+  const cEl = document.getElementById("credits");
+  const mEl = document.getElementById("materials");
+  const aEl = document.getElementById("alien");
+  if (cEl) cEl.textContent = state.credits;
+  if (mEl) mEl.textContent = state.materials;
+  if (aEl) aEl.textContent = state.alien;
 }
 
 function getOpProgress(opIndex) {
-  const raw = state.opProgress[opIndex];
-  if (!raw || typeof raw !== "object") {
-    state.opProgress[opIndex] = { xp: 0, level: 1, trainPoints: 0 };
-  } else {
-    state.opProgress[opIndex] = {
-      xp: Math.max(0, Number(raw.xp) || 0),
-      level: Math.max(1, Number(raw.level) || 1),
-      trainPoints: Math.max(0, Number(raw.trainPoints) || 0)
-    };
+  if (!Array.isArray(state.opProgress) || !state.opProgress[opIndex]) {
+    return { xp: 0, level: 1, trainPoints: 0 };
   }
   return state.opProgress[opIndex];
 }
 
+function getXpNeededForLevel(level) {
+  return 60 + (Math.max(1, level) - 1) * 35;
+}
+
 function grantOpXp(opIndex, amount) {
   const prog = getOpProgress(opIndex);
-  prog.xp += Math.max(0, Math.round(amount));
-  let levelsGained = 0;
-  while (prog.xp >= 100) {
-    prog.xp -= 100;
+  prog.xp += Math.max(0, amount);
+  let leveledUp = 0;
+  while (prog.xp >= getXpNeededForLevel(prog.level)) {
+    prog.xp -= getXpNeededForLevel(prog.level);
     prog.level += 1;
-    prog.trainPoints += 2;
-    levelsGained += 1;
+    prog.trainPoints += 1;
+    leveledUp += 1;
+    const op = OPERATIVES[opIndex];
+    if (op && Array.isArray(op[3])) {
+      op[3][0] = Math.min(99, op[3][0] + 2);
+      op[3][1] = Math.min(99, op[3][1] + 1);
+      op[3][2] = Math.min(99, op[3][2] + 1);
+      op[3][3] = Math.min(99, op[3][3] + 2);
+    }
   }
-  return levelsGained;
+  return leveledUp;
 }
 
 function getOpGear(opIndex) {
-  const g = state.opGear[opIndex];
-  if (!g || typeof g !== "object") {
-    state.opGear[opIndex] = {
-      weaponId: "wpn_std",
-      outfitId: "out_std",
-      frag: 0,
-      smoke: 0,
-      medkit: 0
-    };
-  } else {
-    state.opGear[opIndex] = {
-      weaponId: g.weaponId || "wpn_std",
-      outfitId: g.outfitId || "out_std",
-      frag: Math.max(0, Number(g.frag) || 0),
-      smoke: Math.max(0, Number(g.smoke) || 0),
-      medkit: Math.max(0, Number(g.medkit) || 0)
-    };
+  if (!Array.isArray(state.opGear) || !state.opGear[opIndex]) {
+    return { weaponId: "ar_mk1", outfitId: "fat_std", frag: 1, smoke: 1, medkit: 1 };
   }
   return state.opGear[opIndex];
-}
-
-function getEquippedWeaponItem(opIndex) {
-  const gear = getOpGear(opIndex);
-  return WEAPONS_SHOP.find(w => w.id === gear.weaponId) || WEAPONS_SHOP[0];
 }
 
 function getEquippedOutfitItem(opIndex) {
@@ -359,2164 +301,1851 @@ function getEquippedOutfitItem(opIndex) {
   return OUTFITS_SHOP.find(o => o.id === gear.outfitId) || OUTFITS_SHOP[0];
 }
 
-function getWeapon(opIndex) {
-  const role = OPERATIVES[opIndex][2];
-  const base = WEAPONS_BY_ROLE[role] || WEAPONS_BY_ROLE["Assalto"];
-  const item = getEquippedWeaponItem(opIndex);
-  const lab = getLabWeaponBonus();
+function getLabWeaponBonus() {
+  const tier = Number(state.lab && state.lab.weaponTier) || 0;
   return {
-    name: item.id === "wpn_std" ? base.name : `${base.name} + ${item.name}`,
-    mag: base.mag + (item.magBonus || 0),
-    dmg: base.dmg + (item.dmgBonus || 0) + lab.dmg,
-    optRange: base.optRange,
-    hitBonus: (item.hitBonus || 0) + lab.hit
+    dmg: tier * 3,
+    hit: tier * 3
   };
 }
 
-function getHealCost(opIndex) {
-  const maxHp = getMaxHp(opIndex);
-  const hp = getOpHp(opIndex);
-  const missing = Math.max(0, maxHp - hp);
-  if (missing === 0) return 0;
-  const sev = getInjurySeverity(hp, maxHp);
-  return Math.max(40, Math.round((sev.baseCost + missing * 3.2) * sev.multiplier));
+function getLabArmorBonus() {
+  const tier = Number(state.lab && state.lab.armorTier) || 0;
+  return {
+    hp: tier * 10,
+    dmgRed: tier * 1
+  };
 }
 
-function healOperative(opIndex) {
-  if (!state.built.includes(1)) {
-    logModal("ENFERMARIA EM FALTA", "Constrói primeiro a <b>Enfermaria</b> na base para tratar operacionais feridos.");
-    return;
-  }
-  const maxHp = getMaxHp(opIndex);
-  const hp = getOpHp(opIndex);
-  if (hp >= maxHp) {
-    logModal("SEM FERIMENTOS", `${OPERATIVES[opIndex][0]} já está com os HP máximos.`);
-    return;
-  }
-  const cost = getHealCost(opIndex);
-  if (state.credits < cost) {
-    logModal("CRÉDITOS INSUFICIENTES", `Precisas de <b>${cost} créditos</b> para tratar ${OPERATIVES[opIndex][0]}.`);
-    return;
-  }
-  state.credits -= cost;
-  setOpHp(opIndex, maxHp);
-  save();
-  renderResources();
-  renderRoster();
-  logModal("TRATAMENTO CONCLUÍDO", `${OPERATIVES[opIndex][0]} recuperou totalmente (${maxHp}/${maxHp} HP) por <b>${cost} créditos</b>.`);
+function getLabIntelDebuff() {
+  const tier = Number(state.lab && state.lab.intelTier) || 0;
+  const decoded = Number(state.lab && state.lab.intelDecoded) || 0;
+  return {
+    aimPen: tier * 4 + decoded * 5,
+    dmgRed: tier * 1 + decoded * 1
+  };
 }
 
+function getWeapon(opIndex) {
+  const gear = getOpGear(opIndex);
+  const baseWpn = WEAPONS_SHOP.find(w => w.id === gear.weaponId) || WEAPONS_SHOP[0];
+  const labWpn = getLabWeaponBonus();
+  const armTier = Number(state.armoryTier) || 0;
+  const piercing = Boolean(state.lab && state.lab.piercingAmmo);
+
+  let dmg = baseWpn.dmg + labWpn.dmg + armTier * 4 + (piercing ? 4 : 0);
+  let hitBonus = (baseWpn.hitBonus || 0) + labWpn.hit + armTier * 4;
+  let name = baseWpn.name;
+  if (armTier > 0) name += ` [AR-NV${armTier}]`;
+  if (piercing) name += ` [AP]`;
+
+  return {
+    ...baseWpn,
+    name,
+    dmg,
+    hitBonus,
+    piercing
+  };
+}
+
+function getMaxHp(opIndex) {
+  const op = OPERATIVES[opIndex];
+  const baseHp = op ? op[4] : 90;
+  const prog = getOpProgress(opIndex);
+  const levelHp = (Math.max(1, prog.level) - 1) * 6;
+  const outfitHp = getEquippedOutfitItem(opIndex).hpBonus || 0;
+  const labHp = getLabArmorBonus().hp || 0;
+  const statArmorBonus = op ? Math.max(0, Math.round(((op[3][2] || 70) - 70) * 0.4)) : 0;
+  const prophBonus = state.medProphylaxis && state.medProphylaxis[opIndex] ? 8 : 0;
+  return baseHp + levelHp + outfitHp + labHp + statArmorBonus + prophBonus;
+}
+
+function getOpHp(opIndex) {
+  const maxHp = getMaxHp(opIndex);
+  const raw = Array.isArray(state.opHp) ? Number(state.opHp[opIndex]) : maxHp;
+  if (!Number.isFinite(raw)) return maxHp;
+  return Math.max(0, Math.min(maxHp, raw));
+}
+
+function setOpHp(opIndex, value) {
+  const maxHp = getMaxHp(opIndex);
+  if (!Array.isArray(state.opHp)) {
+    state.opHp = OPERATIVES.map(op => op[4]);
+  }
+  state.opHp[opIndex] = Math.max(0, Math.min(maxHp, Math.round(value)));
+}
+
+function getBarracksRestHeal() {
+  const lv = Number(state.barracksLevel) || 1;
+  return 15 + (lv - 1) * 10;
+}
+
+function getSquadSynergyBonus() {
+  const count = Array.isArray(state.selected) ? state.selected.length : 0;
+  const lv = Number(state.barracksLevel) || 1;
+  if (count <= 1) return 0;
+  return (count - 1) * 2 + (lv - 1) * 2;
+}
 function renderRoster() {
-  const el = document.getElementById("roster-list");
-  if (!el) return;
-  el.innerHTML = "";
-  const infBuilt = state.built.includes(1);
-  const synergy = getSquadSynergyBonus();
+  const listEl = document.getElementById("roster-list");
+  if (!listEl) return;
 
-  const headerInfo = document.createElement("div");
-  headerInfo.className = "card";
-  headerInfo.style.marginBottom = "10px";
-  headerInfo.innerHTML = `
-    <small style="color:var(--muted)">
-      Esquadra selecionada: <b>${state.selected.length}/5</b> · Camaradagem ativa: <b>+${synergy}% precisão</b> · Quartel: <b>Nv.${getBarracksLevel()}/3</b>
-    </small>
+  const cap = 5;
+  const maxHpActive = getMaxHp(selectedOpIndex);
+  const curHpActive = getOpHp(selectedOpIndex);
+  const progActive = getOpProgress(selectedOpIndex);
+  const gearActive = getOpGear(selectedOpIndex);
+  const wpnActive = getWeapon(selectedOpIndex);
+  const outfitActive = getEquippedOutfitItem(selectedOpIndex);
+  const opActive = OPERATIVES[selectedOpIndex] || OPERATIVES[0];
+
+  const statsHtml = opActive[3]
+    .map((val, idx) => `<span><b>${STAT_NAMES[idx]}:</b> ${val}</span>`)
+    .join(" · ");
+
+  listEl.innerHTML = `
+    <div style="margin-bottom:10px;padding:10px;border:1px solid rgba(255,255,255,.14);border-radius:8px;background:rgba(14,22,29,.75)">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+        <div>
+          <b style="color:var(--lime)">${opActive[0]}</b> · <span>${opActive[2]}</span> (${opActive[1]})
+        </div>
+        <div style="font-size:12px">
+          Nv.<b>${progActive.level}</b> · XP: <b>${progActive.xp}/${getXpNeededForLevel(progActive.level)}</b> · PT: <b>${progActive.trainPoints}</b>
+        </div>
+      </div>
+      <div style="font-size:12px;margin-top:6px">
+        HP: <b>${curHpActive}/${maxHpActive}</b> · Arma: <b>${wpnActive.name}</b> (${wpnActive.dmg} DMG) · Farda: <b>${outfitActive.name}</b>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">
+        Mochila: Frag x${gearActive.frag} · Fumo x${gearActive.smoke} · Kit x${gearActive.medkit}
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;display:flex;flex-wrap:wrap;gap:8px">
+        ${statsHtml}
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px">
+      Equipa ativa: <b>${state.selected.length}/${cap}</b> · Bónus de camaradagem: <b>+${getSquadSynergyBonus()}%</b> precisão
+    </div>
   `;
-  el.appendChild(headerInfo);
 
-  OPERATIVES.forEach((op, i) => {
-    const picked = state.selected.includes(i);
-    const maxHp = getMaxHp(i);
-    const hp = getOpHp(i);
-    const sev = getInjurySeverity(hp, maxHp);
-    const healCost = getHealCost(i);
-    const prog = getOpProgress(i);
-    const gear = getOpGear(i);
-    const wpn = getWeapon(i);
-    const outfit = getEquippedOutfitItem(i);
-    const d = document.createElement("div");
-    d.className = "card";
-    d.innerHTML = `
+  OPERATIVES.forEach((op, idx) => {
+    const isSelected = state.selected.includes(idx);
+    const isFocused = idx === selectedOpIndex;
+    const hp = getOpHp(idx);
+    const maxHp = getMaxHp(idx);
+    const prog = getOpProgress(idx);
+
+    const card = document.createElement("div");
+    card.className = "building";
+    card.style.flexDirection = "column";
+    card.style.alignItems = "stretch";
+    card.style.gap = "8px";
+    card.style.marginBottom = "8px";
+    if (isFocused) {
+      card.style.borderColor = "var(--lime)";
+    }
+
+    card.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
         <div>
-          <span class="tag">${op[1]}</span>
-          <h3 style="margin:6px 0 2px">${op[0]} <small style="color:var(--lime)">NV.${prog.level}</small></h3>
-          <small style="color:var(--muted)">${op[2]} · XP: ${prog.xp}/100${prog.trainPoints ? ` · <span style="color:var(--lime)">${prog.trainPoints} PT</span>` : ""}</small>
+          <b>${op[0]}</b> · <span style="color:var(--lime)">${op[2]}</span> (Nv.${prog.level})<br>
+          <small style="color:var(--muted)">${op[1]} · HP: ${hp}/${maxHp} · PT: ${prog.trainPoints}</small>
         </div>
-        <button class="btn" data-pick="${i}">${picked ? "NA EQUIPA ✓" : "ESCALAR"}</button>
-      </div>
-      <p style="margin:8px 0;font-size:13px">${op[4]}</p>
-      <div style="font-size:12px;color:#b8d4e3;margin-bottom:6px">
-        <b>HP:</b> <span style="color:${sev.color}">${hp}/${maxHp} (${sev.label})</span> · <b>Arma:</b> ${wpn.name} (${wpn.dmg} DMG) · <b>Farda:</b> ${outfit.name}
-      </div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:6px">
-        <b>Mochila:</b> Frag x${gear.frag} · Fumo x${gear.smoke} · Kit Saúde x${gear.medkit}
-      </div>
-      <div style="font-size:11px;color:var(--lime);margin-bottom:8px">${ROLE_PERKS[op[2]] || ""}</div>
-      <div class="stats">
-        ${op[3].map((v, sIdx) => `<div class="stat">${STAT_NAMES[sIdx]}: <b>${v}</b></div>`).join("")}
-      </div>
-      ${hp < maxHp ? `
-        <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center;gap:8px">
-          <small style="color:${sev.color}">${sev.label} · Custo cura: ${healCost} CR</small>
-          <button class="btn" data-heal="${i}" ${!infBuilt ? "disabled" : ""}>${infBuilt ? `TRATAR (${healCost} CR)` : "REQUER ENFERMARIA"}</button>
+        <div style="display:flex;gap:6px">
+          <button type="button" class="btn" data-inspect="${idx}">DETALHES</button>
+          <button type="button" class="btn" data-toggle="${idx}">${isSelected ? "NA EQUIPA ✓" : "CONVOCAR"}</button>
         </div>
-      ` : ""}
+      </div>
     `;
-    d.querySelector("[data-pick]").onclick = () => {
-      if (state.selected.includes(i)) {
-        state.selected = state.selected.filter(x => x !== i);
-      } else if (state.selected.length < 5) {
-        state.selected.push(i);
-      } else {
-        logModal("LIMITE ATINGIDO", "Podes selecionar no máximo 5 operacionais por missão.");
-      }
-      save();
-      renderRoster();
-    };
-    const healBtn = d.querySelector("[data-heal]");
-    if (healBtn) {
-      healBtn.onclick = () => healOperative(i);
+
+    const inspectBtn = card.querySelector(`[data-inspect="${idx}"]`);
+    if (inspectBtn) {
+      inspectBtn.onclick = () => {
+        selectedOpIndex = idx;
+        renderRoster();
+      };
     }
-    el.appendChild(d);
+
+    const toggleBtn = card.querySelector(`[data-toggle="${idx}"]`);
+    if (toggleBtn) {
+      toggleBtn.onclick = () => {
+        if (isSelected) {
+          if (state.selected.length <= 1) {
+            logModal("EQUIPA MÍNIMA", "Mantém pelo menos 1 operacional selecionado.");
+            return;
+          }
+          state.selected = state.selected.filter(i => i !== idx);
+        } else {
+          if (state.selected.length >= cap) {
+            logModal("LIMITE DA EQUIPA", `Só podes convocar até ${cap} operacionais por missão.`);
+            return;
+          }
+          state.selected.push(idx);
+        }
+        selectedOpIndex = idx;
+        save();
+        renderRoster();
+      };
+    }
+
+    listEl.appendChild(card);
   });
-    }
-function getShopItemsForCategory(cat) {
-  if (cat === "weapon") return WEAPONS_SHOP;
-  if (cat === "outfit") return OUTFITS_SHOP;
-  return [
-    ...CONSUMABLES_SHOP.frag,
-    ...CONSUMABLES_SHOP.smoke,
-    ...CONSUMABLES_SHOP.medkit
-  ];
 }
-
-function ensureValidShopSelection() {
-  const items = getShopItemsForCategory(selectedShopCategory);
-  if (!items.some(it => it.id === selectedShopItemId)) {
-    selectedShopItemId = items[0] ? items[0].id : "";
-  }
-}
-
-function buySelectedShopItem() {
-  if (!state.built.includes(2)) {
-    logModal("ARSENAL EM FALTA", "Constrói primeiro o <b>Arsenal</b> na base para comprar armamento, fardas e consumíveis.");
-    return;
-  }
-  ensureValidShopSelection();
-  const opIndex = selectedShopOpIndex;
-  const opName = OPERATIVES[opIndex][0];
-  const gear = getOpGear(opIndex);
-
-  if (selectedShopCategory === "weapon") {
-    const item = WEAPONS_SHOP.find(w => w.id === selectedShopItemId) || WEAPONS_SHOP[0];
-    if (gear.weaponId === item.id) {
-      logModal("JÁ EQUIPADO", `${opName} já tem <b>${item.name}</b> equipado.`);
-      return;
-    }
-    if (state.credits < item.credits || state.materials < item.materials) {
-      logModal("RECURSOS INSUFICIENTES", `Precisas de <b>${item.credits} créditos</b> e <b>${item.materials} materiais</b>.`);
-      return;
-    }
-    state.credits -= item.credits;
-    state.materials -= item.materials;
-    gear.weaponId = item.id;
-    save();
-    renderResources();
-    renderRoster();
-    renderBuildings();
-    logModal("ARMAMENTO EQUIPADO", `${opName} recebeu <b>${item.name}</b>.`);
-    return;
-  }
-
-  if (selectedShopCategory === "outfit") {
-    const item = OUTFITS_SHOP.find(o => o.id === selectedShopItemId) || OUTFITS_SHOP[0];
-    if (gear.outfitId === item.id) {
-      logModal("JÁ EQUIPADO", `${opName} já tem <b>${item.name}</b> equipada.`);
-      return;
-    }
-    if (state.credits < item.credits || state.materials < item.materials) {
-      logModal("RECURSOS INSUFICIENTES", `Precisas de <b>${item.credits} créditos</b> e <b>${item.materials} materiais</b>.`);
-      return;
-    }
-    state.credits -= item.credits;
-    state.materials -= item.materials;
-    const prevMax = getMaxHp(opIndex);
-    const prevHp = getOpHp(opIndex);
-    gear.outfitId = item.id;
-    const newMax = getMaxHp(opIndex);
-    if (newMax > prevMax) {
-      setOpHp(opIndex, prevHp + (newMax - prevMax));
-    } else {
-      setOpHp(opIndex, Math.min(newMax, prevHp));
-    }
-    save();
-    renderResources();
-    renderRoster();
-    renderBuildings();
-    logModal("FARDA EQUIPADA", `${opName} equipou <b>${item.name}</b>.`);
-    return;
-  }
-
-  const allCons = [
-    ...CONSUMABLES_SHOP.frag.map(x => ({ ...x, kind: "frag" })),
-    ...CONSUMABLES_SHOP.smoke.map(x => ({ ...x, kind: "smoke" })),
-    ...CONSUMABLES_SHOP.medkit.map(x => ({ ...x, kind: "medkit" }))
-  ];
-  const item = allCons.find(c => c.id === selectedShopItemId) || allCons[0];
-  if (state.credits < item.credits || state.materials < item.materials) {
-    logModal("RECURSOS INSUFICIENTES", `Precisas de <b>${item.credits} créditos</b> e <b>${item.materials} materiais</b>.`);
-    return;
-  }
-  state.credits -= item.credits;
-  state.materials -= item.materials;
-  gear[item.kind] = (gear[item.kind] || 0) + item.qty;
-  save();
-  renderResources();
-  renderRoster();
-  renderBuildings();
-  logModal("CONSUMÍVEL ADICIONADO", `${opName} recebeu <b>${item.name}</b> na mochila.`);
-}
-
-function upgradeBarracks() {
-  const lv = getBarracksLevel();
-  const upg = getBarracksUpgradeCost();
-  if (!upg) return;
-  if (state.credits < upg.credits || state.materials < upg.materials) {
-    logModal("RECURSOS INSUFICIENTES", `Melhorar o Quartel para o Nível ${upg.nextLv} custa <b>${upg.credits} créditos</b> e <b>${upg.materials} materiais</b>.`);
-    return;
-  }
-  state.credits -= upg.credits;
-  state.materials -= upg.materials;
-  state.barracksLevel = upg.nextLv;
-  OPERATIVES.forEach((_, idx) => {
-    setOpHp(idx, Math.min(getMaxHp(idx), getOpHp(idx) + 10));
-  });
-  save();
-  renderResources();
-  renderRoster();
-  renderBuildings();
-  logModal("QUARTEL MELHORADO", `Quartel agora no <b>Nível ${upg.nextLv}</b> (+${upg.hpBonus} HP base e descanso de +${upg.restHeal} HP entre missões).`);
-}
-
-function researchLabProject(kind) {
-  if (!state.built.includes(3)) {
-    logModal("LABORATÓRIO EM FALTA", "Constrói primeiro o <b>Laboratório</b> na base para estudar material alienígena.");
-    return;
-  }
-  const tier = Number(state.lab[kind + "Tier"]) || 0;
-  const table = {
-    weapon: [
-      { alien: 1, credits: 350, materials: 10, label: "Balística Xeno I (+5 dano, +3% precisão)" },
-      { alien: 2, credits: 650, materials: 18, label: "Balística Xeno II (+10 dano, +6% precisão)" }
-    ],
-    intel: [
-      { alien: 1, credits: 300, materials: 8, label: "Análise Tática I (-8% precisão e -2 dano inimigo)" },
-      { alien: 2, credits: 600, materials: 16, label: "Análise Tática II (-15% precisão e -4 dano inimigo)" }
-    ],
-    armor: [
-      { alien: 1, credits: 350, materials: 12, hpGain: 10, label: "Blindagem Reativa I (+10 HP máx., -2 dano)" },
-      { alien: 2, credits: 700, materials: 20, hpGain: 10, label: "Blindagem Reativa II (+20 HP máx., -4 dano)" }
-    ]
-  };
-  const proj = table[kind][tier];
-  if (!proj) {
-    logModal("PESQUISA CONCLUÍDA", "Este projeto já está no nível máximo.");
-    return;
-  }
-  if ((state.alien || 0) < proj.alien || state.credits < proj.credits || state.materials < proj.materials) {
-    logModal("RECURSOS INSUFICIENTES", `Precisas de <b>${proj.alien} Tec. Alienígena</b>, <b>${proj.credits} créditos</b> e <b>${proj.materials} materiais</b>.`);
-    return;
-  }
-  state.alien -= proj.alien;
-  state.credits -= proj.credits;
-  state.materials -= proj.materials;
-  state.lab[kind + "Tier"] = tier + 1;
-  if (kind === "armor") {
-    OPERATIVES.forEach((_, idx) => {
-      setOpHp(idx, Math.min(getMaxHp(idx), getOpHp(idx) + (proj.hpGain || 10)));
-    });
-  }
-  save();
-  renderResources();
-  renderRoster();
-  renderBuildings();
-  logModal("INVESTIGAÇÃO CONCLUÍDA", `Ativado: <b>${proj.label}</b>.`);
-}
-
-function resetGameProgress() {
-  if (!confirm("Apagar todo o progresso guardado e recomeçar do zero?")) return;
-  localStorage.removeItem("oz_save");
-  location.reload();
-}
+let expTrainOp = 0;
+let expTrainStat = 0;
+let expMedOp = 0;
+let expLabTarget = "flanker";
 
 function renderBuildings() {
   const el = document.getElementById("buildings");
   if (!el) return;
+
   el.innerHTML = "";
-  ensureValidShopSelection();
 
-  const bLv = getBarracksLevel();
-  const bUpg = getBarracksUpgradeCost();
-  const synergy = getSquadSynergyBonus();
-  const restHeal = getBarracksRestHeal();
+  BUILDINGS.forEach((b, i) => {
+    const [name, desc, costCr, costMat] = b;
+    const isCommandCenter = i === 4;
+    const cc = state.commandCenter || { built: false, level: 0, reconReady: false };
 
-  const barracksHub = document.createElement("div");
-  barracksHub.className = "building";
-  barracksHub.style.flexDirection = "column";
-  barracksHub.style.alignItems = "stretch";
-  barracksHub.style.gap = "10px";
+    let built = state.built.includes(i);
+    if (isCommandCenter) {
+      built = Boolean(cc.built);
+    }
 
-  const squadRowsHtml = OPERATIVES.map((op, idx) => {
-    const picked = state.selected.includes(idx);
-    const maxHp = getMaxHp(idx);
-    const hp = getOpHp(idx);
-    const sev = getInjurySeverity(hp, maxHp);
-    const gear = getOpGear(idx);
-    return `
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 8px;background:#0b1218;border:1px solid ${picked ? "var(--lime)" : "rgba(255,255,255,.08)"};border-radius:6px">
-        <div style="min-width:0;flex:1">
-          <b style="font-size:12px">${op[0]}</b> <small style="color:var(--muted)">· ${op[2]}</small><br>
-          <small style="color:${sev.color}">${hp}/${maxHp} HP (${sev.label})</small>
-          <small style="color:var(--muted)"> · Frag:${gear.frag} Fumo:${gear.smoke} Kit:${gear.medkit}</small>
-        </div>
-        <button class="btn" data-pick-barracks="${idx}" style="padding:6px 9px;font-size:10px;white-space:nowrap">${picked ? "NA EQUIPA ✓" : "ESCALAR"}</button>
+    const row = document.createElement("div");
+    row.className = "building";
+    row.style.flexDirection = "column";
+    row.style.alignItems = "stretch";
+    row.style.gap = "8px";
+    row.style.marginBottom = "10px";
+
+    let levelInfo = "";
+    if (i === 0) {
+      levelInfo = ` · Nível ${state.barracksLevel || 1}/3`;
+    } else if (isCommandCenter && built) {
+      levelInfo = ` · Nível ${cc.level || 1}/2`;
+    }
+
+    row.innerHTML = `
+      <div>
+        <b>${name}${levelInfo}</b><br>
+        <small style="color:var(--muted)">${desc}</small>
       </div>
     `;
-  }).join("");
 
-  barracksHub.innerHTML = `
-    <div>
-      <b>QUARTEL · NÍVEL ${bLv}/3 · EQUIPA ${state.selected.length}/5</b><br>
-      <small style="color:var(--muted)">
-        Bónus HP: <b>+${getBarracksHpBonus()} HP</b> · Camaradagem: <b>+${synergy}% precisão</b> · Descanso fora da missão: <b>+${restHeal} HP</b>
-      </small>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:6px">${squadRowsHtml}</div>
-    <button class="btn" id="btn-upgrade-barracks" ${!bUpg ? "disabled" : ""} style="width:100%">
-      ${bUpg ? `MELHORAR QUARTEL PARA NV.${bUpg.nextLv} (${bUpg.credits} CR / ${bUpg.materials} MAT)` : "QUARTEL NO NÍVEL MÁXIMO (3)"}
-    </button>
-  `;
+    const actionWrap = document.createElement("div");
+    actionWrap.style.display = "flex";
+    actionWrap.style.flexWrap = "wrap";
+    actionWrap.style.gap = "8px";
 
-  barracksHub.querySelectorAll("[data-pick-barracks]").forEach(btn => {
-    btn.onclick = () => {
-      const idx = Number(btn.dataset.pickBarracks);
-      if (state.selected.includes(idx)) {
-        state.selected = state.selected.filter(x => x !== idx);
-      } else if (state.selected.length < 5) {
-        state.selected.push(idx);
-      } else {
-        logModal("LIMITE ATINGIDO", "Podes selecionar no máximo 5 operacionais por missão.");
-        return;
-      }
-      save();
-      renderRoster();
-      renderBuildings();
-    };
-  });
-
-  const upgBtn = barracksHub.querySelector("#btn-upgrade-barracks");
-  if (upgBtn && bUpg) upgBtn.onclick = upgradeBarracks;
-  el.appendChild(barracksHub);
-
-  BUILDINGS.slice(1).forEach((b, idxOffset) => {
-    const i = idxOffset + 1;
-    const built = state.built.includes(i);
-    const d = document.createElement("div");
-    d.className = "building";
-    d.innerHTML = `
-      <div><b>${b[0]}</b><br><small style="color:var(--muted)">${b[1]}</small><br><small>${b[2]} CR · ${b[3]} MAT</small></div>
-      <button class="btn" ${built ? "disabled" : ""}>${built ? "CONSTRUÍDO" : "CONSTRUIR"}</button>
-    `;
-    const btn = d.querySelector("button");
     if (!built) {
-      btn.onclick = () => {
-        if (state.credits < b[2] || state.materials < b[3]) {
-          logModal("RECURSOS INSUFICIENTES", "Precisas de mais créditos ou materiais para construir.");
+      const buildBtn = document.createElement("button");
+      buildBtn.type = "button";
+      buildBtn.className = "btn";
+      buildBtn.textContent = `CONSTRUIR (${costCr} CR · ${costMat} MAT)`;
+      buildBtn.onclick = () => {
+        if (state.credits < costCr || state.materials < costMat) {
+          logModal("RECURSOS INSUFICIENTES", `Precisas de <b>${costCr} CR</b> e <b>${costMat} MAT</b> para construir ${name}.`);
           return;
         }
-        state.credits -= b[2];
-        state.materials -= b[3];
-        state.built.push(i);
+        state.credits -= costCr;
+        state.materials -= costMat;
+        if (isCommandCenter) {
+          state.commandCenter.built = true;
+          state.commandCenter.level = 1;
+        } else if (!state.built.includes(i)) {
+          state.built.push(i);
+        }
         save();
         renderResources();
         renderBuildings();
-        renderRoster();
+        logModal("INSTALAÇÃO CONCLUÍDA", `<b>${name}</b> está agora operacional na base.`);
       };
+      actionWrap.appendChild(buildBtn);
+    } else {
+      const tag = document.createElement("span");
+      tag.style.fontSize = "12px";
+      tag.style.color = "var(--lime)";
+      tag.style.alignSelf = "center";
+      tag.textContent = "OPERACIONAL ✓";
+      actionWrap.appendChild(tag);
+
+      if (i === 0) {
+        const curLv = state.barracksLevel || 1;
+        const upgBtn = document.createElement("button");
+        upgBtn.type = "button";
+        upgBtn.className = "btn";
+        upgBtn.disabled = curLv >= 3;
+        upgBtn.textContent = curLv >= 3 ? "QUARTEL NÍVEL MÁXIMO (3/3)" : `MELHORAR QUARTEL (${curLv === 1 ? "400 CR · 10 MAT" : "700 CR · 18 MAT"})`;
+        upgBtn.onclick = () => {
+          const needCr = curLv === 1 ? 400 : 700;
+          const needMat = curLv === 1 ? 10 : 18;
+          if (state.credits < needCr || state.materials < needMat) {
+            logModal("RECURSOS INSUFICIENTES", `Precisas de <b>${needCr} CR</b> e <b>${needMat} MAT</b>.`);
+            return;
+          }
+          state.credits -= needCr;
+          state.materials -= needMat;
+          state.barracksLevel = curLv + 1;
+          save();
+          renderResources();
+          renderBuildings();
+          renderRoster();
+          logModal("QUARTEL MELHORADO", `O Quartel subiu para o <b>Nível ${state.barracksLevel}</b>.`);
+        };
+        actionWrap.appendChild(upgBtn);
+      }
+
+      if (isCommandCenter) {
+        const reconBtn = document.createElement("button");
+        reconBtn.type = "button";
+        reconBtn.className = "btn";
+        reconBtn.disabled = Boolean(cc.reconReady);
+        reconBtn.textContent = cc.reconReady ? "RECONHECIMENTO ATIVO ✓" : "VARREDURA RECONHECIMENTO (200 CR · +15% T1)";
+        reconBtn.onclick = () => {
+          if (state.credits < 200) {
+            logModal("CRÉDITOS INSUFICIENTES", "Precisas de <b>200 CR</b> para iniciar a varredura.");
+            return;
+          }
+          state.credits -= 200;
+          state.commandCenter.reconReady = true;
+          save();
+          renderResources();
+          renderBuildings();
+          logModal("RECONHECIMENTO CARREGADO", "A esquadra ganha <b>+15% de precisão</b> no Turno 1 da próxima missão.");
+        };
+        actionWrap.appendChild(reconBtn);
+
+        const ccUpgBtn = document.createElement("button");
+        ccUpgBtn.type = "button";
+        ccUpgBtn.className = "btn";
+        ccUpgBtn.disabled = (cc.level || 1) >= 2;
+        ccUpgBtn.textContent = (cc.level || 1) >= 2 ? "CENTRO DE COMANDO NÍVEL MÁXIMO (2/2)" : "MELHORAR PARA NÍVEL 2 (950 CR · 24 MAT)";
+        ccUpgBtn.onclick = () => {
+          if (state.credits < 950 || state.materials < 24) {
+            logModal("RECURSOS INSUFICIENTES", "Precisas de <b>950 CR</b> e <b>24 MAT</b>.");
+            return;
+          }
+          state.credits -= 950;
+          state.materials -= 24;
+          state.commandCenter.level = 2;
+          save();
+          renderResources();
+          renderBuildings();
+          logModal("CENTRO DE COMANDO MELHORADO", "Centro de Comando no <b>Nível 2</b>: maior extração e hipótese de +1 Tec. Alienígena na vitória.");
+        };
+        actionWrap.appendChild(ccUpgBtn);
+      }
     }
-    el.appendChild(d);
+
+    row.appendChild(actionWrap);
+    el.appendChild(row);
   });
 
-  const armoryBuilt = state.built.includes(2);
-  const opOptions = OPERATIVES.map((op, idx) => `<option value="${idx}" ${idx === selectedShopOpIndex ? "selected" : ""}>${op[0]} (${op[2]})</option>`).join("");
-  const shopItems = getShopItemsForCategory(selectedShopCategory);
-  const itemOptions = shopItems.map(it => `<option value="${it.id}" ${it.id === selectedShopItemId ? "selected" : ""}>${it.name} — ${it.credits} CR / ${it.materials} MAT</option>`).join("");
-  const currentItem = shopItems.find(it => it.id === selectedShopItemId) || shopItems[0];
-
-  const shopCard = document.createElement("div");
-  shopCard.className = "building";
-  shopCard.style.flexDirection = "column";
-  shopCard.style.alignItems = "stretch";
-  shopCard.style.gap = "8px";
-  shopCard.innerHTML = `
-    <div>
-      <b>ARSENAL — EQUIPAMENTO E CONSUMÍVEIS</b><br>
-      <small style="color:var(--muted)">${armoryBuilt ? "Arsenal ativo: equipa armas, fardas, granadas e kits." : "Constrói o Arsenal para equipar operacionais."}</small>
-    </div>
-    <label style="font-size:11px;color:var(--muted)">Operacional:</label>
-    <select id="shop-op-select" ${!armoryBuilt ? "disabled" : ""} style="width:100%;padding:9px;background-color:#0e161d;color:#f2f7fa;border:1px solid rgba(255,255,255,.22);border-radius:6px;font-size:12px">${opOptions}</select>
-    <label style="font-size:11px;color:var(--muted)">Categoria:</label>
-    <select id="shop-cat-select" ${!armoryBuilt ? "disabled" : ""} style="width:100%;padding:9px;background-color:#0e161d;color:#f2f7fa;border:1px solid rgba(255,255,255,.22);border-radius:6px;font-size:12px">
-      <option value="weapon" ${selectedShopCategory === "weapon" ? "selected" : ""}>Armamento</option>
-      <option value="outfit" ${selectedShopCategory === "outfit" ? "selected" : ""}>Fardas e Proteção</option>
-      <option value="consumable" ${selectedShopCategory === "consumable" ? "selected" : ""}>Granadas e Kits de Saúde</option>
-    </select>
-    <label style="font-size:11px;color:var(--muted)">Item:</label>
-    <select id="shop-item-select" ${!armoryBuilt ? "disabled" : ""} style="width:100%;padding:9px;background-color:#0e161d;color:#f2f7fa;border:1px solid rgba(255,255,255,.22);border-radius:6px;font-size:12px">${itemOptions}</select>
-    <small style="color:#b8d4e3">${currentItem ? currentItem.desc : ""}</small>
-    <button class="btn" id="btn-buy-shop" ${!armoryBuilt ? "disabled" : ""} style="width:100%">EQUIPAR / COMPRAR</button>
-  `;
-
-  shopCard.querySelector("#shop-op-select").onchange = e => {
-    selectedShopOpIndex = Number(e.target.value);
-    renderBuildings();
-  };
-  shopCard.querySelector("#shop-cat-select").onchange = e => {
-    selectedShopCategory = e.target.value;
-    const list = getShopItemsForCategory(selectedShopCategory);
-    selectedShopItemId = list[0] ? list[0].id : "";
-    renderBuildings();
-  };
-  shopCard.querySelector("#shop-item-select").onchange = e => {
-    selectedShopItemId = e.target.value;
-    renderBuildings();
-  };
-  shopCard.querySelector("#btn-buy-shop").onclick = buySelectedShopItem;
-  el.appendChild(shopCard);
-
-  const labBuilt = state.built.includes(3);
-  const wTier = Number(state.lab.weaponTier) || 0;
-  const iTier = Number(state.lab.intelTier) || 0;
-  const aTier = Number(state.lab.armorTier) || 0;
-
-  const labCard = document.createElement("div");
-  labCard.className = "building";
-  labCard.style.flexDirection = "column";
-  labCard.style.alignItems = "stretch";
-  labCard.style.gap = "8px";
-  labCard.innerHTML = `
-    <div>
-      <b>LABORATÓRIO — PESQUISA E INFORMAÇÃO INIMIGA</b><br>
-      <small style="color:var(--muted)">${labBuilt ? "Laboratório ativo: estuda amostras alienígenas para armamento, informação e blindagem." : "Constrói o Laboratório para desbloquear as pesquisas."}</small>
-    </div>
-    <button class="btn" id="lab-w" ${!labBuilt || wTier >= 2 ? "disabled" : ""} style="width:100%">
-      ${wTier >= 2 ? "ARMAMENTO XENO: NÍVEL MÁXIMO (2/2)" : `ARMAMENTO XENO (NV.${wTier}/2) — ${wTier === 0 ? "1 XENO · 350 CR · 10 MAT" : "2 XENO · 650 CR · 18 MAT"}`}
-    </button>
-    <button class="btn" id="lab-i" ${!labBuilt || iTier >= 2 ? "disabled" : ""} style="width:100%">
-      ${iTier >= 2 ? "INFORMAÇÃO INIMIGA: NÍVEL MÁXIMO (2/2)" : `INFORMAÇÃO INIMIGA (NV.${iTier}/2) — ${iTier === 0 ? "1 XENO · 300 CR · 8 MAT" : "2 XENO · 600 CR · 16 MAT"}`}
-    </button>
-    <button class="btn" id="lab-a" ${!labBuilt || aTier >= 2 ? "disabled" : ""} style="width:100%">
-      ${aTier >= 2 ? "BLINDAGEM ADAPTATIVA: NÍVEL MÁXIMO (2/2)" : `BLINDAGEM ADAPTATIVA (NV.${aTier}/2) — ${aTier === 0 ? "1 XENO · 350 CR · 12 MAT" : "2 XENO · 700 CR · 20 MAT"}`}
-    </button>
-  `;
-  labCard.querySelector("#lab-w").onclick = () => researchLabProject("weapon");
-  labCard.querySelector("#lab-i").onclick = () => researchLabProject("intel");
-  labCard.querySelector("#lab-a").onclick = () => researchLabProject("armor");
-  el.appendChild(labCard);
+  renderFacilityExtras(el);
 
   const resetBtn = document.createElement("button");
+  resetBtn.type = "button";
   resetBtn.className = "btn";
-  resetBtn.textContent = "RESET PROGRESSO (TESTE)";
-  resetBtn.style.marginTop = "12px";
   resetBtn.style.width = "100%";
-  resetBtn.onclick = resetGameProgress;
+  resetBtn.style.marginTop = "14px";
+  resetBtn.textContent = "RESET PROGRESSO (TESTE)";
+  resetBtn.onclick = () => {
+    try {
+      localStorage.removeItem(SAVE_KEY);
+    } catch (_) {}
+    state = createDefaultState();
+    selectedOpIndex = 0;
+    selectedShopOpIndex = 0;
+    activeCombatMode = null;
+    save();
+    renderResources();
+    renderRoster();
+    renderBuildings();
+    renderMissions();
+    logModal("PROGRESSO REINICIADO", "Estado inicial restaurado com o Quartel no Nível 1.", "base");
+  };
   el.appendChild(resetBtn);
+        }
+function getHealCost(opIndex) {
+  const maxHp = getMaxHp(opIndex);
+  const curHp = getOpHp(opIndex);
+  const missing = Math.max(0, maxHp - curHp);
+  return Math.max(40, missing * 4);
+}
 
-  el.querySelectorAll("select option").forEach(opt => {
+function renderFacilityExtras(container) {
+  const infBuilt = state.built.includes(1);
+  const armBuilt = state.built.includes(2);
+  const labBuilt = state.built.includes(3);
+
+  const opOpts = OPERATIVES.map((op, i) => {
+    const p = getOpProgress(i);
+    return `<option value="${i}" ${i === expTrainOp ? "selected" : ""}>${op[0]} (Nv.${p.level} · PT:${p.trainPoints})</option>`;
+  }).join("");
+
+  const statOpts = STAT_NAMES.map((s, i) => {
+    return `<option value="${i}" ${i === expTrainStat ? "selected" : ""}>${s} (${OPERATIVES[expTrainOp][3][i]})</option>`;
+  }).join("");
+
+  const medOpts = OPERATIVES.map((op, i) => {
+    const hp = getOpHp(i);
+    const maxHp = getMaxHp(i);
+    const proph = state.medProphylaxis && state.medProphylaxis[i] ? " · PROFILAXIA ✓" : "";
+    return `<option value="${i}" ${i === expMedOp ? "selected" : ""}>${op[0]} (${hp}/${maxHp} HP${proph})</option>`;
+  }).join("");
+
+  const barracksBox = document.createElement("div");
+  barracksBox.className = "building";
+  barracksBox.style.flexDirection = "column";
+  barracksBox.style.alignItems = "stretch";
+  barracksBox.style.gap = "8px";
+  barracksBox.style.marginBottom = "10px";
+  barracksBox.innerHTML = `
+    <div>
+      <b>QUARTEL — TREINO DE ATRIBUTOS E DESCANSO RÁPIDO</b><br>
+      <small style="color:var(--muted)">Usa 1 Ponto de Treino (gratuito) ou 260 CR · 7 MAT para subir +2 num atributo.</small>
+    </div>
+    <select id="oz-train-op" style="width:100%;padding:8px;background:#0e161d;color:#f2f7fa;border:1px solid rgba(255,255,255,.22);border-radius:6px;font-size:12px">${opOpts}</select>
+    <select id="oz-train-stat" style="width:100%;padding:8px;background:#0e161d;color:#f2f7fa;border:1px solid rgba(255,255,255,.22);border-radius:6px;font-size:12px">${statOpts}</select>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button type="button" class="btn" id="oz-btn-train" style="flex:1">TREINAR ATRIBUTO</button>
+      <button type="button" class="btn" id="oz-btn-rest" style="flex:1">DESCANSO RÁPIDO (90 CR)</button>
+    </div>
+  `;
+  container.appendChild(barracksBox);
+
+  const medBox = document.createElement("div");
+  medBox.className = "building";
+  medBox.style.flexDirection = "column";
+  medBox.style.alignItems = "stretch";
+  medBox.style.gap = "8px";
+  medBox.style.marginBottom = "10px";
+  medBox.innerHTML = `
+    <div>
+      <b>ENFERMARIA — TRATAMENTO, URGÊNCIA E PROFILAXIA</b><br>
+      <small style="color:var(--muted)">${infBuilt ? "Cura padrão, recuperação de urgência (HP completo) e reforço +8 HP para a próxima saída." : "Constrói a Enfermaria para usar estas opções."}</small>
+    </div>
+    <select id="oz-med-op" ${!infBuilt ? "disabled" : ""} style="width:100%;padding:8px;background:#0e161d;color:#f2f7fa;border:1px solid rgba(255,255,255,.22);border-radius:6px;font-size:12px">${medOpts}</select>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button type="button" class="btn" id="oz-btn-heal" ${!infBuilt ? "disabled" : ""} style="flex:1">CURAR FERIDO</button>
+      <button type="button" class="btn" id="oz-btn-urgent" ${!infBuilt ? "disabled" : ""} style="flex:1">CUIDADO URGENTE</button>
+      <button type="button" class="btn" id="oz-btn-proph" ${!infBuilt ? "disabled" : ""} style="flex:1">PROFILAXIA (180 CR · 4 MAT)</button>
+    </div>
+  `;
+  container.appendChild(medBox);
+
+  const armoryBox = document.createElement("div");
+  armoryBox.className = "building";
+  armoryBox.style.flexDirection = "column";
+  armoryBox.style.alignItems = "stretch";
+  armoryBox.style.gap = "8px";
+  armoryBox.style.marginBottom = "10px";
+
+  const shopOpOpts = OPERATIVES.map((op, i) => {
+    return `<option value="${i}" ${i === selectedShopOpIndex ? "selected" : ""}>${op[0]} (${op[2]})</option>`;
+  }).join("");
+
+  const armTier = Number(state.armoryTier) || 0;
+  const squadCount = state.selected.length;
+
+  armoryBox.innerHTML = `
+    <div>
+      <b>ARSENAL — EQUIPAMENTO, REABASTECIMENTO E NÍVEL (${armTier}/2)</b><br>
+      <small style="color:var(--muted)">${armBuilt ? "Equipa armas, fardas e consumíveis ou melhora o nível de armamento da base." : "Constrói o Arsenal para equipar e melhorar armamento."}</small>
+    </div>
+    <select id="oz-shop-op" ${!armBuilt ? "disabled" : ""} style="width:100%;padding:8px;background:#0e161d;color:#f2f7fa;border:1px solid rgba(255,255,255,.22);border-radius:6px;font-size:12px">${shopOpOpts}</select>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button type="button" class="btn" data-shop-cat="weapon" ${!armBuilt ? "disabled" : ""}>ARMAS</button>
+      <button type="button" class="btn" data-shop-cat="outfit" ${!armBuilt ? "disabled" : ""}>FARDAS</button>
+      <button type="button" class="btn" data-shop-cat="frag" ${!armBuilt ? "disabled" : ""}>FRAG</button>
+      <button type="button" class="btn" data-shop-cat="smoke" ${!armBuilt ? "disabled" : ""}>FUMO</button>
+      <button type="button" class="btn" data-shop-cat="medkit" ${!armBuilt ? "disabled" : ""}>KIT</button>
+    </div>
+    <div id="oz-shop-items" style="display:flex;flex-direction:column;gap:6px"></div>
+    <button type="button" class="btn" id="oz-btn-resupply" ${!armBuilt ? "disabled" : ""} style="width:100%">
+      REABASTECER EQUIPA ATIVA (${squadCount * 150} CR · ${squadCount * 3} MAT)
+    </button>
+    <button type="button" class="btn" id="oz-btn-arm-tier" ${!armBuilt || armTier >= 2 ? "disabled" : ""} style="width:100%">
+      ${armTier >= 2 ? "ARMAMENTO NO NÍVEL MÁXIMO (2/2)" : `MELHORAR ARMAMENTO (${armTier === 0 ? "550 CR · 14 MAT" : "900 CR · 22 MAT"})`}
+    </button>
+  `;
+  container.appendChild(armoryBox);
+
+  const labBox = document.createElement("div");
+  labBox.className = "building";
+  labBox.style.flexDirection = "column";
+  labBox.style.alignItems = "stretch";
+  labBox.style.gap = "8px";
+  labBox.style.marginBottom = "10px";
+
+  const wTier = state.lab.weaponTier || 0;
+  const iTier = state.lab.intelTier || 0;
+  const aTier = state.lab.armorTier || 0;
+  const decoded = state.lab.intelDecoded || 0;
+  const piercing = Boolean(state.lab.piercingAmmo);
+
+  labBox.innerHTML = `
+    <div>
+      <b>LABORATÓRIO — PESQUISA XENO, ANÁLISE E PERFURANTE</b><br>
+      <small style="color:var(--muted)">${labBuilt ? `Armas: ${wTier}/2 · Info: ${iTier}/2 · Blindagem: ${aTier}/2 · Amostras: ${decoded}/2` : "Constrói o Laboratório para pesquisar tecnologia alienígena."}</small>
+    </div>
+    <button type="button" class="btn" id="oz-lab-wpn" ${!labBuilt || wTier >= 2 ? "disabled" : ""} style="width:100%">
+      ${wTier >= 2 ? "PESQUISA ARMAS XENO COMPLETA (2/2)" : `PESQUISA ARMAS XENO (${wTier === 0 ? "1 XENO · 300 CR" : "2 XENO · 550 CR"})`}
+    </button>
+    <button type="button" class="btn" id="oz-lab-int" ${!labBuilt || iTier >= 2 ? "disabled" : ""} style="width:100%">
+      ${iTier >= 2 ? "PESQUISA INFO XENO COMPLETA (2/2)" : `PESQUISA INFO XENO (${iTier === 0 ? "1 XENO · 300 CR" : "2 XENO · 550 CR"})`}
+    </button>
+    <button type="button" class="btn" id="oz-lab-arm" ${!labBuilt || aTier >= 2 ? "disabled" : ""} style="width:100%">
+      ${aTier >= 2 ? "PESQUISA BLINDAGEM XENO COMPLETA (2/2)" : `PESQUISA BLINDAGEM XENO (${aTier === 0 ? "1 XENO · 350 CR" : "2 XENO · 600 CR"})`}
+    </button>
+    <select id="oz-lab-target" ${!labBuilt ? "disabled" : ""} style="width:100%;padding:8px;background:#0e161d;color:#f2f7fa;border:1px solid rgba(255,255,255,.22);border-radius:6px;font-size:12px">
+      <option value="flanker" ${expLabTarget === "flanker" ? "selected" : ""}>Foco de Análise: Flanqueadores / Sentinela</option>
+      <option value="skirmisher" ${expLabTarget === "skirmisher" ? "selected" : ""}>Foco de Análise: Pesados / Caçadores</option>
+    </select>
+    <button type="button" class="btn" id="oz-lab-decode" ${!labBuilt || decoded >= 2 ? "disabled" : ""} style="width:100%">
+      ${decoded >= 2 ? "DESCODIFICAÇÃO DE AMOSTRAS COMPLETA (2/2)" : "DESCODIFICAR AMOSTRA XENO (1 XENO · 220 CR)"}
+    </button>
+    <button type="button" class="btn" id="oz-lab-piercing" ${!labBuilt || piercing ? "disabled" : ""} style="width:100%">
+      ${piercing ? "MUNIÇÃO PERFURANTE XENO ATIVA ✓" : "PESQUISAR MUNIÇÃO PERFURANTE (2 XENO · 650 CR · 16 MAT)"}
+    </button>
+  `;
+  container.appendChild(labBox);
+
+  bindFacilityExtraEvents(container, armBuilt);
+}
+function renderArsenalShopItems(armBuilt) {
+  const box = document.getElementById("oz-shop-items");
+  if (!box) return;
+  box.innerHTML = "";
+
+  const gear = getOpGear(selectedShopOpIndex);
+  const opName = OPERATIVES[selectedShopOpIndex][0];
+
+  if (selectedShopCategory === "weapon") {
+    WEAPONS_SHOP.forEach(w => {
+      const equipped = gear.weaponId === w.id;
+      const itemRow = document.createElement("div");
+      itemRow.style.display = "flex";
+      itemRow.style.justifyContent = "space-between";
+      itemRow.style.alignItems = "center";
+      itemRow.style.gap = "8px";
+      itemRow.style.padding = "6px 8px";
+      itemRow.style.border = "1px solid rgba(255,255,255,.12)";
+      itemRow.style.borderRadius = "6px";
+
+      itemRow.innerHTML = `
+        <div style="font-size:12px">
+          <b>${w.name}</b> (${w.dmg} DMG · Alcance ${w.optRange})<br>
+          <small style="color:var(--muted)">${w.desc}</small>
+        </div>
+      `;
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn";
+      btn.disabled = !armBuilt || equipped;
+      btn.textContent = equipped ? "EQUIPADA ✓" : (w.credits === 0 && w.materials === 0 ? "EQUIPAR" : `COMPRAR (${w.credits} CR · ${w.materials} MAT)`);
+      btn.onclick = () => {
+        if (state.credits < w.credits || state.materials < w.materials) {
+          logModal("RECURSOS INSUFICIENTES", `Precisas de <b>${w.credits} CR</b> e <b>${w.materials} MAT</b>.`);
+          return;
+        }
+        state.credits -= w.credits;
+        state.materials -= w.materials;
+        gear.weaponId = w.id;
+        save();
+        renderResources();
+        renderRoster();
+        renderBuildings();
+        logModal("ARMA EQUIPADA", `<b>${w.name}</b> equipada em <b>${opName}</b>.`);
+      };
+      itemRow.appendChild(btn);
+      box.appendChild(itemRow);
+    });
+    return;
+  }
+
+  if (selectedShopCategory === "outfit") {
+    OUTFITS_SHOP.forEach(o => {
+      const equipped = gear.outfitId === o.id;
+      const itemRow = document.createElement("div");
+      itemRow.style.display = "flex";
+      itemRow.style.justifyContent = "space-between";
+      itemRow.style.alignItems = "center";
+      itemRow.style.gap = "8px";
+      itemRow.style.padding = "6px 8px";
+      itemRow.style.border = "1px solid rgba(255,255,255,.12)";
+      itemRow.style.borderRadius = "6px";
+
+      itemRow.innerHTML = `
+        <div style="font-size:12px">
+          <b>${o.name}</b> (+${o.hpBonus} HP · -${o.dmgRed} Dano)<br>
+          <small style="color:var(--muted)">${o.desc}</small>
+        </div>
+      `;
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn";
+      btn.disabled = !armBuilt || equipped;
+      btn.textContent = equipped ? "EQUIPADA ✓" : (o.credits === 0 && o.materials === 0 ? "EQUIPAR" : `COMPRAR (${o.credits} CR · ${o.materials} MAT)`);
+      btn.onclick = () => {
+        if (state.credits < o.credits || state.materials < o.materials) {
+          logModal("RECURSOS INSUFICIENTES", `Precisas de <b>${o.credits} CR</b> e <b>${o.materials} MAT</b>.`);
+          return;
+        }
+        state.credits -= o.credits;
+        state.materials -= o.materials;
+        gear.outfitId = o.id;
+        setOpHp(selectedShopOpIndex, Math.max(getOpHp(selectedShopOpIndex), getMaxHp(selectedShopOpIndex)));
+        save();
+        renderResources();
+        renderRoster();
+        renderBuildings();
+        logModal("FARDA EQUIPADA", `<b>${o.name}</b> equipada em <b>${opName}</b>.`);
+      };
+      itemRow.appendChild(btn);
+      box.appendChild(itemRow);
+    });
+    return;
+  }
+
+  const catList = CONSUMABLES_SHOP[selectedShopCategory] || CONSUMABLES_SHOP.frag;
+  const currentCount = gear[selectedShopCategory] || 0;
+  catList.forEach(c => {
+    const itemRow = document.createElement("div");
+    itemRow.style.display = "flex";
+    itemRow.style.justifyContent = "space-between";
+    itemRow.style.alignItems = "center";
+    itemRow.style.gap = "8px";
+    itemRow.style.padding = "6px 8px";
+    itemRow.style.border = "1px solid rgba(255,255,255,.12)";
+    itemRow.style.borderRadius = "6px";
+
+    itemRow.innerHTML = `
+      <div style="font-size:12px">
+        <b>${c.name}</b> · Atual: <b>${currentCount}</b><br>
+        <small style="color:var(--muted)">${c.desc}</small>
+      </div>
+    `;
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn";
+    btn.disabled = !armBuilt;
+    btn.textContent = `COMPRAR (${c.credits} CR · ${c.materials} MAT)`;
+    btn.onclick = () => {
+      if (state.credits < c.credits || state.materials < c.materials) {
+        logModal("RECURSOS INSUFICIENTES", `Precisas de <b>${c.credits} CR</b> e <b>${c.materials} MAT</b>.`);
+        return;
+      }
+      state.credits -= c.credits;
+      state.materials -= c.materials;
+      gear[selectedShopCategory] = (gear[selectedShopCategory] || 0) + c.qty;
+      save();
+      renderResources();
+      renderRoster();
+      renderBuildings();
+      logModal("SUPRIMENTO ADQUIRIDO", `Adicionado <b>${c.name}</b> para <b>${opName}</b>.`);
+    };
+    itemRow.appendChild(btn);
+    box.appendChild(itemRow);
+  });
+}
+
+function bindFacilityExtraEvents(container, armBuilt) {
+  const trainOpSel = container.querySelector("#oz-train-op");
+  if (trainOpSel) {
+    trainOpSel.onchange = e => {
+      expTrainOp = Number(e.target.value);
+      renderBuildings();
+    };
+  }
+
+  const trainStatSel = container.querySelector("#oz-train-stat");
+  if (trainStatSel) {
+    trainStatSel.onchange = e => {
+      expTrainStat = Number(e.target.value);
+    };
+  }
+
+  const trainBtn = container.querySelector("#oz-btn-train");
+  if (trainBtn) {
+    trainBtn.onclick = () => {
+      const prog = getOpProgress(expTrainOp);
+      const op = OPERATIVES[expTrainOp];
+      const curVal = op[3][expTrainStat];
+      if (curVal >= 99) {
+        logModal("MÁXIMO ATINGIDO", `${STAT_NAMES[expTrainStat]} de ${op[0]} já está no máximo.`);
+        return;
+      }
+      if (prog.trainPoints > 0) {
+        prog.trainPoints -= 1;
+        op[3][expTrainStat] = Math.min(99, curVal + 3);
+        save();
+        renderResources();
+        renderRoster();
+        renderBuildings();
+        logModal("TREINO CONCLUÍDO", `${op[0]} recebeu <b>+3 em ${STAT_NAMES[expTrainStat]}</b>.`);
+        return;
+      }
+      if (state.credits < 260 || state.materials < 7) {
+        logModal("RECURSOS INSUFICIENTES", "Treinar sem Pontos de Treino custa <b>260 CR</b> e <b>7 MAT</b>.");
+        return;
+      }
+      state.credits -= 260;
+      state.materials -= 7;
+      op[3][expTrainStat] = Math.min(99, curVal + 2);
+      save();
+      renderResources();
+      renderRoster();
+      renderBuildings();
+      logModal("TREINO INTENSIVO", `${op[0]} recebeu <b>+2 em ${STAT_NAMES[expTrainStat]}</b>.`);
+    };
+  }
+
+  const restBtn = container.querySelector("#oz-btn-rest");
+  if (restBtn) {
+    restBtn.onclick = () => {
+      if (state.selected.includes(expTrainOp)) {
+        logModal("EM EQUIPA ATIVA", `${OPERATIVES[expTrainOp][0]} está na equipa ativa. Retira da equipa ou usa a Enfermaria.`);
+        return;
+      }
+      const maxHp = getMaxHp(expTrainOp);
+      const curHp = getOpHp(expTrainOp);
+      if (curHp >= maxHp) {
+        logModal("HP COMPLETO", `${OPERATIVES[expTrainOp][0]} já está com HP máximo.`);
+        return;
+      }
+      if (state.credits < 90) {
+        logModal("CRÉDITOS INSUFICIENTES", "O descanso rápido custa <b>90 CR</b>.");
+        return;
+      }
+      const healAmt = getBarracksRestHeal() + 10;
+      state.credits -= 90;
+      setOpHp(expTrainOp, curHp + healAmt);
+      save();
+      renderResources();
+      renderRoster();
+      renderBuildings();
+      logModal("DESCANSO CONCLUÍDO", `${OPERATIVES[expTrainOp][0]} recuperou <b>+${Math.min(maxHp - curHp, healAmt)} HP</b>.`);
+    };
+  }
+
+  const medOpSel = container.querySelector("#oz-med-op");
+  if (medOpSel) {
+    medOpSel.onchange = e => {
+      expMedOp = Number(e.target.value);
+    };
+  }
+
+  const healBtn = container.querySelector("#oz-btn-heal");
+  if (healBtn) {
+    healBtn.onclick = () => {
+      const maxHp = getMaxHp(expMedOp);
+      const curHp = getOpHp(expMedOp);
+      if (curHp >= maxHp) {
+        logModal("SEM FERIMENTOS", `${OPERATIVES[expMedOp][0]} já está com HP máximo.`);
+        return;
+      }
+      const cost = getHealCost(expMedOp);
+      if (state.credits < cost) {
+        logModal("CRÉDITOS INSUFICIENTES", `O tratamento custa <b>${cost} CR</b>.`);
+        return;
+      }
+      state.credits -= cost;
+      setOpHp(expMedOp, maxHp);
+      save();
+      renderResources();
+      renderRoster();
+      renderBuildings();
+      logModal("TRATAMENTO CONCLUÍDO", `${OPERATIVES[expMedOp][0]} recuperou para <b>${maxHp}/${maxHp} HP</b>.`);
+    };
+  }
+
+  const urgentBtn = container.querySelector("#oz-btn-urgent");
+  if (urgentBtn) {
+    urgentBtn.onclick = () => {
+      const maxHp = getMaxHp(expMedOp);
+      const curHp = getOpHp(expMedOp);
+      if (curHp >= maxHp) {
+        logModal("SEM FERIMENTOS", `${OPERATIVES[expMedOp][0]} já está com HP máximo.`);
+        return;
+      }
+      const cost = Math.max(120, Math.round(getHealCost(expMedOp) * 1.35));
+      if (state.credits < cost) {
+        logModal("CRÉDITOS INSUFICIENTES", `O cuidado urgente custa <b>${cost} CR</b>.`);
+        return;
+      }
+      state.credits -= cost;
+      setOpHp(expMedOp, maxHp);
+      save();
+      renderResources();
+      renderRoster();
+      renderBuildings();
+      logModal("CUIDADO URGENTE", `${OPERATIVES[expMedOp][0]} estabilizado com <b>${maxHp}/${maxHp} HP</b>.`);
+    };
+  }
+
+  const prophBtn = container.querySelector("#oz-btn-proph");
+  if (prophBtn) {
+    prophBtn.onclick = () => {
+      if (state.medProphylaxis[expMedOp]) {
+        logModal("PROFILAXIA ATIVA", `${OPERATIVES[expMedOp][0]} já tem profilaxia para a próxima missão.`);
+        return;
+      }
+      if (state.credits < 180 || state.materials < 4) {
+        logModal("RECURSOS INSUFICIENTES", "Profilaxia custa <b>180 CR</b> e <b>4 MAT</b>.");
+        return;
+      }
+      state.credits -= 180;
+      state.materials -= 4;
+      state.medProphylaxis[expMedOp] = true;
+      setOpHp(expMedOp, Math.min(getMaxHp(expMedOp), getOpHp(expMedOp) + 8));
+      save();
+      renderResources();
+      renderRoster();
+      renderBuildings();
+      logModal("PROFILAXIA APLICADA", `${OPERATIVES[expMedOp][0]} recebeu <b>+8 HP</b> para a próxima missão.`);
+    };
+  }
+
+  const shopOpSel = container.querySelector("#oz-shop-op");
+  if (shopOpSel) {
+    shopOpSel.onchange = e => {
+      selectedShopOpIndex = Number(e.target.value);
+      renderArsenalShopItems(armBuilt);
+    };
+  }
+
+  container.querySelectorAll("[data-shop-cat]").forEach(btn => {
+    btn.onclick = () => {
+      selectedShopCategory = btn.getAttribute("data-shop-cat");
+      renderArsenalShopItems(armBuilt);
+    };
+  });
+
+  renderArsenalShopItems(armBuilt);
+
+  const resupplyBtn = container.querySelector("#oz-btn-resupply");
+  if (resupplyBtn) {
+    resupplyBtn.onclick = () => {
+      const squad = state.selected;
+      const needCr = squad.length * 150;
+      const needMat = squad.length * 3;
+      if (squad.length === 0) {
+        logModal("SEM EQUIPA", "Seleciona operacionais antes de reabastecer.");
+        return;
+      }
+      if (state.credits < needCr || state.materials < needMat) {
+        logModal("RECURSOS INSUFICIENTES", `Reabastecer custa <b>${needCr} CR</b> e <b>${needMat} MAT</b>.`);
+        return;
+      }
+      state.credits -= needCr;
+      state.materials -= needMat;
+      squad.forEach(idx => {
+        const g = getOpGear(idx);
+        g.frag = Math.max(g.frag || 0, 1);
+        g.smoke = Math.max(g.smoke || 0, 1);
+        g.medkit = Math.max(g.medkit || 0, 1);
+      });
+      save();
+      renderResources();
+      renderRoster();
+      renderBuildings();
+      logModal("ESQUADRA REABASTECIDA", "Cada operacional ativo tem agora pelo menos 1 Frag, 1 Fumo e 1 Kit.");
+    };
+  }
+
+  const armTierBtn = container.querySelector("#oz-btn-arm-tier");
+  if (armTierBtn) {
+    armTierBtn.onclick = () => {
+      const cur = state.armoryTier || 0;
+      if (cur >= 2) return;
+      const needCr = cur === 0 ? 550 : 900;
+      const needMat = cur === 0 ? 14 : 22;
+      if (state.credits < needCr || state.materials < needMat) {
+        logModal("RECURSOS INSUFICIENTES", `Melhoria de armamento custa <b>${needCr} CR</b> e <b>${needMat} MAT</b>.`);
+        return;
+      }
+      state.credits -= needCr;
+      state.materials -= needMat;
+      state.armoryTier = cur + 1;
+      save();
+      renderResources();
+      renderRoster();
+      renderBuildings();
+      logModal("ARMAMENTO MELHORADO", `Nível de armamento subiu para <b>${state.armoryTier}/2</b>.`);
+    };
+  }
+
+  const labWpnBtn = container.querySelector("#oz-lab-wpn");
+  if (labWpnBtn) {
+    labWpnBtn.onclick = () => {
+      const cur = state.lab.weaponTier || 0;
+      if (cur >= 2) return;
+      const needAlien = cur === 0 ? 1 : 2;
+      const needCr = cur === 0 ? 300 : 550;
+      if ((state.alien || 0) < needAlien || state.credits < needCr) {
+        logModal("RECURSOS INSUFICIENTES", `Precisas de <b>${needAlien} XENO</b> e <b>${needCr} CR</b>.`);
+        return;
+      }
+      state.alien -= needAlien;
+      state.credits -= needCr;
+      state.lab.weaponTier = cur + 1;
+      save();
+      renderResources();
+      renderRoster();
+      renderBuildings();
+      logModal("PESQUISA CONCLUÍDA", `Armas Xeno no nível <b>${state.lab.weaponTier}/2</b>.`);
+    };
+  }
+
+  const labIntBtn = container.querySelector("#oz-lab-int");
+  if (labIntBtn) {
+    labIntBtn.onclick = () => {
+      const cur = state.lab.intelTier || 0;
+      if (cur >= 2) return;
+      const needAlien = cur === 0 ? 1 : 2;
+      const needCr = cur === 0 ? 300 : 550;
+      if ((state.alien || 0) < needAlien || state.credits < needCr) {
+        logModal("RECURSOS INSUFICIENTES", `Precisas de <b>${needAlien} XENO</b> e <b>${needCr} CR</b>.`);
+        return;
+      }
+      state.alien -= needAlien;
+      state.credits -= needCr;
+      state.lab.intelTier = cur + 1;
+      save();
+      renderResources();
+      renderBuildings();
+      logModal("PESQUISA CONCLUÍDA", `Informação Xeno no nível <b>${state.lab.intelTier}/2</b>.`);
+    };
+  }
+
+  const labArmBtn = container.querySelector("#oz-lab-arm");
+  if (labArmBtn) {
+    labArmBtn.onclick = () => {
+      const cur = state.lab.armorTier || 0;
+      if (cur >= 2) return;
+      const needAlien = cur === 0 ? 1 : 2;
+      const needCr = cur === 0 ? 350 : 600;
+      if ((state.alien || 0) < needAlien || state.credits < needCr) {
+        logModal("RECURSOS INSUFICIENTES", `Precisas de <b>${needAlien} XENO</b> e <b>${needCr} CR</b>.`);
+        return;
+      }
+      state.alien -= needAlien;
+      state.credits -= needCr;
+      state.lab.armorTier = cur + 1;
+      save();
+      renderResources();
+      renderRoster();
+      renderBuildings();
+      logModal("PESQUISA CONCLUÍDA", `Blindagem Xeno no nível <b>${state.lab.armorTier}/2</b>.`);
+    };
+  }
+
+  const labTargetSel = container.querySelector("#oz-lab-target");
+  if (labTargetSel) {
+    labTargetSel.onchange = e => {
+      expLabTarget = e.target.value;
+    };
+  }
+
+  const labDecodeBtn = container.querySelector("#oz-lab-decode");
+  if (labDecodeBtn) {
+    labDecodeBtn.onclick = () => {
+      const cur = state.lab.intelDecoded || 0;
+      if (cur >= 2) return;
+      if ((state.alien || 0) < 1 || state.credits < 220) {
+        logModal("RECURSOS INSUFICIENTES", "Descodificar amostra custa <b>1 XENO</b> e <b>220 CR</b>.");
+        return;
+      }
+      state.alien -= 1;
+      state.credits -= 220;
+      state.lab.intelDecoded = cur + 1;
+      save();
+      renderResources();
+      renderBuildings();
+      logModal("AMOSTRA DESCODIFICADA", `Relatórios táticos no nível <b>${state.lab.intelDecoded}/2</b>.`);
+    };
+  }
+
+  const labPiercingBtn = container.querySelector("#oz-lab-piercing");
+  if (labPiercingBtn) {
+    labPiercingBtn.onclick = () => {
+      if (state.lab.piercingAmmo) return;
+      if ((state.alien || 0) < 2 || state.credits < 650 || state.materials < 16) {
+        logModal("RECURSOS INSUFICIENTES", "Munição Perfurante custa <b>2 XENO</b>, <b>650 CR</b> e <b>16 MAT</b>.");
+        return;
+      }
+      state.alien -= 2;
+      state.credits -= 650;
+      state.materials -= 16;
+      state.lab.piercingAmmo = true;
+      save();
+      renderResources();
+      renderRoster();
+      renderBuildings();
+      logModal("MUNIÇÃO PERFURANTE ATIVA", "Armas agora ganham <b>+4 dano</b> e <b>[AP]</b>.");
+    };
+  }
+
+  container.querySelectorAll("select option").forEach(opt => {
     opt.style.backgroundColor = "#0e161d";
     opt.style.color = "#f2f7fa";
   });
-}
-const MISSION_ENEMIES = [
-  [
-    { name: "SENTINELA XENO", x: 5, y: 1, hp: 65, dmg: 14, role: "flanker" },
-    { name: "CAÇADOR XENO", x: 6, y: 4, hp: 75, dmg: 18, role: "skirmisher" }
-  ],
-  [
-    { name: "FLANQUEADOR XENO", x: 4, y: 1, hp: 70, dmg: 16, role: "flanker" },
-    { name: "SUPRESSOR XENO", x: 6, y: 3, hp: 85, dmg: 19, role: "skirmisher" },
-    { name: "SENTINELA XENO", x: 6, y: 5, hp: 65, dmg: 15, role: "flanker" }
-  ],
-  [
-    { name: "COLOSSO XENO", x: 5, y: 2, hp: 105, dmg: 22, role: "skirmisher" },
-    { name: "ASSALTANTE XENO", x: 4, y: 4, hp: 75, dmg: 18, role: "flanker" },
-    { name: "INTERCETOR XENO", x: 7, y: 1, hp: 80, dmg: 19, role: "flanker" }
-  ]
-];
-
-const MISSION_SAMPLES = [
-  [{ x: 3, y: 4, id: "m0_s1" }],
-  [{ x: 4, y: 2, id: "m1_s1" }, { x: 5, y: 4, id: "m1_s2" }],
-  [{ x: 3, y: 1, id: "m2_s1" }, { x: 6, y: 2, id: "m2_s2" }]
-];
+    }
+const GRID_W = 8;
+const GRID_H = 6;
 
 let battle = {
   missionIndex: 0,
   turn: 1,
-  active: 0,
+  activeUnitIdx: 0,
   units: [],
   enemies: [],
   smokes: [],
-  samples: [],
-  finished: false
+  finished: false,
+  commandReconTurn1: false
 };
+
+function renderMissions() {
+  const list = document.getElementById("mission-list");
+  if (!list) return;
+  list.innerHTML = "";
+
+  const cc = state.commandCenter || { built: false, level: 0, reconReady: false };
+  const reconNote = cc.built && cc.reconReady
+    ? `<div style="margin-bottom:10px;padding:8px 10px;border:1px solid var(--lime);border-radius:6px;font-size:12px;color:var(--lime)">Reconhecimento do Centro de Comando pronto: +15% de precisão no Turno 1.</div>`
+    : "";
+
+  list.innerHTML = reconNote;
+
+  MISSIONS.forEach((m, idx) => {
+    const done = state.completed.includes(idx);
+    const card = document.createElement("div");
+    card.className = "building";
+    card.style.flexDirection = "column";
+    card.style.alignItems = "stretch";
+    card.style.gap = "8px";
+    card.style.marginBottom = "10px";
+
+    card.innerHTML = `
+      <div>
+        <b>${m.title}</b> ${done ? `<span style="color:var(--lime)">· CONCLUÍDA ✓</span>` : ""}<br>
+        <small style="color:var(--muted)">${m.desc}</small><br>
+        <small style="color:#6ef7ff">Recompensa: ${m.rewardCredits} CR · ${m.rewardMaterials} MAT · ${m.xpBase} XP · Bónus: ${m.secondaryLabel} (+${m.bonusCredits} CR / +${m.bonusMaterials} MAT)</small>
+      </div>
+      <button type="button" class="btn" data-launch="${idx}">INICIAR OPERAÇÃO</button>
+    `;
+
+    const launchBtn = card.querySelector(`[data-launch="${idx}"]`);
+    if (launchBtn) {
+      launchBtn.onclick = () => startMission(idx);
+    }
+
+    list.appendChild(card);
+  });
+}
+
+function buildEnemiesForMission(missionIndex) {
+  const baseTemplates = [
+    { name: "Drone Sentinela", role: "flanker", hp: 46, maxHp: 46, dmg: 14, aim: 62, move: 3, x: 6, y: 1 },
+    { name: "Assaltante Xeno", role: "flanker", hp: 54, maxHp: 54, dmg: 17, aim: 66, move: 4, x: 6, y: 3 },
+    { name: "Caçador de Cobertura", role: "skirmisher", hp: 62, maxHp: 62, dmg: 19, aim: 64, move: 3, x: 7, y: 4 }
+  ];
+
+  const extra = missionIndex >= 1
+    ? [{ name: "Guardião Blindado", role: "skirmisher", hp: 78, maxHp: 78, dmg: 22, aim: 68, move: 2, x: 7, y: 2 }]
+    : [];
+
+  const extra2 = missionIndex >= 2
+    ? [{ name: "Ceifador de Assalto", role: "flanker", hp: 70, maxHp: 70, dmg: 24, aim: 72, move: 4, x: 5, y: 5 }]
+    : [];
+
+  return [...baseTemplates, ...extra, ...extra2].map((e, i) => ({
+    ...e,
+    id: `en_${i}`,
+    hunker: false
+  }));
+}
+
+function startMission(missionIndex) {
+  const idx = Number(missionIndex) || 0;
+  const squadIndices = Array.isArray(state.selected) && state.selected.length > 0
+    ? state.selected.slice(0, 5)
+    : [0];
+
+  const startPositions = [
+    [1, 1],
+    [0, 2],
+    [1, 3],
+    [0, 4],
+    [1, 5]
+  ];
+
+  const units = squadIndices.map((opIdx, i) => {
+    const op = OPERATIVES[opIdx] || OPERATIVES[0];
+    const gear = getOpGear(opIdx);
+    const wpn = getWeapon(opIdx);
+    const maxHp = getMaxHp(opIdx);
+    const curHp = getOpHp(opIdx);
+    const spawnHp = curHp > 0 ? curHp : Math.max(25, Math.round(maxHp * 0.5));
+    const [sx, sy] = startPositions[i] || [1, Math.min(GRID_H - 1, i + 1)];
+
+    return {
+      opIndex: opIdx,
+      name: op[0],
+      role: op[2],
+      stats: op[3],
+      x: sx,
+      y: sy,
+      hp: spawnHp,
+      maxHp,
+      ammo: wpn.mag || 6,
+      maxAmmo: wpn.mag || 6,
+      ap: 2,
+      overwatch: false,
+      hunker: false,
+      frag: gear.frag || 0,
+      smoke: gear.smoke || 0,
+      medkit: gear.medkit || 0
+    };
+  });
+
+  const cc = state.commandCenter || { built: false, level: 0, reconReady: false };
+  const hasRecon = Boolean(cc.built && cc.reconReady);
+  if (hasRecon) {
+    cc.reconReady = false;
+    save();
+  }
+
+  state.mission = idx;
+  activeCombatMode = null;
+
+  battle = {
+    missionIndex: idx,
+    turn: 1,
+    activeUnitIdx: 0,
+    units,
+    enemies: buildEnemiesForMission(idx),
+    smokes: [],
+    finished: false,
+    commandReconTurn1: hasRecon
+  };
+
+  go("battle");
+  const reconMsg = hasRecon ? " · Reconhecimento ativo (+15% precisão T1)" : "";
+  battleLog(`Operação iniciada: ${MISSIONS[idx].title}${reconMsg}.`);
+}
+
+function battleLog(msg) {
+  const logEl = document.getElementById("battle-log");
+  if (logEl) logEl.textContent = msg;
+}
+
+function manhattanDist(ax, ay, bx, by) {
+  return Math.abs(ax - bx) + Math.abs(ay - by);
+}
 
 function getCoverAt(x, y) {
   return COVERS.find(c => c.x === x && c.y === y) || null;
 }
 
-function hasLineOfSight(x1, y1, x2, y2) {
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const steps = Math.max(Math.abs(dx), Math.abs(dy));
-  if (steps <= 1) return true;
-  for (let i = 1; i < steps; i++) {
-    const ix = Math.round(x1 + (dx * i) / steps);
-    const iy = Math.round(y1 + (dy * i) / steps);
-    const cov = getCoverAt(ix, iy);
-    if (cov && cov.blocksSight) return false;
-  }
-  return true;
+function isSmokeAt(x, y) {
+  return battle.smokes.some(s => s.turns > 0 && manhattanDist(x, y, s.x, s.y) <= 1);
+}
+
+function getUnitAt(x, y) {
+  return battle.units.find(u => u.hp > 0 && u.x === x && u.y === y) || null;
+}
+
+function getEnemyAt(x, y) {
+  return battle.enemies.find(e => e.hp > 0 && e.x === x && e.y === y) || null;
 }
 
 function getTargetCoverBonus(attackerX, attackerY, targetX, targetY) {
-  let best = 0;
-  const dirs = [
-    [1, 0], [-1, 0], [0, 1], [0, -1]
+  let bonus = 0;
+  const dx = Math.sign(attackerX - targetX);
+  const dy = Math.sign(attackerY - targetY);
+  const checkCoords = [
+    [targetX + dx, targetY],
+    [targetX, targetY + dy],
+    [targetX + dx, targetY + dy]
   ];
-  for (const [dx, dy] of dirs) {
-    const cx = targetX + dx;
-    const cy = targetY + dy;
+
+  for (const [cx, cy] of checkCoords) {
     const cov = getCoverAt(cx, cy);
-    if (!cov) continue;
-    const distToCover = Math.hypot(attackerX - cx, attackerY - cy);
-    const distToTarget = Math.hypot(attackerX - targetX, attackerY - targetY);
-    if (distToCover < distToTarget) {
-      const val = cov.type === "full" ? 25 : 15;
-      if (val > best) best = val;
+    if (cov) {
+      bonus = Math.max(bonus, cov.type === "full" ? 30 : 15);
     }
   }
-  return best;
-}
-
-function renderMissions() {
-  const el = document.getElementById("mission-list");
-  if (!el) return;
-  el.innerHTML = "";
-  const synergy = getSquadSynergyBonus();
-  const intel = getLabIntelDebuff();
-
-  const squadBar = document.createElement("div");
-  squadBar.className = "card";
-  squadBar.style.marginBottom = "10px";
-  squadBar.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px">
-      <b style="font-size:12px">ESQUADRA ATIVA (${state.selected.length}/5)</b>
-      <small style="color:var(--lime)">Camaradagem: +${synergy}% precisão</small>
-    </div>
-    <div style="display:flex;flex-wrap:wrap;gap:6px">
-      ${OPERATIVES.map((op, idx) => {
-        const active = state.selected.includes(idx);
-        const hp = getOpHp(idx);
-        const maxHp = getMaxHp(idx);
-        return `<button class="btn" data-msel="${idx}" style="padding:5px 8px;font-size:10px;opacity:${active ? "1" : "0.55"}">${active ? "✓ " : ""}${op[0]} (${hp}/${maxHp})</button>`;
-      }).join("")}
-    </div>
-    ${intel.aimPen > 0 ? `<div style="margin-top:6px;font-size:11px;color:#6ef7ff">Info Lab ativa: inimigos -${intel.aimPen}% precisão e -${intel.dmgRed} dano.</div>` : ""}
-  `;
-  squadBar.querySelectorAll("[data-msel]").forEach(btn => {
-    btn.onclick = () => {
-      const idx = Number(btn.dataset.msel);
-      if (state.selected.includes(idx)) {
-        state.selected = state.selected.filter(x => x !== idx);
-      } else if (state.selected.length < 5) {
-        state.selected.push(idx);
-      } else {
-        logModal("LIMITE ATINGIDO", "Máximo de 5 operacionais por missão.");
-        return;
+  return bonus;
       }
-      save();
-      renderMissions();
-      renderBuildings();
-    };
-  });
-  el.appendChild(squadBar);
-
-  MISSIONS.forEach((m, i) => {
-    const done = state.completed.includes(i);
-    const d = document.createElement("div");
-    d.className = "card";
-    d.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-        <div>
-          <span class="tag">OPERAÇÃO 0${i + 1}${done ? " · CONCLUÍDA" : ""}</span>
-          <h3 style="margin:6px 0 4px">${m.title}</h3>
-          <p style="margin:0 0 6px;font-size:13px;color:var(--muted)">${m.desc}</p>
-          <small style="color:#d6e9f5">Base: <b>${m.rewardCredits} CR</b> · <b>${m.rewardMaterials} MAT</b> · <b>${m.xpBase} XP</b></small><br>
-          <small style="color:var(--lime)">Bónus (${m.secondaryLabel}): +${m.bonusCredits} CR · +${m.bonusMaterials} MAT</small>
-        </div>
-        <button class="btn" data-start="${i}">INICIAR</button>
-      </div>
-    `;
-    d.querySelector("[data-start]").onclick = () => startMission(i);
-    el.appendChild(d);
-  });
-}
-
-function startMission(i) {
-  if (!Array.isArray(state.selected) || state.selected.length === 0) {
-    logModal("SEM OPERACIONAIS", "Seleciona pelo menos 1 operacional no Quartel ou nas Missões antes de iniciar.");
-    return;
-  }
-  state.mission = i;
-  activeCombatMode = null;
-
-  const startPositions = [
-    [0, 1], [0, 2], [0, 3], [0, 4], [1, 2]
-  ];
-
-  const units = state.selected.slice(0, 5).map((opIdx, slot) => {
-    const op = OPERATIVES[opIdx];
-    const wpn = getWeapon(opIdx);
-    const maxHp = getMaxHp(opIdx);
-    const curHp = Math.max(15, getOpHp(opIdx));
-    const pos = startPositions[slot] || [0, slot % 6];
-    return {
-      opIndex: opIdx,
-      name: op[0],
-      role: op[2],
-      stats: [...op[3]],
-      x: pos[0],
-      y: pos[1],
-      hp: curHp,
-      maxHp: maxHp,
-      ap: 2,
-      ammo: wpn.mag,
-      overwatch: false,
-      hunkered: false,
-      acted: false
-    };
-  });
-
-  const enemies = (MISSION_ENEMIES[i] || MISSION_ENEMIES[0]).map(e => ({
-    ...e,
-    maxHp: e.hp,
-    overwatch: false
-  }));
-
-  const samples = (MISSION_SAMPLES[i] || []).map(s => ({
-    ...s,
-    collected: false
-  }));
-
-  battle = {
-    missionIndex: i,
-    turn: 1,
-    active: 0,
-    units,
-    enemies,
-    smokes: [],
-    samples,
-    finished: false
-  };
-
-  go("battle");
-  renderBattle();
-  const sampleMsg = samples.length > 0 ? ` Amostras xeno (✦): ${samples.length}.` : "";
-  battleLog(`Operação ${MISSIONS[i].title} iniciada. Turno 1.${sampleMsg}`);
-  }
 function getActiveUnit() {
-  if (!Array.isArray(battle.units) || battle.units.length === 0) return null;
-  for (let offset = 0; offset < battle.units.length; offset++) {
-    const idx = (battle.active + offset) % battle.units.length;
-    const u = battle.units[idx];
-    if (u && u.hp > 0 && u.ap > 0) {
-      battle.active = idx;
-      return u;
+  if (!battle || !Array.isArray(battle.units) || battle.units.length === 0) return null;
+  const alive = battle.units.filter(u => u.hp > 0);
+  if (alive.length === 0) return null;
+  let u = battle.units[battle.activeUnitIdx];
+  if (!u || u.hp <= 0 || u.ap <= 0) {
+    const nextIdx = battle.units.findIndex(item => item.hp > 0 && item.ap > 0);
+    if (nextIdx !== -1) {
+      battle.activeUnitIdx = nextIdx;
+      u = battle.units[nextIdx];
+    } else {
+      const firstAlive = battle.units.findIndex(item => item.hp > 0);
+      battle.activeUnitIdx = firstAlive !== -1 ? firstAlive : 0;
+      u = battle.units[battle.activeUnitIdx];
     }
   }
-  return battle.units[battle.active] || null;
-}
-
-function isInSmoke(x, y) {
-  return Array.isArray(battle.smokes) && battle.smokes.some(sm => {
-    return sm.turns > 0 && Math.abs(sm.x - x) <= 1 && Math.abs(sm.y - y) <= 1;
-  });
+  return u;
 }
 
 function calcHitChance(unit, enemy, isOverwatch = false) {
-  if (!unit || !enemy || enemy.hp <= 0) return 0;
-  const dist = Math.hypot(enemy.x - unit.x, enemy.y - unit.y);
-  if (!hasLineOfSight(unit.x, unit.y, enemy.x, enemy.y)) return 0;
-
+  const op = OPERATIVES[unit.opIndex] || OPERATIVES[0];
   const wpn = getWeapon(unit.opIndex);
-  let chance = unit.stats[0] + (wpn.hitBonus || 0) + getSquadSynergyBonus();
+  const aimStat = op[3][0] || 75;
+  const dist = manhattanDist(unit.x, unit.y, enemy.x, enemy.y);
 
-  const rangeDiff = Math.abs(dist - wpn.optRange);
-  chance -= Math.round(rangeDiff * 4.5);
+  let chance = aimStat + (wpn.hitBonus || 0) + getSquadSynergyBonus();
+  chance -= Math.max(0, dist - (wpn.optRange || 5)) * 4;
 
-  if (unit.role === "Assalto" && dist <= 4) chance += 5;
-  if (unit.role === "Sniper" && dist >= 5) chance += 6;
-  if (unit.role === "Batedora" && isOverwatch) chance += 5;
+  const covBonus = getTargetCoverBonus(unit.x, unit.y, enemy.x, enemy.y);
+  const piercingFactor = wpn.piercing ? 0.5 : 1;
+  chance -= Math.round(covBonus * piercingFactor);
 
-  const coverBonus = getTargetCoverBonus(unit.x, unit.y, enemy.x, enemy.y);
-  if (coverBonus > 0) {
-    let effCover = coverBonus;
-    if (unit.role === "Engenheira") effCover = Math.max(0, effCover - 5);
-    chance -= effCover;
+  if (isSmokeAt(enemy.x, enemy.y)) {
+    chance -= 25;
   }
 
-  if (isInSmoke(enemy.x, enemy.y) || isInSmoke(unit.x, unit.y)) {
-    chance -= 22;
+  if (isOverwatch) {
+    chance -= 12;
   }
-  if (isOverwatch) chance -= 10;
 
-  return Math.max(5, Math.min(96, Math.round(chance)));
+  const decoded = Number(state.lab && state.lab.intelDecoded) || 0;
+  if (decoded > 0) {
+    chance += expLabTarget === enemy.role ? decoded * 6 : decoded * 2;
+  }
+
+  if (battle.commandReconTurn1 && battle.turn === 1) {
+    chance += 15;
+  }
+
+  return Math.max(5, Math.min(98, Math.round(chance)));
 }
 
-function throwFragGrenadeAt(tx, ty) {
-  const unit = getActiveUnit();
-  if (!unit || battle.finished) return;
-  const gear = getOpGear(unit.opIndex);
-  if ((gear.frag || 0) <= 0) {
-    logModal("SEM GRANADAS", `${unit.name} não tem granadas de fragmentação na mochila.`);
+function calcDamage(unit, enemy) {
+  const wpn = getWeapon(unit.opIndex);
+  const outfit = getEquippedOutfitItem(unit.opIndex);
+  const intel = getLabIntelDebuff();
+  const baseDmg = wpn.dmg || 20;
+  const enemyDmgRed = intel.dmgRed || 0;
+  const selfOutfitBonus = outfit.id === "exo_heavy" ? 2 : 0;
+  return Math.max(6, baseDmg + selfOutfitBonus - enemyDmgRed);
+}
+
+function canMoveTo(unit, tx, ty) {
+  if (tx < 0 || tx >= GRID_W || ty < 0 || ty >= GRID_H) return false;
+  if (getUnitAt(tx, ty) || getEnemyAt(tx, ty)) return false;
+  const cov = getCoverAt(tx, ty);
+  if (cov && cov.blocksSight) return false;
+
+  const mobStat = unit.stats && unit.stats[1] ? unit.stats[1] : 72;
+  const maxStep = unit.ap >= 2 ? 4 + Math.floor((mobStat - 70) / 10) : 3;
+  const dist = manhattanDist(unit.x, unit.y, tx, ty);
+  return dist >= 1 && dist <= Math.max(2, maxStep);
+}
+
+function renderBattle() {
+  const gridEl = document.getElementById("battle-grid");
+  const statusEl = document.getElementById("battle-status");
+  if (!gridEl) return;
+
+  battle.smokes = battle.smokes.filter(s => s.turns > 0);
+  const active = getActiveUnit();
+
+  if (statusEl) {
+    const aliveEnemies = battle.enemies.filter(e => e.hp > 0).length;
+    const aliveUnits = battle.units.filter(u => u.hp > 0).length;
+    statusEl.textContent = active
+      ? `TURNO ${battle.turn} · ATIVO: ${active.name} (AP ${active.ap}/2 · HP ${active.hp}/${active.maxHp} · Mun ${active.ammo}/${active.maxAmmo}) · Esquadra: ${aliveUnits} · Alvos: ${aliveEnemies}`
+      : `TURNO ${battle.turn} · SEM UNIDADES ATIVAS · Alvos: ${aliveEnemies}`;
+  }
+
+  gridEl.innerHTML = "";
+
+  for (let y = 0; y < GRID_H; y++) {
+    for (let x = 0; x < GRID_W; x++) {
+      const cell = document.createElement("div");
+      cell.className = "cell";
+
+      const unitHere = getUnitAt(x, y);
+      const enemyHere = getEnemyAt(x, y);
+      const covHere = getCoverAt(x, y);
+      const smokeHere = isSmokeAt(x, y);
+
+      let movable = false;
+      let targetableEnemy = null;
+
+      if (active && !battle.finished) {
+        if (activeCombatMode === "move" && active.ap > 0 && canMoveTo(active, x, y)) {
+          movable = true;
+          cell.classList.add("move");
+        } else if (activeCombatMode === "shoot" && active.ap > 0 && enemyHere) {
+          targetableEnemy = enemyHere;
+          cell.classList.add("shoot");
+        } else if (activeCombatMode === "frag" && active.ap > 0 && active.frag > 0 && manhattanDist(active.x, active.y, x, y) <= 6) {
+          cell.classList.add("shoot");
+        } else if (activeCombatMode === "smoke" && active.ap > 0 && active.smoke > 0 && manhattanDist(active.x, active.y, x, y) <= 6) {
+          cell.classList.add("move");
+        } else if (activeCombatMode === "medkit" && active.ap > 0 && active.medkit > 0 && unitHere && unitHere.hp < unitHere.maxHp && manhattanDist(active.x, active.y, x, y) <= 2) {
+          cell.classList.add("move");
+        }
+      }
+
+      if (smokeHere) {
+        cell.style.boxShadow = "inset 0 0 0 2px rgba(200,220,235,.55)";
+      }
+
+      if (covHere) {
+        const covTag = document.createElement("span");
+        covTag.style.fontSize = "9px";
+        covTag.style.opacity = "0.75";
+        covTag.textContent = covHere.type === "full" ? "COB-F" : "COB-M";
+        cell.appendChild(covTag);
+      }
+
+      if (unitHere) {
+        const badge = document.createElement("div");
+        badge.className = "unit player";
+        if (active && active.opIndex === unitHere.opIndex) {
+          badge.style.outline = "2px solid var(--lime)";
+        }
+        badge.textContent = `${unitHere.name.split(" ")[0]} (${unitHere.hp})`;
+        cell.appendChild(badge);
+      }
+
+      if (enemyHere) {
+        const eBadge = document.createElement("div");
+        eBadge.className = "unit enemy";
+        eBadge.textContent = `${enemyHere.name.split(" ")[0]} (${enemyHere.hp})`;
+        cell.appendChild(eBadge);
+      }
+
+      cell.onclick = () => {
+        if (!active || battle.finished) return;
+
+        if (activeCombatMode === "move" && movable) {
+          active.x = x;
+          active.y = y;
+          active.ap = Math.max(0, active.ap - 1);
+          active.hunker = false;
+          activeCombatMode = null;
+          battleLog(`${active.name} deslocou-se para (${x + 1}, ${y + 1}).`);
+          if (active.ap <= 0) selectNextUnitWithAp();
+          renderBattle();
+          renderBattleActions();
+          return;
+        }
+
+        if (activeCombatMode === "shoot" && targetableEnemy) {
+          performShot(active, targetableEnemy);
+          return;
+        }
+
+        if (activeCombatMode === "frag" && active.ap > 0 && active.frag > 0 && manhattanDist(active.x, active.y, x, y) <= 6) {
+          throwFragGrenade(active, x, y);
+          return;
+        }
+
+        if (activeCombatMode === "smoke" && active.ap > 0 && active.smoke > 0 && manhattanDist(active.x, active.y, x, y) <= 6) {
+          throwSmokeGrenade(active, x, y);
+          return;
+        }
+
+        if (activeCombatMode === "medkit" && active.ap > 0 && active.medkit > 0 && unitHere && unitHere.hp < unitHere.maxHp && manhattanDist(active.x, active.y, x, y) <= 2) {
+          useMedkit(active, unitHere);
+          return;
+        }
+
+        if (unitHere) {
+          const idx = battle.units.findIndex(u => u.opIndex === unitHere.opIndex);
+          if (idx !== -1 && unitHere.ap > 0) {
+            battle.activeUnitIdx = idx;
+            activeCombatMode = null;
+            battleLog(`${unitHere.name} selecionado.`);
+            renderBattle();
+            renderBattleActions();
+          }
+        }
+      };
+
+      gridEl.appendChild(cell);
+    }
+  }
+
+  renderBattleActions();
+}
+
+function selectNextUnitWithAp() {
+  const nextIdx = battle.units.findIndex(u => u.hp > 0 && u.ap > 0);
+  if (nextIdx !== -1) {
+    battle.activeUnitIdx = nextIdx;
+  }
+}
+
+function performShot(unit, enemy) {
+  if (unit.ammo <= 0) {
+    battleLog(`${unit.name} está sem munição — usa RECARREGAR.`);
+    activeCombatMode = null;
+    renderBattleActions();
     return;
   }
-  if (unit.ap < 1) {
-    logModal("SEM PA", `${unit.name} não tem pontos de ação suficientes.`);
-    return;
-  }
-  gear.frag -= 1;
-  unit.ap -= 1;
+
+  const hitChance = calcHitChance(unit, enemy, false);
+  unit.ammo = Math.max(0, unit.ammo - 1);
+  unit.ap = 0;
+  unit.hunker = false;
   activeCombatMode = null;
-  save();
+
+  const roll = Math.random() * 100;
+  if (roll <= hitChance) {
+    const dmg = calcDamage(unit, enemy);
+    enemy.hp = Math.max(0, enemy.hp - dmg);
+    battleLog(`${unit.name} acertou em ${enemy.name} (${hitChance}%) por ${dmg} de dano${enemy.hp <= 0 ? " — ALVO ELIMINADO" : ""}.`);
+  } else {
+    battleLog(`${unit.name} falhou o disparo contra ${enemy.name} (${hitChance}%).`);
+  }
+
+  checkWin();
+  if (!battle.finished) {
+    selectNextUnitWithAp();
+    renderBattle();
+  }
+    }
+function renderBattleActions() {
+  const actEl = document.getElementById("battle-actions");
+  if (!actEl) return;
+  actEl.innerHTML = "";
+
+  if (battle.finished) {
+    const backBtn = document.createElement("button");
+    backBtn.type = "button";
+    backBtn.className = "btn";
+    backBtn.textContent = "VOLTAR À BASE";
+    backBtn.onclick = () => go("base");
+    actEl.appendChild(backBtn);
+    return;
+  }
+
+  const active = getActiveUnit();
+  if (!active) return;
+
+  const buttons = [
+    {
+      label: activeCombatMode === "move" ? "MOVER (ATIVO)" : "MOVER",
+      disabled: active.ap <= 0,
+      onClick: () => {
+        activeCombatMode = activeCombatMode === "move" ? null : "move";
+        battleLog(activeCombatMode === "move" ? `Seleciona uma célula verde para mover ${active.name}.` : "Modo de movimento cancelado.");
+        renderBattle();
+      }
+    },
+    {
+      label: activeCombatMode === "shoot" ? "DISPARAR (ATIVO)" : "DISPARAR",
+      disabled: active.ap <= 0 || active.ammo <= 0,
+      onClick: () => {
+        activeCombatMode = activeCombatMode === "shoot" ? null : "shoot";
+        battleLog(activeCombatMode === "shoot" ? `Seleciona um inimigo destacado para ${active.name} disparar.` : "Modo de disparo cancelado.");
+        renderBattle();
+      }
+    },
+    {
+      label: "VIGILÂNCIA",
+      disabled: active.ap <= 0 || active.ammo <= 0 || active.overwatch,
+      onClick: () => {
+        active.overwatch = true;
+        active.hunker = false;
+        active.ap = 0;
+        activeCombatMode = null;
+        battleLog(`${active.name} entrou em VIGILÂNCIA.`);
+        selectNextUnitWithAp();
+        renderBattle();
+      }
+    },
+    {
+      label: "HUNKER",
+      disabled: active.ap <= 0 || active.hunker,
+      onClick: () => {
+        active.hunker = true;
+        active.overwatch = false;
+        active.ap = 0;
+        activeCombatMode = null;
+        battleLog(`${active.name} protegeu-se em cobertura (HUNKER).`);
+        selectNextUnitWithAp();
+        renderBattle();
+      }
+    },
+    {
+      label: `RECARREGAR (${active.ammo}/${active.maxAmmo})`,
+      disabled: active.ap <= 0 || active.ammo >= active.maxAmmo,
+      onClick: () => {
+        active.ammo = active.maxAmmo;
+        active.ap = Math.max(0, active.ap - 1);
+        activeCombatMode = null;
+        battleLog(`${active.name} recarregou a arma (${active.ammo}/${active.maxAmmo}).`);
+        if (active.ap <= 0) selectNextUnitWithAp();
+        renderBattle();
+      }
+    },
+    {
+      label: `FRAG (${active.frag})`,
+      disabled: active.ap <= 0 || active.frag <= 0,
+      onClick: () => {
+        activeCombatMode = activeCombatMode === "frag" ? null : "frag";
+        battleLog(activeCombatMode === "frag" ? "Seleciona a célula alvo para a granada de fragmentação." : "Granada cancelada.");
+        renderBattle();
+      }
+    },
+    {
+      label: `FUMO (${active.smoke})`,
+      disabled: active.ap <= 0 || active.smoke <= 0,
+      onClick: () => {
+        activeCombatMode = activeCombatMode === "smoke" ? null : "smoke";
+        battleLog(activeCombatMode === "smoke" ? "Seleciona a célula alvo para lançar fumo." : "Fumo cancelado.");
+        renderBattle();
+      }
+    },
+    {
+      label: `KIT (${active.medkit})`,
+      disabled: active.ap <= 0 || active.medkit <= 0,
+      onClick: () => {
+        activeCombatMode = activeCombatMode === "medkit" ? null : "medkit";
+        battleLog(activeCombatMode === "medkit" ? "Seleciona um aliado adjacente (ou o próprio) para curar." : "Kit cancelado.");
+        renderBattle();
+      }
+    },
+    {
+      label: "PRÓXIMO",
+      disabled: battle.units.filter(u => u.hp > 0 && u.ap > 0).length <= 1,
+      onClick: () => {
+        const len = battle.units.length;
+        for (let step = 1; step <= len; step++) {
+          const candIdx = (battle.activeUnitIdx + step) % len;
+          const cand = battle.units[candIdx];
+          if (cand && cand.hp > 0 && cand.ap > 0) {
+            battle.activeUnitIdx = candIdx;
+            activeCombatMode = null;
+            battleLog(`Unidade ativa: ${cand.name}.`);
+            renderBattle();
+            return;
+          }
+        }
+      }
+    },
+    {
+      label: "TERMINAR TURNO",
+      disabled: false,
+      onClick: () => {
+        activeCombatMode = null;
+        runEnemyTurn();
+      }
+    }
+  ];
+
+  buttons.forEach(cfg => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "btn";
+    b.textContent = cfg.label;
+    b.disabled = Boolean(cfg.disabled);
+    b.onclick = cfg.onClick;
+    actEl.appendChild(b);
+  });
+}
+
+function throwFragGrenade(unit, tx, ty) {
+  const gear = getOpGear(unit.opIndex);
+  unit.frag = Math.max(0, unit.frag - 1);
+  gear.frag = Math.max(0, (gear.frag || 0) - 1);
+  unit.ap = 0;
+  activeCombatMode = null;
 
   let hits = 0;
   battle.enemies.forEach(e => {
-    if (e.hp > 0 && Math.abs(e.x - tx) <= 1 && Math.abs(e.y - ty) <= 1) {
+    if (e.hp > 0 && manhattanDist(e.x, e.y, tx, ty) <= 1) {
       e.hp = Math.max(0, e.hp - 32);
       hits += 1;
     }
   });
 
-  battleLog(`${unit.name} lançou Granada de Fragmentação em (${tx + 1},${ty + 1}) — ${hits} alvo(s) atingido(s) (32 dano).`);
-  checkWin();
-  renderBattle();
-}
-
-function throwSmokeGrenadeAt(tx, ty) {
-  const unit = getActiveUnit();
-  if (!unit || battle.finished) return;
-  const gear = getOpGear(unit.opIndex);
-  if ((gear.smoke || 0) <= 0) {
-    logModal("SEM FUMO", `${unit.name} não tem granadas de fumo na mochila.`);
-    return;
-  }
-  if (unit.ap < 1) {
-    logModal("SEM PA", `${unit.name} não tem pontos de ação suficientes.`);
-    return;
-  }
-  gear.smoke -= 1;
-  unit.ap -= 1;
-  activeCombatMode = null;
   save();
-
-  battle.smokes.push({ x: tx, y: ty, turns: 2 });
-  battleLog(`${unit.name} lançou Granada de Fumo em (${tx + 1},${ty + 1}) por 2 turnos.`);
-  renderBattle();
+  battleLog(`${unit.name} lançou Granada Frag em (${tx + 1}, ${ty + 1}) — ${hits} alvo(s) atingido(s).`);
+  checkWin();
+  if (!battle.finished) {
+    selectNextUnitWithAp();
+    renderBattle();
+  }
 }
 
-function useFieldMedkit() {
-  const unit = getActiveUnit();
-  if (!unit || battle.finished) return;
+function throwSmokeGrenade(unit, tx, ty) {
   const gear = getOpGear(unit.opIndex);
-  if ((gear.medkit || 0) <= 0) {
-    logModal("SEM KITS", `${unit.name} não tem Kit de Saúde na mochila.`);
-    return;
-  }
-  if (unit.hp >= unit.maxHp) {
-    logModal("HP COMPLETO", `${unit.name} já está com a saúde máxima.`);
-    return;
-  }
-  const healAmt = unit.role === "Médico" ? 50 : 40;
-  gear.medkit -= 1;
-  unit.hp = Math.min(unit.maxHp, unit.hp + healAmt);
+  unit.smoke = Math.max(0, unit.smoke - 1);
+  gear.smoke = Math.max(0, (gear.smoke || 0) - 1);
   unit.ap = Math.max(0, unit.ap - 1);
   activeCombatMode = null;
+
+  battle.smokes.push({ x: tx, y: ty, turns: 2 });
   save();
-
-  battleLog(`${unit.name} usou Kit de Saúde (+${healAmt} HP · agora ${unit.hp}/${unit.maxHp} HP).`);
-  renderBattle();
-      }
-function renderBattle() {
-  const grid = document.getElementById("battle-grid");
-  const statusEl = document.getElementById("battle-status");
-  const actionsEl = document.getElementById("battle-actions");
-  if (!grid || !statusEl || !actionsEl) return;
-
-  const activeUnit = getActiveUnit();
-  const gear = activeUnit ? getOpGear(activeUnit.opIndex) : { frag: 0, smoke: 0, medkit: 0 };
-  const wpn = activeUnit ? getWeapon(activeUnit.opIndex) : { name: "-", dmg: 0, mag: 0 };
-
-  statusEl.innerHTML = activeUnit ? `
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
-      <div>
-        <b>TURNO ${battle.turn}</b> · Ativo: <b style="color:var(--lime)">${activeUnit.name}</b> (${activeUnit.role})
-      </div>
-      <div style="font-size:12px">
-        HP: <b>${activeUnit.hp}/${activeUnit.maxHp}</b> · PA: <b>${activeUnit.ap}</b> · Mun: <b>${activeUnit.ammo}/${wpn.mag}</b>
-      </div>
-    </div>
-    <div style="font-size:11px;color:var(--muted);margin-top:4px">
-      Arma: <b>${wpn.name}</b> (${wpn.dmg} DMG) · Mochila: Frag x${gear.frag} · Fumo x${gear.smoke} · Kit x${gear.medkit}
-      ${activeCombatMode ? ` · <span style="color:#ffd166">Modo: ${activeCombatMode.toUpperCase()}</span>` : ""}
-    </div>
-  ` : `<div><b>TURNO ${battle.turn}</b> · A aguardar resolução...</div>`;
-
-  grid.innerHTML = "";
-  for (let y = 0; y < 6; y++) {
-    for (let x = 0; x < 8; x++) {
-      const tile = document.createElement("div");
-      tile.className = "tile";
-      tile.dataset.x = x;
-      tile.dataset.y = y;
-
-      const cov = getCoverAt(x, y);
-      const inSmoke = isInSmoke(x, y);
-      const sample = Array.isArray(battle.samples)
-        ? battle.samples.find(s => !s.collected && s.x === x && s.y === y)
-        : null;
-      const unitHere = battle.units.find(u => u.hp > 0 && u.x === x && u.y === y);
-      const enemyHere = battle.enemies.find(e => e.hp > 0 && e.x === x && e.y === y);
-
-      if (inSmoke) {
-        tile.style.background = "rgba(170, 190, 210, 0.28)";
-        tile.style.borderColor = "rgba(220, 235, 250, 0.5)";
-      }
-
-      if (unitHere) {
-        const isCurrent = activeUnit && unitHere.opIndex === activeUnit.opIndex;
-        tile.textContent = unitHere.name.slice(0, 2).toUpperCase() + (unitHere.overwatch ? "👁" : "");
-        tile.style.background = isCurrent ? "rgba(155, 240, 11, 0.24)" : "rgba(76, 175, 255, 0.2)";
-        tile.style.borderColor = isCurrent ? "var(--lime)" : "#4cafff";
-        tile.style.color = "#ffffff";
-      } else if (enemyHere) {
-        tile.textContent = "X" + (enemyHere.overwatch ? "!" : "");
-        tile.style.background = "rgba(255, 92, 119, 0.24)";
-        tile.style.borderColor = "#ff5c77";
-        tile.style.color = "#ffd6de";
-      } else if (sample) {
-        tile.textContent = "✦";
-        tile.style.color = "#6ef7ff";
-        tile.style.borderColor = "rgba(110, 247, 255, 0.55)";
-      } else if (cov) {
-        tile.textContent = cov.type === "full" ? "▣" : "▤";
-        tile.style.color = cov.type === "full" ? "#ffd166" : "#b8d4e3";
-      } else if (inSmoke) {
-        tile.textContent = "☁";
-        tile.style.color = "#e6f2ff";
-      }
-
-      if (activeUnit && !battle.finished) {
-        const dist = Math.hypot(x - activeUnit.x, y - activeUnit.y);
-        if (!unitHere && !enemyHere && !cov && dist <= 3.1 && activeUnit.ap > 0 && !activeCombatMode) {
-          tile.style.boxShadow = "inset 0 0 0 1px rgba(155, 240, 11, 0.35)";
-        }
-      }
-
-      tile.onclick = () => onTileClick(x, y);
-      grid.appendChild(tile);
-    }
-  }
-
-  actionsEl.innerHTML = "";
-  if (!activeUnit || battle.finished) return;
-
-  const buttons = [
-    {
-      label: activeCombatMode === "frag" ? "CANCELAR FRAG" : `FRAG (${gear.frag})`,
-      disabled: gear.frag <= 0 || activeUnit.ap <= 0,
-      fn: () => {
-        activeCombatMode = activeCombatMode === "frag" ? null : "frag";
-        renderBattle();
-      }
-    },
-    {
-      label: activeCombatMode === "smoke" ? "CANCELAR FUMO" : `FUMO (${gear.smoke})`,
-      disabled: gear.smoke <= 0 || activeUnit.ap <= 0,
-      fn: () => {
-        activeCombatMode = activeCombatMode === "smoke" ? null : "smoke";
-        renderBattle();
-      }
-    },
-    {
-      label: `KIT (${gear.medkit})`,
-      disabled: gear.medkit <= 0 || activeUnit.ap <= 0 || activeUnit.hp >= activeUnit.maxHp,
-      fn: useFieldMedkit
-    },
-    {
-      label: activeUnit.overwatch ? "VIGILÂNCIA ✓" : "VIGILÂNCIA",
-      disabled: activeUnit.ap <= 0,
-      fn: () => setOverwatch(activeUnit)
-    },
-    {
-      label: activeUnit.hunkered ? "HUNKER ✓" : "HUNKER",
-      disabled: activeUnit.ap <= 0,
-      fn: () => setHunker(activeUnit)
-    },
-    {
-      label: "RECARREGAR",
-      disabled: activeUnit.ap <= 0 || activeUnit.ammo >= wpn.mag,
-      fn: () => reloadUnit(activeUnit)
-    },
-    {
-      label: "PRÓXIMO",
-      disabled: false,
-      fn: () => cycleNextUnit()
-    },
-    {
-      label: "TERMINAR TURNO",
-      disabled: false,
-      fn: () => endPlayerTurn()
-    }
-  ];
-
-  buttons.forEach(b => {
-    const btn = document.createElement("button");
-    btn.className = "btn";
-    btn.textContent = b.label;
-    btn.disabled = !!b.disabled;
-    btn.style.backgroundColor = "#121d27";
-    btn.style.color = b.disabled ? "#6f8796" : "#f2f7fa";
-    btn.style.border = "1px solid rgba(255,255,255,.18)";
-    btn.onclick = b.fn;
-    actionsEl.appendChild(btn);
-  });
-      }
-function battleLog(msg) {
-  const el = document.getElementById("battle-log");
-  if (!el) return;
-  el.textContent = msg;
-}
-
-function collectSampleAt(x, y, unit) {
-  if (!Array.isArray(battle.samples)) return;
-  battle.samples.forEach(s => {
-    if (!s.collected && s.x === x && s.y === y) {
-      s.collected = true;
-      state.alien = (state.alien || 0) + 1;
-      save();
-      renderResources();
-      battleLog(`${unit.name} recolheu uma amostra alienígena (+1 Tec. Alienígena)!`);
-    }
-  });
-}
-
-function moveUnitTo(unit, x, y) {
-  if (unit.ap <= 0) {
-    logModal("SEM PA", `${unit.name} não tem pontos de ação disponíveis.`);
-    return;
-  }
-  const cov = getCoverAt(x, y);
-  if (cov && cov.blocksSight) {
-    logModal("OBSTÁCULO", "Não podes ocupar uma cobertura total bloqueada.");
-    return;
-  }
-  const occupied =
-    battle.units.some(u => u.hp > 0 && u.x === x && u.y === y) ||
-    battle.enemies.some(e => e.hp > 0 && e.x === x && e.y === y);
-  if (occupied) {
-    logModal("CASA OCUPADA", "Já existe alguém nessa posição.");
-    return;
-  }
-  const dist = Math.hypot(x - unit.x, y - unit.y);
-  const maxMove = unit.ap === 2 ? 4.2 : 3.2;
-  if (dist > maxMove) {
-    logModal("FORA DE ALCANCE", "Essa casa está demasiado longe para o movimento atual.");
-    return;
-  }
-
-  unit.x = x;
-  unit.y = y;
-  unit.ap -= 1;
-  unit.hunkered = false;
-
-  battle.enemies.forEach(e => {
-    if (e.hp > 0 && e.overwatch) {
-      e.overwatch = false;
-      const hitChance = Math.max(10, Math.min(85, 55 - getLabIntelDebuff().aimPen));
-      const roll = Math.random() * 100;
-      if (roll <= hitChance) {
-        const rawDmg = Math.max(4, e.dmg - getLabIntelDebuff().dmgRed);
-        unit.hp = Math.max(0, unit.hp - rawDmg);
-        battleLog(`${e.name} disparou em Vigilância contra ${unit.name} (-${rawDmg} HP)!`);
-      } else {
-        battleLog(`Vigilância de ${e.name} falhou sobre ${unit.name}.`);
-      }
-    }
-  });
-
-  collectSampleAt(x, y, unit);
-  checkWin();
+  battleLog(`${unit.name} lançou Granada de Fumo em (${tx + 1}, ${ty + 1}) por 2 turnos.`);
+  if (unit.ap <= 0) selectNextUnitWithAp();
   renderBattle();
 }
 
-function shootEnemy(unit, enemy) {
-  if (unit.ap <= 0) {
-    logModal("SEM PA", `${unit.name} não tem pontos de ação para disparar.`);
-    return;
-  }
-  if (unit.ammo <= 0) {
-    logModal("SEM MUNIÇÕES", `${unit.name} precisa de recarregar a arma.`);
-    return;
-  }
-  const chance = calcHitChance(unit, enemy, false);
-  if (chance <= 0) {
-    logModal("SEM LINHA DE VISÃO", "Há um obstáculo a bloquear o disparo para este alvo.");
-    return;
-  }
-
-  unit.ap = 0;
-  unit.ammo -= 1;
-  unit.hunkered = false;
-  unit.overwatch = false;
-
-  const wpn = getWeapon(unit.opIndex);
-  const dist = Math.hypot(enemy.x - unit.x, enemy.y - unit.y);
-  let critChance = 12;
-  if (unit.role === "Sniper" && dist >= 5) critChance += 5;
-
-  const roll = Math.random() * 100;
-  if (roll <= chance) {
-    const isCrit = Math.random() * 100 <= critChance;
-    const dmg = isCrit ? Math.round(wpn.dmg * 1.35) : wpn.dmg;
-    enemy.hp = Math.max(0, enemy.hp - dmg);
-    battleLog(
-      `${unit.name} acertou (${chance}%) em ${enemy.name} para ${dmg} dano${isCrit ? " CRÍTICO" : ""}!`
-    );
-  } else {
-    battleLog(`${unit.name} falhou o disparo (${chance}%) contra ${enemy.name}.`);
-  }
-
-  checkWin();
-  renderBattle();
-}
-
-function setOverwatch(unit) {
-  if (unit.ap <= 0) return;
-  unit.overwatch = !unit.overwatch;
-  if (unit.overwatch) {
-    unit.ap = 0;
-    battleLog(`${unit.name} entrou em Vigilância.`);
-  }
-  renderBattle();
-}
-
-function setHunker(unit) {
-  if (unit.ap <= 0) return;
-  unit.hunkered = true;
-  unit.ap = 0;
-  battleLog(`${unit.name} assumiu posição defensiva (Hunker).`);
-  renderBattle();
-}
-
-function reloadUnit(unit) {
-  if (unit.ap <= 0) return;
-  const wpn = getWeapon(unit.opIndex);
-  unit.ammo = wpn.mag;
-  unit.ap -= 1;
-  battleLog(`${unit.name} recarregou (${wpn.mag} munições).`);
-  renderBattle();
-}
-
-function cycleNextUnit() {
-  if (!Array.isArray(battle.units) || battle.units.length === 0) return;
-  for (let i = 1; i <= battle.units.length; i++) {
-    const idx = (battle.active + i) % battle.units.length;
-    if (battle.units[idx].hp > 0) {
-      battle.active = idx;
-      activeCombatMode = null;
-      renderBattle();
-      return;
-    }
-  }
-}
-
-function onTileClick(x, y) {
-  if (battle.finished) return;
-  const unit = getActiveUnit();
-  if (!unit) return;
-
-  if (activeCombatMode === "frag") {
-    throwFragGrenadeAt(x, y);
-    return;
-  }
-  if (activeCombatMode === "smoke") {
-    throwSmokeGrenadeAt(x, y);
-    return;
-  }
-
-  const enemyHere = battle.enemies.find(e => e.hp > 0 && e.x === x && e.y === y);
-  if (enemyHere) {
-    shootEnemy(unit, enemyHere);
-    return;
-  }
-
-  const unitHere = battle.units.find(u => u.hp > 0 && u.x === x && u.y === y);
-  if (unitHere) {
-    battle.active = battle.units.indexOf(unitHere);
-    activeCombatMode = null;
-    renderBattle();
-    return;
-  }
-
-  moveUnitTo(unit, x, y);
-}
-function endPlayerTurn() {
-  if (battle.finished) return;
+function useMedkit(unit, targetUnit) {
+  const gear = getOpGear(unit.opIndex);
+  unit.medkit = Math.max(0, unit.medkit - 1);
+  gear.medkit = Math.max(0, (gear.medkit || 0) - 1);
+  unit.ap = Math.max(0, unit.ap - 1);
   activeCombatMode = null;
 
-  if (Array.isArray(battle.smokes)) {
-    battle.smokes = battle.smokes
-      .map(sm => ({ ...sm, turns: sm.turns - 1 }))
-      .filter(sm => sm.turns > 0);
+  const isMedic = unit.role === "Médico";
+  const healAmt = isMedic ? 50 : 40;
+  const before = targetUnit.hp;
+  targetUnit.hp = Math.min(targetUnit.maxHp, targetUnit.hp + healAmt);
+  save();
+  battleLog(`${unit.name} tratou ${targetUnit.name} (+${targetUnit.hp - before} HP).`);
+  if (unit.ap <= 0) selectNextUnitWithAp();
+  renderBattle();
+      }
+function triggerOverwatchReactions(enemy) {
+  for (const unit of battle.units) {
+    if (enemy.hp <= 0) break;
+    if (unit.hp > 0 && unit.overwatch && unit.ammo > 0) {
+      unit.overwatch = false;
+      unit.ammo = Math.max(0, unit.ammo - 1);
+      const hitChance = calcHitChance(unit, enemy, true);
+      if (Math.random() * 100 <= hitChance) {
+        const dmg = calcDamage(unit, enemy);
+        enemy.hp = Math.max(0, enemy.hp - dmg);
+        battleLog(`VIGILÂNCIA: ${unit.name} atingiu ${enemy.name} (${hitChance}%) por ${dmg} de dano.`);
+      } else {
+        battleLog(`VIGILÂNCIA: ${unit.name} falhou o disparo de reação contra ${enemy.name} (${hitChance}%).`);
+      }
+    }
   }
-
-  runEnemyTurn();
 }
 
 function runEnemyTurn() {
-  const intel = getLabIntelDebuff();
-  const logs = [];
+  if (battle.finished) return;
 
-  battle.enemies.forEach(enemy => {
-    if (enemy.hp <= 0) return;
+  const intelDebuff = getLabIntelDebuff();
+  const events = [];
 
-    const aliveUnits = battle.units.filter(u => u.hp > 0);
-    if (aliveUnits.length === 0) return;
+  for (const enemy of battle.enemies) {
+    if (enemy.hp <= 0) continue;
 
-    let target = aliveUnits[0];
-    let bestDist = Math.hypot(target.x - enemy.x, target.y - enemy.y);
-    aliveUnits.forEach(u => {
-      const d = Math.hypot(u.x - enemy.x, u.y - enemy.y);
+    const livingUnits = battle.units.filter(u => u.hp > 0);
+    if (livingUnits.length === 0) break;
+
+    let target = livingUnits[0];
+    let bestDist = manhattanDist(enemy.x, enemy.y, target.x, target.y);
+    for (const u of livingUnits) {
+      const d = manhattanDist(enemy.x, enemy.y, u.x, u.y);
       if (d < bestDist) {
         bestDist = d;
         target = u;
       }
-    });
+    }
 
-    const stepX = enemy.x + Math.sign(target.x - enemy.x);
-    const stepY = enemy.y + Math.sign(target.y - enemy.y);
-    const stepBlocked =
-      battle.units.some(u => u.hp > 0 && u.x === stepX && u.y === stepY) ||
-      battle.enemies.some(e => e !== enemy && e.hp > 0 && e.x === stepX && e.y === stepY) ||
-      Boolean(getCoverAt(stepX, stepY) && getCoverAt(stepX, stepY).blocksSight);
-
-    if (bestDist > 4.5 && !stepBlocked) {
-      enemy.x = stepX;
-      enemy.y = stepY;
-      bestDist = Math.hypot(target.x - enemy.x, target.y - enemy.y);
-
-      const watcher = battle.units.find(u => u.hp > 0 && u.overwatch && hasLineOfSight(u.x, u.y, enemy.x, enemy.y));
-      if (watcher) {
-        watcher.overwatch = false;
-        const wChance = Math.max(15, Math.min(92, calcHitChance(watcher, enemy, true)));
-        const wRoll = Math.random() * 100;
-        if (wRoll <= wChance) {
-          const wDmg = getWeapon(watcher.opIndex).dmg;
-          enemy.hp = Math.max(0, enemy.hp - wDmg);
-          logs.push(`Vigilância de ${watcher.name} atingiu ${enemy.name} (-${wDmg} HP)`);
-          if (enemy.hp <= 0) {
-            logs.push(`${enemy.name} neutralizado em Vigilância`);
-            return;
-          }
+    if (bestDist > 2) {
+      const steps = Math.min(enemy.move || 3, bestDist - 2);
+      for (let s = 0; s < steps; s++) {
+        const dx = Math.sign(target.x - enemy.x);
+        const dy = Math.sign(target.y - enemy.y);
+        const candidates = [
+          [enemy.x + dx, enemy.y],
+          [enemy.x, enemy.y + dy]
+        ];
+        let moved = false;
+        for (const [nx, ny] of candidates) {
+          if (nx < 0 || nx >= GRID_W || ny < 0 || ny >= GRID_H) continue;
+          if (getUnitAt(nx, ny) || getEnemyAt(nx, ny)) continue;
+          const cov = getCoverAt(nx, ny);
+          if (cov && cov.blocksSight) continue;
+          enemy.x = nx;
+          enemy.y = ny;
+          moved = true;
+          break;
+        }
+        if (moved) {
+          triggerOverwatchReactions(enemy);
+          if (enemy.hp <= 0) break;
         } else {
-          logs.push(`Vigilância de ${watcher.name} falhou sobre ${enemy.name}`);
+          break;
         }
       }
     }
 
-    if (enemy.hp <= 0) return;
+    if (enemy.hp <= 0) continue;
 
-    if (hasLineOfSight(enemy.x, enemy.y, target.x, target.y)) {
-      let hitChance = 62 - intel.aimPen;
-      const coverBonus = getTargetCoverBonus(enemy.x, enemy.y, target.x, target.y);
-      if (coverBonus > 0) hitChance -= coverBonus;
-      if (target.hunkered) hitChance -= 20;
-      if (isInSmoke(target.x, target.y) || isInSmoke(enemy.x, enemy.y)) hitChance -= 30;
-      const outfit = getEquippedOutfitItem(target.opIndex);
-      hitChance -= (outfit.dodgeBonus || 0);
-      hitChance = Math.max(8, Math.min(90, Math.round(hitChance)));
+    const outfit = getEquippedOutfitItem(target.opIndex);
+    const covBonus = getTargetCoverBonus(enemy.x, enemy.y, target.x, target.y);
+    let hitChance = (enemy.aim || 64) - (intelDebuff.aimPen || 0) - covBonus - (outfit.dodgeBonus || 0);
+    if (target.hunker) hitChance -= 25;
+    if (isSmokeAt(target.x, target.y)) hitChance -= 25;
+    hitChance = Math.max(8, Math.min(92, Math.round(hitChance)));
 
-      const roll = Math.random() * 100;
-      if (roll <= hitChance) {
-        let dmg = Math.max(4, enemy.dmg - intel.dmgRed);
-        dmg = Math.max(2, dmg - (outfit.dmgRed || 0) - getLabArmorBonus().dmgRed);
-        if (target.role === "Armas pesadas") dmg = Math.max(2, dmg - 2);
-        if (target.hunkered) dmg = Math.max(1, Math.round(dmg * 0.65));
-
-        target.hp = Math.max(0, target.hp - dmg);
-        logs.push(`${enemy.name} acertou (${hitChance}%) em ${target.name} (-${dmg} HP)`);
-      } else {
-        logs.push(`${enemy.name} falhou (${hitChance}%) contra ${target.name}`);
-      }
+    if (Math.random() * 100 <= hitChance) {
+      const rawDmg = enemy.dmg || 16;
+      const armorRed = (outfit.dmgRed || 0) + (getLabArmorBonus().dmgRed || 0);
+      const finalDmg = Math.max(4, rawDmg - armorRed);
+      target.hp = Math.max(0, target.hp - finalDmg);
+      events.push(`${enemy.name} atingiu ${target.name} (-${finalDmg} HP)`);
     } else {
-      enemy.overwatch = true;
-      logs.push(`${enemy.name} entrou em Vigilância sem linha de visão`);
+      events.push(`${enemy.name} falhou contra ${target.name}`);
     }
-  });
 
-  checkWin();
-  if (battle.finished) {
-    if (logs.length > 0) {
-      battleLog(`${document.getElementById("battle-log").textContent} · ${logs.join(" | ")}`);
-    }
-    renderBattle();
-    return;
+    checkWin();
+    if (battle.finished) return;
   }
 
   battle.turn += 1;
+  battle.smokes.forEach(s => {
+    s.turns = Math.max(0, s.turns - 1);
+  });
+  battle.smokes = battle.smokes.filter(s => s.turns > 0);
+
   battle.units.forEach(u => {
     if (u.hp > 0) {
       u.ap = 2;
       u.overwatch = false;
-      u.hunkered = false;
+      u.hunker = false;
     }
   });
-  battle.active = 0;
 
-  if (logs.length > 0) {
-    battleLog(`Turno ${battle.turn}: ${logs.join(" | ")}`);
-  } else {
-    battleLog(`Turno ${battle.turn} iniciado.`);
-  }
+  selectNextUnitWithAp();
   renderBattle();
-}
-function applyBarracksRestAfterMission() {
-  const restHeal = getBarracksRestHeal();
-  const rested = [];
-  OPERATIVES.forEach((op, idx) => {
-    if (state.selected.includes(idx)) return;
-    const maxHp = getMaxHp(idx);
-    const curHp = getOpHp(idx);
-    if (curHp < maxHp) {
-      const nextHp = Math.min(maxHp, curHp + restHeal);
-      setOpHp(idx, nextHp);
-      rested.push(`${op[0]} (+${nextHp - curHp} HP)`);
-    }
-  });
-  return rested;
+  battleLog(events.length > 0 ? `Turno inimigo: ${events.join(" · ")}.` : `Turno ${battle.turn} da esquadra.`);
 }
 
 function checkWin() {
   if (battle.finished) return;
 
-  const allEnemiesDown = battle.enemies.every(e => e.hp <= 0);
-  const allUnitsDown = battle.units.every(u => u.hp <= 0);
+  const allEnemiesDead = battle.enemies.every(e => e.hp <= 0);
+  const allUnitsDead = battle.units.every(u => u.hp <= 0);
 
-  if (!allEnemiesDown && !allUnitsDown) return;
+  if (!allEnemiesDead && !allUnitsDead) return;
+
   battle.finished = true;
+  activeCombatMode = null;
+
+  const mission = MISSIONS[battle.missionIndex] || MISSIONS[0];
 
   battle.units.forEach(u => {
     setOpHp(u.opIndex, u.hp);
   });
 
-  if (allEnemiesDown) {
-    const m = MISSIONS[battle.missionIndex] || MISSIONS[0];
-    let earnedCredits = m.rewardCredits;
-    let earnedMaterials = m.rewardMaterials;
-    let bonusText = "";
+  state.medProphylaxis = {};
 
-    const secondaryMet =
-      (m.secondaryType === "clear_all" && allEnemiesDown) ||
-      (m.secondaryType === "no_casualties" && battle.units.every(u => u.hp > 0)) ||
-      (m.secondaryType === "fast_clear" && battle.turn <= 6);
-
-    if (secondaryMet) {
-      earnedCredits += m.bonusCredits;
-      earnedMaterials += m.bonusMaterials;
-      bonusText = `<br><span style="color:var(--lime)">Objetivo secundário cumprido (${m.secondaryLabel}): +${m.bonusCredits} CR · +${m.bonusMaterials} MAT</span>`;
+  const restHeal = getBarracksRestHeal();
+  OPERATIVES.forEach((_, idx) => {
+    if (!state.selected.includes(idx)) {
+      const cur = getOpHp(idx);
+      if (cur > 0) setOpHp(idx, cur + restHeal);
     }
+  });
 
-    state.credits += earnedCredits;
-    state.materials += earnedMaterials;
+  if (allEnemiesDead) {
     if (!state.completed.includes(battle.missionIndex)) {
       state.completed.push(battle.missionIndex);
     }
 
-    const xpNotes = battle.units.map(u => {
-      const gained = m.xpBase + (u.hp > 0 ? 10 : 0);
-      const lvUp = grantOpXp(u.opIndex, gained);
-      return `${u.name}: +${gained} XP${lvUp > 0 ? ` (SUBIU NV.${getOpProgress(u.opIndex).level}!)` : ""}`;
-    });
+    let secondaryMet = false;
+    if (mission.secondaryType === "clear_all") {
+      secondaryMet = true;
+    } else if (mission.secondaryType === "no_casualties") {
+      secondaryMet = battle.units.every(u => u.hp > 0);
+    } else if (mission.secondaryType === "fast_clear") {
+      secondaryMet = battle.turn <= 6;
+    }
 
-    const rested = applyBarracksRestAfterMission();
-    const restText = rested.length > 0
-      ? `<br><small style="color:#6ef7ff">Descanso no Quartel: ${rested.join(", ")}</small>`
-      : "";
+    let totalCr = mission.rewardCredits + (secondaryMet ? mission.bonusCredits : 0);
+    let totalMat = mission.rewardMaterials + (secondaryMet ? mission.bonusMaterials : 0);
+    let alienGain = 1;
+
+    const cc = state.commandCenter || { built: false, level: 0 };
+    let ccNote = "";
+    if (cc.built) {
+      const lv = cc.level || 1;
+      const extraCr = lv >= 2 ? 180 : 90;
+      const extraMat = lv >= 2 ? 6 : 3;
+      totalCr += extraCr;
+      totalMat += extraMat;
+      let extraAlien = 0;
+      if (lv >= 2 && Math.random() < 0.65) {
+        extraAlien = 1;
+        alienGain += 1;
+      }
+      ccNote = `<br><small style="color:#6ef7ff">Centro de Comando (Nv.${lv}): +${extraCr} CR · +${extraMat} MAT${extraAlien ? " · +1 Tec. Alienígena" : ""}</small>`;
+    }
+
+    state.credits += totalCr;
+    state.materials += totalMat;
+    state.alien = (state.alien || 0) + alienGain;
+
+    const levelNotes = [];
+    battle.units.forEach(u => {
+      const xpGain = u.hp > 0 ? mission.xpBase : Math.round(mission.xpBase * 0.5);
+      const ups = grantOpXp(u.opIndex, xpGain);
+      if (ups > 0) {
+        levelNotes.push(`${u.name} subiu para Nv.${getOpProgress(u.opIndex).level}`);
+      }
+    });
 
     save();
     renderResources();
     renderRoster();
     renderBuildings();
+    renderMissions();
+    renderBattle();
 
-    battleLog(`Vitória na operação ${m.title}!`);
+    const lvlHtml = levelNotes.length > 0 ? `<br><b>Promoções:</b> ${levelNotes.join(" · ")}` : "";
+    const secHtml = secondaryMet
+      ? `<br>Objetivo secundário concluído: <b>+${mission.bonusCredits} CR · +${mission.bonusMaterials} MAT</b>`
+      : `<br><small style="color:var(--muted)">Objetivo secundário não cumprido (${mission.secondaryLabel}).</small>`;
+
     logModal(
       "OPERAÇÃO CONCLUÍDA",
-      `Ganhaste <b>${earnedCredits} créditos</b> e <b>${earnedMaterials} materiais</b>.${bonusText}<br><small style="color:var(--muted)">${xpNotes.join(" · ")}</small>${restText}`,
-      "missions"
+      `Vitória em <b>${mission.title}</b>!<br>Recompensa: <b>+${totalCr} CR · +${totalMat} MAT · +${alienGain} Tec. Alienígena</b>${secHtml}${ccNote}${lvlHtml}`,
+      "base"
     );
-    return;
+  } else {
+    save();
+    renderResources();
+    renderRoster();
+    renderBuildings();
+    renderMissions();
+    renderBattle();
+
+    logModal(
+      "ESQUADRA INCAPACITADA",
+      "Todos os operacionais caíram em combate. Recupera a equipa no Quartel ou na Enfermaria.",
+      "base"
+    );
   }
+}
 
-  const rested = applyBarracksRestAfterMission();
-  const restText = rested.length > 0
-    ? `<br><small style="color:#6ef7ff">Descanso no Quartel: ${rested.join(", ")}</small>`
-    : "";
-
-  save();
+function initOperationZero() {
   renderResources();
   renderRoster();
   renderBuildings();
-
-  battleLog("Esquadra abatida. Reagrupamento na base.");
-  logModal(
-    "MISSÃO FALHADA",
-    `A tua esquadra foi neutralizada. Usa a <b>Enfermaria</b> ou o descanso do <b>Quartel</b> para recuperar antes da próxima saída.${restText}`,
-    "base"
-  );
+  renderMissions();
 }
 
-save();
-renderResources();
-renderRoster();
-renderBuildings();
-renderMissions();
-(function initBaseFacilitiesExpansion() {
-  if (!state.facilities || typeof state.facilities !== "object") {
-    state.facilities = {
-      armoryTier: 0,
-      labIntelDecoded: 0,
-      piercingAmmo: false,
-      medProphylaxis: {}
-    };
-  }
-  if (!state.facilities.medProphylaxis || typeof state.facilities.medProphylaxis !== "object") {
-    state.facilities.medProphylaxis = {};
-  }
-
-  let expTrainOp = 0;
-  let expTrainStat = 0;
-  let expMedOp = 0;
-  let expLabTarget = "flanker";
-
-  function syncExpansionState() {
-    if (!state.facilities || typeof state.facilities !== "object") {
-      state.facilities = { armoryTier: 0, labIntelDecoded: 0, piercingAmmo: false, medProphylaxis: {} };
-    }
-    if (!state.facilities.medProphylaxis || typeof state.facilities.medProphylaxis !== "object") {
-      state.facilities.medProphylaxis = {};
-    }
-  }
-
-  const origGetMaxHp = typeof getMaxHp === "function" ? getMaxHp : null;
-  if (origGetMaxHp) {
-    getMaxHp = function(opIndex) {
-      syncExpansionState();
-      const baseMax = origGetMaxHp(opIndex);
-      const op = OPERATIVES[opIndex];
-      const statArmorBonus = op ? Math.max(0, Math.round(((op[3][2] || 68) - 68) * 0.4)) : 0;
-      const prophBonus = state.facilities.medProphylaxis[opIndex] ? 8 : 0;
-      return baseMax + statArmorBonus + prophBonus;
-    };
-  }
-
-  const origGetWeapon = typeof getWeapon === "function" ? getWeapon : null;
-  if (origGetWeapon) {
-    getWeapon = function(opIndex) {
-      syncExpansionState();
-      const wpn = { ...origGetWeapon(opIndex) };
-      const armTier = Number(state.facilities.armoryTier) || 0;
-      if (armTier > 0) {
-        wpn.dmg += armTier * 4;
-        wpn.hitBonus = (wpn.hitBonus || 0) + armTier * 4;
-        wpn.name = `${wpn.name} [AR-NV${armTier}]`;
-      }
-      if (state.facilities.piercingAmmo) {
-        wpn.dmg += 4;
-        wpn.piercing = true;
-      }
-      return wpn;
-    };
-  }
-
-  const origGetLabIntelDebuff = typeof getLabIntelDebuff === "function" ? getLabIntelDebuff : null;
-  if (origGetLabIntelDebuff) {
-    getLabIntelDebuff = function() {
-      syncExpansionState();
-      const baseIntel = { ...origGetLabIntelDebuff() };
-      const decoded = Number(state.facilities.labIntelDecoded) || 0;
-      if (decoded > 0) {
-        baseIntel.aimPen += decoded * 5;
-        baseIntel.dmgRed += decoded * 1;
-      }
-      return baseIntel;
-    };
-  }
-
-  const origCalcHitChance = typeof calcHitChance === "function" ? calcHitChance : null;
-  if (origCalcHitChance) {
-    calcHitChance = function(unit, enemy, isOverwatch = false) {
-      syncExpansionState();
-      let chance = origCalcHitChance(unit, enemy, isOverwatch);
-      const decoded = Number(state.facilities.labIntelDecoded) || 0;
-      if (decoded > 0 && enemy) {
-        if (expLabTarget === enemy.role) {
-          chance += decoded * 6;
-        } else {
-          chance += decoded * 2;
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initOperationZero);
+} else {
+  initOperationZero();
         }
-      }
-      const wpn = typeof getWeapon === "function" ? getWeapon(unit.opIndex) : null;
-      if (wpn && wpn.piercing && typeof getTargetCoverBonus === "function") {
-        const covBonus = getTargetCoverBonus(unit.x, unit.y, enemy.x, enemy.y);
-        if (covBonus > 0) chance += Math.round(covBonus * 0.4);
-      }
-      return Math.max(5, Math.min(98, Math.round(chance)));
-    };
-  }
-
-  function trainOperativeStat(opIndex, statIndex) {
-    syncExpansionState();
-    const prog = getOpProgress(opIndex);
-    const op = OPERATIVES[opIndex];
-    const currentVal = op[3][statIndex];
-    if (currentVal >= 99) {
-      logModal("MÁXIMO ATINGIDO", `${STAT_NAMES[statIndex]} de ${op[0]} já está no máximo.`);
-      return;
-    }
-
-    if (prog.trainPoints > 0) {
-      prog.trainPoints -= 1;
-      op[3][statIndex] = Math.min(99, currentVal + 3);
-      save();
-      renderResources();
-      renderRoster();
-      renderBuildings();
-      logModal("TREINO CONCLUÍDO", `${op[0]} recebeu <b>+3 em ${STAT_NAMES[statIndex]}</b> usando 1 Ponto de Treino.`);
-      return;
-    }
-
-    const creditCost = 260;
-    const matCost = 7;
-    if (state.credits < creditCost || state.materials < matCost) {
-      logModal("RECURSOS INSUFICIENTES", `Sem pontos de treino livres. Treinar custa <b>${creditCost} CR</b> e <b>${matCost} MAT</b>.`);
-      return;
-    }
-    state.credits -= creditCost;
-    state.materials -= matCost;
-    op[3][statIndex] = Math.min(99, currentVal + 2);
-    save();
-    renderResources();
-    renderRoster();
-    renderBuildings();
-    logModal("TREINO INTENSIVO", `${op[0]} recebeu <b>+2 em ${STAT_NAMES[statIndex]}</b>.`);
-  }
-
-  function restOperativeNow(opIndex) {
-    if (state.selected.includes(opIndex)) {
-      logModal("EM SERVIÇO ATIVO", `${OPERATIVES[opIndex][0]} está na equipa ativa. Retira da equipa ou usa a Enfermaria.`);
-      return;
-    }
-    const maxHp = getMaxHp(opIndex);
-    const curHp = getOpHp(opIndex);
-    if (curHp >= maxHp) {
-      logModal("SEM DESGASTE", `${OPERATIVES[opIndex][0]} já está com HP máximo.`);
-      return;
-    }
-    const cost = 90;
-    if (state.credits < cost) {
-      logModal("CRÉDITOS INSUFICIENTES", `Descanso imediato no Quartel custa <b>${cost} créditos</b>.`);
-      return;
-    }
-    const healAmt = getBarracksRestHeal() + 10;
-    state.credits -= cost;
-    setOpHp(opIndex, curHp + healAmt);
-    save();
-    renderResources();
-    renderRoster();
-    renderBuildings();
-    logModal("DESCANSO NO QUARTEL", `${OPERATIVES[opIndex][0]} recuperou <b>+${Math.min(maxHp - curHp, healAmt)} HP</b>.`);
-  }
-
-  function urgentInfirmaryCare(opIndex) {
-    if (!state.built.includes(1)) {
-      logModal("ENFERMARIA EM FALTA", "Constrói primeiro a <b>Enfermaria</b>.");
-      return;
-    }
-    const maxHp = getMaxHp(opIndex);
-    const curHp = getOpHp(opIndex);
-    if (curHp >= maxHp) {
-      logModal("SAÚDE COMPLETA", `${OPERATIVES[opIndex][0]} não precisa de cuidados.`);
-      return;
-    }
-    const cost = Math.max(120, Math.round(getHealCost(opIndex) * 1.35));
-    if (state.credits < cost) {
-      logModal("CRÉDITOS INSUFICIENTES", `Cuidado urgente custa <b>${cost} créditos</b>.`);
-      return;
-    }
-    state.credits -= cost;
-    setOpHp(opIndex, maxHp);
-    save();
-    renderResources();
-    renderRoster();
-    renderBuildings();
-    logModal("CUIDADO URGENTE CONCLUÍDO", `${OPERATIVES[opIndex][0]} estabilizado com <b>${maxHp}/${maxHp} HP</b>.`);
-  }
-
-  function applyMedicalProphylaxis(opIndex) {
-    syncExpansionState();
-    if (!state.built.includes(1)) {
-      logModal("ENFERMARIA EM FALTA", "Constrói primeiro a <b>Enfermaria</b>.");
-      return;
-    }
-    if (state.facilities.medProphylaxis[opIndex]) {
-      logModal("PROFILAXIA ATIVA", `${OPERATIVES[opIndex][0]} já tem profilaxia médica pronta para a próxima missão.`);
-      return;
-    }
-    const costCredits = 180;
-    const costMat = 4;
-    if (state.credits < costCredits || state.materials < costMat) {
-      logModal("RECURSOS INSUFICIENTES", `Profilaxia médica custa <b>${costCredits} CR</b> e <b>${costMat} MAT</b>.`);
-      return;
-    }
-    state.credits -= costCredits;
-    state.materials -= costMat;
-    state.facilities.medProphylaxis[opIndex] = true;
-    const newMax = getMaxHp(opIndex);
-    setOpHp(opIndex, Math.min(newMax, getOpHp(opIndex) + 8));
-    save();
-    renderResources();
-    renderRoster();
-    renderBuildings();
-    logModal("PROFILAXIA APLICADA", `${OPERATIVES[opIndex][0]} recebeu <b>+8 HP</b> de reforço para a próxima saída.`);
-  }
-
-  function resupplyActiveSquad() {
-    if (!state.built.includes(2)) {
-      logModal("ARSENAL EM FALTA", "Constrói primeiro o <b>Arsenal</b>.");
-      return;
-    }
-    const squad = Array.isArray(state.selected) ? state.selected : [];
-    if (squad.length === 0) {
-      logModal("SEM ESQUADRA", "Seleciona operacionais na equipa antes de reabastecer.");
-      return;
-    }
-    const totalCredits = squad.length * 150;
-    const totalMat = squad.length * 3;
-    if (state.credits < totalCredits || state.materials < totalMat) {
-      logModal("RECURSOS INSUFICIENTES", `Reabastecer ${squad.length} operacionais custa <b>${totalCredits} CR</b> e <b>${totalMat} MAT</b>.`);
-      return;
-    }
-    state.credits -= totalCredits;
-    state.materials -= totalMat;
-    squad.forEach(idx => {
-      const g = getOpGear(idx);
-      g.frag = Math.max(g.frag || 0, 1);
-      g.smoke = Math.max(g.smoke || 0, 1);
-      g.medkit = Math.max(g.medkit || 0, 1);
-    });
-    save();
-    renderResources();
-    renderRoster();
-    renderBuildings();
-    logModal("ESQUADRA REABASTECIDA", `Cada operacional ativo recebeu pelo menos <b>1 Frag, 1 Fumo e 1 Kit de Saúde</b>.`);
-  }
-
-  function upgradeArmoryTier() {
-    syncExpansionState();
-    if (!state.built.includes(2)) {
-      logModal("ARSENAL EM FALTA", "Constrói primeiro o <b>Arsenal</b>.");
-      return;
-    }
-    const cur = Number(state.facilities.armoryTier) || 0;
-    if (cur >= 2) {
-      logModal("ARSENAL NO MÁXIMO", "O Arsenal já atingiu o Nível 2 de equipamento.");
-      return;
-    }
-    const costCr = cur === 0 ? 550 : 900;
-    const costMat = cur === 0 ? 14 : 22;
-    if (state.credits < costCr || state.materials < costMat) {
-      logModal("RECURSOS INSUFICIENTES", `Melhoria de Arsenal custa <b>${costCr} CR</b> e <b>${costMat} MAT</b>.`);
-      return;
-    }
-    state.credits -= costCr;
-    state.materials -= costMat;
-    state.facilities.armoryTier = cur + 1;
-    save();
-    renderResources();
-    renderRoster();
-    renderBuildings();
-    logModal("ARSENAL MELHORADO", `Armamento agora no <b>Nível ${state.facilities.armoryTier}</b> (+4 dano e +4% precisão).`);
-  }
-
-  function decodeAlienSample() {
-    syncExpansionState();
-    if (!state.built.includes(3)) {
-      logModal("LABORATÓRIO EM FALTA", "Constrói primeiro o <b>Laboratório</b>.");
-      return;
-    }
-    const decoded = Number(state.facilities.labIntelDecoded) || 0;
-    if (decoded >= 2) {
-      logModal("ANÁLISE COMPLETA", "Já descodificaste o máximo de relatórios alienígenas (2/2).");
-      return;
-    }
-    const alienCost = 1;
-    const crCost = 220;
-    if ((state.alien || 0) < alienCost || state.credits < crCost) {
-      logModal("RECURSOS INSUFICIENTES", `Descodificar amostra custa <b>${alienCost} Tec. Alienígena</b> e <b>${crCost} CR</b>.`);
-      return;
-    }
-    state.alien -= alienCost;
-    state.credits -= crCost;
-    state.facilities.labIntelDecoded = decoded + 1;
-    save();
-    renderResources();
-    renderBuildings();
-    logModal("AMOSTRA DESCODIFICADA", `Relatório Tático <b>${state.facilities.labIntelDecoded}/2</b> ativo: maior precisão e menor precisão/dano inimigo.`);
-  }
-
-  function researchPiercingAmmo() {
-    syncExpansionState();
-    if (!state.built.includes(3)) {
-      logModal("LABORATÓRIO EM FALTA", "Constrói primeiro o <b>Laboratório</b>.");
-      return;
-    }
-    if (state.facilities.piercingAmmo) {
-      logModal("JÁ PESQUISADO", "A <b>Munição Perfurante Xeno</b> já está ativa.");
-      return;
-    }
-    const alienCost = 2;
-    const crCost = 650;
-    const matCost = 16;
-    if ((state.alien || 0) < alienCost || state.credits < crCost || state.materials < matCost) {
-      logModal("RECURSOS INSUFICIENTES", `Munição Perfurante Xeno custa <b>${alienCost} XENO</b>, <b>${crCost} CR</b> e <b>${matCost} MAT</b>.`);
-      return;
-    }
-    state.alien -= alienCost;
-    state.credits -= crCost;
-    state.materials -= matCost;
-    state.facilities.piercingAmmo = true;
-    save();
-    renderResources();
-    renderRoster();
-    renderBuildings();
-    logModal("PROJETO EXPERIMENTAL CONCLUÍDO", "<b>Munição Perfurante Xeno</b> ativa (+4 dano e ignora parte da cobertura).");
-  }
-
-  function renderExtraFacilitiesPanel() {
-    syncExpansionState();
-    const el = document.getElementById("buildings");
-    if (!el) return;
-
-    const old = document.getElementById("oz-extra-facilities-panel");
-    if (old) old.remove();
-
-    const infBuilt = state.built.includes(1);
-    const armBuilt = state.built.includes(2);
-    const labBuilt = state.built.includes(3);
-
-    const opOpts = OPERATIVES.map((op, i) => {
-      const p = getOpProgress(i);
-      return `<option value="${i}" ${i === expTrainOp ? "selected" : ""}>${op[0]} (Nv.${p.level} · PT:${p.trainPoints})</option>`;
-    }).join("");
-
-    const statOpts = STAT_NAMES.map((s, i) => {
-      return `<option value="${i}" ${i === expTrainStat ? "selected" : ""}>${s} (${OPERATIVES[expTrainOp][3][i]})</option>`;
-    }).join("");
-
-    const medOpts = OPERATIVES.map((op, i) => {
-      const hp = getOpHp(i);
-      const maxHp = getMaxHp(i);
-      const proph = state.facilities.medProphylaxis[i] ? " · PROFILAXIA ✓" : "";
-      return `<option value="${i}" ${i === expMedOp ? "selected" : ""}>${op[0]} (${hp}/${maxHp} HP${proph})</option>`;
-    }).join("");
-
-    const panel = document.createElement("div");
-    panel.id = "oz-extra-facilities-panel";
-    panel.style.display = "flex";
-    panel.style.flexDirection = "column";
-    panel.style.gap = "10px";
-    panel.style.marginTop = "10px";
-
-    panel.innerHTML = `
-      <div class="building" style="flex-direction:column;align-items:stretch;gap:8px">
-        <div>
-          <b>QUARTEL — TREINO DE ATRIBUTOS E DESCANSO RÁPIDO</b><br>
-          <small style="color:var(--muted)">Usa Pontos de Treino (gratuitos) ou 260 CR / 7 MAT para +2 atributo.</small>
-        </div>
-        <select id="exp-train-op" style="width:100%;padding:8px;background:#0e161d;color:#f2f7fa;border:1px solid rgba(255,255,255,.22);border-radius:6px;font-size:12px">${opOpts}</select>
-        <select id="exp-train-stat" style="width:100%;padding:8px;background:#0e161d;color:#f2f7fa;border:1px solid rgba(255,255,255,.22);border-radius:6px;font-size:12px">${statOpts}</select>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn" id="exp-btn-train" style="flex:1">TREINAR ATRIBUTO</button>
-          <button class="btn" id="exp-btn-rest" style="flex:1">DESCANSO (90 CR)</button>
-        </div>
-      </div>
-
-      <div class="building" style="flex-direction:column;align-items:stretch;gap:8px">
-        <div>
-          <b>ENFERMARIA — CUIDADO URGENTE E PROFILAXIA</b><br>
-          <small style="color:var(--muted)">${infBuilt ? "Tratamento de urgência e reforço médico (+8 HP) antes da saída." : "Constrói a Enfermaria para usar estas funções."}</small>
-        </div>
-        <select id="exp-med-op" ${!infBuilt ? "disabled" : ""} style="width:100%;padding:8px;background:#0e161d;color:#f2f7fa;border:1px solid rgba(255,255,255,.22);border-radius:6px;font-size:12px">${medOpts}</select>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn" id="exp-btn-urgent" ${!infBuilt ? "disabled" : ""} style="flex:1">CUIDADO URGENTE</button>
-          <button class="btn" id="exp-btn-proph" ${!infBuilt ? "disabled" : ""} style="flex:1">PROFILAXIA (180 CR / 4 MAT)</button>
-        </div>
-      </div>
-
-      <div class="building" style="flex-direction:column;align-items:stretch;gap:8px">
-        <div>
-          <b>ARSENAL — REABASTECIMENTO E NÍVEL DE ARMAMENTO</b><br>
-          <small style="color:var(--muted)">Nível de Armamento: <b>${state.facilities.armoryTier || 0}/2</b> · Equipa ativa: <b>${state.selected.length}</b> operacionais.</small>
-        </div>
-        <button class="btn" id="exp-btn-resupply" ${!armBuilt ? "disabled" : ""} style="width:100%">
-          REABASTECER EQUIPA ATIVA (${state.selected.length * 150} CR / ${state.selected.length * 3} MAT)
-        </button>
-        <button class="btn" id="exp-btn-arm-tier" ${!armBuilt || (state.facilities.armoryTier || 0) >= 2 ? "disabled" : ""} style="width:100%">
-          ${(state.facilities.armoryTier || 0) >= 2 ? "ARMAMENTO NO NÍVEL MÁXIMO (2/2)" : `MELHORAR ARMAMENTO (${(state.facilities.armoryTier || 0) === 0 ? "550 CR / 14 MAT" : "900 CR / 22 MAT"})`}
-        </button>
-      </div>
-
-      <div class="building" style="flex-direction:column;align-items:stretch;gap:8px">
-        <div>
-          <b>LABORATÓRIO — DESCODIFICAÇÃO E MUNIÇÃO PERFURANTE</b><br>
-          <small style="color:var(--muted)">Relatórios descodificados: <b>${state.facilities.labIntelDecoded || 0}/2</b> · Perfurante: <b>${state.facilities.piercingAmmo ? "ATIVA ✓" : "INATIVA"}</b></small>
-        </div>
-        <select id="exp-lab-target" ${!labBuilt ? "disabled" : ""} style="width:100%;padding:8px;background:#0e161d;color:#f2f7fa;border:1px solid rgba(255,255,255,.22);border-radius:6px;font-size:12px">
-          <option value="flanker" ${expLabTarget === "flanker" ? "selected" : ""}>Foco de Análise: Flanqueadores / Sentinela</option>
-          <option value="skirmisher" ${expLabTarget === "skirmisher" ? "selected" : ""}>Foco de Análise: Pesados / Caçadores</option>
-        </select>
-        <button class="btn" id="exp-btn-decode" ${!labBuilt || (state.facilities.labIntelDecoded || 0) >= 2 ? "disabled" : ""} style="width:100%">
-          ${(state.facilities.labIntelDecoded || 0) >= 2 ? "DESCODIFICAÇÃO COMPLETA (2/2)" : "DESCODIFICAR AMOSTRA (1 XENO / 220 CR)"}
-        </button>
-        <button class="btn" id="exp-btn-piercing" ${!labBuilt || state.facilities.piercingAmmo ? "disabled" : ""} style="width:100%">
-          ${state.facilities.piercingAmmo ? "MUNIÇÃO PERFURANTE ATIVA ✓" : "PESQUISAR PERFURANTE (2 XENO / 650 CR / 16 MAT)"}
-        </button>
-      </div>
-    `;
-
-    panel.querySelector("#exp-train-op").onchange = e => {
-      expTrainOp = Number(e.target.value);
-      renderExtraFacilitiesPanel();
-    };
-    panel.querySelector("#exp-train-stat").onchange = e => {
-      expTrainStat = Number(e.target.value);
-    };
-    panel.querySelector("#exp-btn-train").onclick = () => trainOperativeStat(expTrainOp, expTrainStat);
-    panel.querySelector("#exp-btn-rest").onclick = () => restOperativeNow(expTrainOp);
-
-    panel.querySelector("#exp-med-op").onchange = e => {
-      expMedOp = Number(e.target.value);
-    };
-    panel.querySelector("#exp-btn-urgent").onclick = () => urgentInfirmaryCare(expMedOp);
-    panel.querySelector("#exp-btn-proph").onclick = () => applyMedicalProphylaxis(expMedOp);
-
-    panel.querySelector("#exp-btn-resupply").onclick = resupplyActiveSquad;
-    panel.querySelector("#exp-btn-arm-tier").onclick = upgradeArmoryTier;
-
-    panel.querySelector("#exp-lab-target").onchange = e => {
-      expLabTarget = e.target.value;
-    };
-    panel.querySelector("#exp-btn-decode").onclick = decodeAlienSample;
-    panel.querySelector("#exp-btn-piercing").onclick = researchPiercingAmmo;
-
-    panel.querySelectorAll("select option").forEach(opt => {
-      opt.style.backgroundColor = "#0e161d";
-      opt.style.color = "#f2f7fa";
-    });
-
-    const resetBtn = Array.from(el.querySelectorAll("button")).find(b => b.textContent.includes("RESET PROGRESSO"));
-    if (resetBtn) {
-      el.insertBefore(panel, resetBtn);
-    } else {
-      el.appendChild(panel);
-    }
-  }
-
-  const origRenderBuildings = typeof renderBuildings === "function" ? renderBuildings : null;
-  if (origRenderBuildings) {
-    renderBuildings = function() {
-      origRenderBuildings();
-      renderExtraFacilitiesPanel();
-    };
-  }
-
-  const origCheckWin = typeof checkWin === "function" ? checkWin : null;
-  if (origCheckWin) {
-    checkWin = function() {
-      const wasFinished = battle && battle.finished;
-      origCheckWin();
-      if (!wasFinished && battle && battle.finished) {
-        syncExpansionState();
-        state.facilities.medProphylaxis = {};
-        save();
-        (function initCommandCenterModule() {
-  if (!state.commandCenter || typeof state.commandCenter !== "object") {
-    state.commandCenter = {
-      built: false,
-      level: 0,
-      reconReady: false
-    };
-  }
-
-  function syncCommandCenter() {
-    if (!state.commandCenter || typeof state.commandCenter !== "object") {
-      state.commandCenter = { built: false, level: 0, reconReady: false };
-    }
-    state.commandCenter.built = Boolean(state.commandCenter.built);
-    state.commandCenter.level = Math.max(0, Math.min(2, Number(state.commandCenter.level) || 0));
-    state.commandCenter.reconReady = Boolean(state.commandCenter.reconReady);
-  }
-
-  function buildCommandCenter() {
-    syncCommandCenter();
-    if (state.commandCenter.built) {
-      logModal("JÁ CONSTRUÍDO", "O <b>Centro de Comando</b> já está operacional na base.");
-      return;
-    }
-    const costCr = 850;
-    const costMat = 18;
-    if (state.credits < costCr || state.materials < costMat) {
-      logModal("RECURSOS INSUFICIENTES", `Construir o Centro de Comando custa <b>${costCr} CR</b> e <b>${costMat} MAT</b>.`);
-      return;
-    }
-    state.credits -= costCr;
-    state.materials -= costMat;
-    state.commandCenter.built = true;
-    state.commandCenter.level = 1;
-    save();
-    renderResources();
-    renderBuildings();
-    logModal("CENTRO DE COMANDO ATIVO", "Instalação concluída no <b>Nível 1</b>. Reconhecimento e drones de extração desbloqueados.");
-  }
-
-  function upgradeCommandCenter() {
-    syncCommandCenter();
-    if (!state.commandCenter.built) {
-      buildCommandCenter();
-      return;
-    }
-    if (state.commandCenter.level >= 2) {
-      logModal("NÍVEL MÁXIMO", "O Centro de Comando já está no <b>Nível 2</b>.");
-      return;
-    }
-    const costCr = 950;
-    const costMat = 24;
-    if (state.credits < costCr || state.materials < costMat) {
-      logModal("RECURSOS INSUFICIENTES", `Melhorar para o Nível 2 custa <b>${costCr} CR</b> e <b>${costMat} MAT</b>.`);
-      return;
-    }
-    state.credits -= costCr;
-    state.materials -= costMat;
-    state.commandCenter.level = 2;
-    save();
-    renderResources();
-    renderBuildings();
-    logModal("CENTRO DE COMANDO MELHORADO", "Agora no <b>Nível 2</b>: maior rendimento de extração e apoio de reconhecimento.");
-  }
-
-  function runReconSweep() {
-    syncCommandCenter();
-    if (!state.commandCenter.built) {
-      logModal("CENTRO EM FALTA", "Constrói primeiro o <b>Centro de Comando</b>.");
-      return;
-    }
-    if (state.commandCenter.reconReady) {
-      logModal("RECONHECIMENTO PRONTO", "A varredura já está preparada para a próxima missão.");
-      return;
-    }
-    const costCr = 200;
-    if (state.credits < costCr) {
-      logModal("CRÉDITOS INSUFICIENTES", `A varredura de reconhecimento custa <b>${costCr} CR</b>.`);
-      return;
-    }
-    state.credits -= costCr;
-    state.commandCenter.reconReady = true;
-    save();
-    renderResources();
-    renderBuildings();
-    logModal("RECONHECIMENTO CONCLUÍDO", "Dados de setor carregados: <b>+15% de precisão</b> no Turno 1 da próxima missão.");
-  }
-
-  const origStartMission = typeof startMission === "function" ? startMission : null;
-  if (origStartMission) {
-    startMission = function(i) {
-      syncCommandCenter();
-      const hadRecon = state.commandCenter.reconReady;
-      origStartMission(i);
-      if (hadRecon && battle && !battle.finished) {
-        state.commandCenter.reconReady = false;
-        battle.commandReconTurn1 = true;
-        save();
-        renderBuildings();
-        if (typeof battleLog === "function") {
-          battleLog(`${document.getElementById("battle-log") ? document.getElementById("battle-log").textContent : ""} · Reconhecimento ativo (+15% precisão no Turno 1).`);
-        }
-      }
-    };
-  }
-
-  const origCalcHit = typeof calcHitChance === "function" ? calcHitChance : null;
-  if (origCalcHit) {
-    calcHitChance = function(unit, enemy, isOverwatch = false) {
-      let chance = origCalcHit(unit, enemy, isOverwatch);
-      if (battle && battle.commandReconTurn1 && battle.turn === 1) {
-        chance += 15;
-      }
-      return Math.max(5, Math.min(98, Math.round(chance)));
-    };
-  }
-
-  const origCheckWin = typeof checkWin === "function" ? checkWin : null;
-  if (origCheckWin) {
-    checkWin = function() {
-      syncCommandCenter();
-      const wasFinished = battle && battle.finished;
-      const allEnemiesDownBefore = battle && Array.isArray(battle.enemies) && battle.enemies.every(e => e.hp <= 0);
-      const creditsBefore = state.credits;
-      const matBefore = state.materials;
-
-      origCheckWin();
-
-      if (!wasFinished && battle && battle.finished && allEnemiesDownBefore && state.commandCenter.built) {
-        const lv = state.commandCenter.level || 1;
-        const extraCr = lv === 2 ? 180 : 90;
-        const extraMat = lv === 2 ? 6 : 3;
-        state.credits += extraCr;
-        state.materials += extraMat;
-
-        let alienBonus = 0;
-        if (lv >= 2 && Math.random() < 0.65) {
-          state.alien = (state.alien || 0) + 1;
-          alienBonus = 1;
-        }
-        save();
-        renderResources();
-        if (typeof renderBuildings === "function") renderBuildings();
-
-        const modalBody = document.getElementById("modal-body");
-        if (modalBody && state.credits > creditsBefore) {
-          const droneNote = alienBonus > 0 ? ` · <b>+1 Tec. Alienígena</b>` : "";
-          modalBody.innerHTML += `<br><small style="color:#6ef7ff">Centro de Comando (Nv.${lv}): +${extraCr} CR · +${extraMat} MAT${droneNote}</small>`;
-        } else if (state.materials > matBefore) {
-          renderResources();
-        }
-      }
-    };
-  }
-
-  function renderCommandCenterCard() {
-    syncCommandCenter();
-    const el = document.getElementById("buildings");
-    if (!el) return;
-
-    const existing = document.getElementById("oz-command-center-card");
-    if (existing) existing.remove();
-
-    const cc = state.commandCenter;
-    const card = document.createElement("div");
-    card.id = "oz-command-center-card";
-    card.className = "building";
-    card.style.flexDirection = "column";
-    card.style.alignItems = "stretch";
-    card.style.gap = "8px";
-    card.style.marginTop = "10px";
-
-    card.innerHTML = `
-      <div>
-        <b>CENTRO DE COMANDO · ${cc.built ? `NÍVEL ${cc.level}/2` : "POR CONSTRUIR"}</b><br>
-        <small style="color:var(--muted)">
-          Coordena reconhecimento pré-missão, bónus de extração e drones de apoio.
-          ${cc.reconReady ? `<span style="color:var(--lime)">· Reconhecimento pronto para Turno 1</span>` : ""}
-        </small>
-      </div>
-      ${!cc.built ? `
-        <button class="btn" id="cc-btn-build" style="width:100%">CONSTRUIR CENTRO DE COMANDO (850 CR / 18 MAT)</button>
-      ` : `
-        <button class="btn" id="cc-btn-recon" ${cc.reconReady ? "disabled" : ""} style="width:100%">
-          ${cc.reconReady ? "RECONHECIMENTO ATIVO PARA PRÓXIMA MISSÃO ✓" : "VARREDURA DE RECONHECIMENTO (200 CR · +15% PRECISÃO T1)"}
-        </button>
-        <button class="btn" id="cc-btn-upgrade" ${cc.level >= 2 ? "disabled" : ""} style="width:100%">
-          ${cc.level >= 2 ? "CENTRO DE COMANDO NO NÍVEL MÁXIMO (2/2)" : "MELHORAR PARA NÍVEL 2 (950 CR / 24 MAT)"}
-        </button>
-      `}
-    `;
-
-    const buildBtn = card.querySelector("#cc-btn-build");
-    if (buildBtn) buildBtn.onclick = buildCommandCenter;
-
-    const reconBtn = card.querySelector("#cc-btn-recon");
-    if (reconBtn) reconBtn.onclick = runReconSweep;
-
-    const upgBtn = card.querySelector("#cc-btn-upgrade");
-    if (upgBtn) upgBtn.onclick = upgradeCommandCenter;
-
-    const resetBtn = Array.from(el.querySelectorAll("button")).find(b => b.textContent.includes("RESET PROGRESSO"));
-    if (resetBtn) {
-      el.insertBefore(card, resetBtn);
-    } else {
-      el.appendChild(card);
-    }
-  }
-
-  const origRenderBld = typeof renderBuildings === "function" ? renderBuildings : null;
-  if (origRenderBld) {
-    renderBuildings = function() {
-      origRenderBld();
-      renderCommandCenterCard();
-    };
-  }
-
-  if (typeof renderBuildings === "function") {
-    renderBuildings();
-  }
-})();
-        (function forceShowCommandCenter() {
-  function ensureCommandCenterVisible() {
-    const container = document.getElementById("buildings");
-    if (!container) return;
-
-    if (typeof state === "object" && state && !state.commandCenter) {
-      state.commandCenter = { built: false, level: 0, reconReady: false };
-    }
-
-    let card = document.getElementById("oz-command-center-card");
-    if (!card) {
-      card = document.createElement("div");
-      card.id = "oz-command-center-card";
-      card.className = "building";
-      card.style.flexDirection = "column";
-      card.style.alignItems = "stretch";
-      card.style.gap = "8px";
-      card.style.marginTop = "10px";
-      card.style.border = "1px solid var(--lime)";
-    }
-
-    const cc = (typeof state === "object" && state && state.commandCenter)
-      ? state.commandCenter
-      : { built: false, level: 0, reconReady: false };
-
-    card.innerHTML = `
-      <div>
-        <b>CENTRO DE COMANDO · ${cc.built ? `NÍVEL ${cc.level || 1}/2` : "POR CONSTRUIR"}</b><br>
-        <small style="color:var(--muted)">
-          Logística de missões, reconhecimento (+15% precisão no Turno 1) e extração de recursos.
-        </small>
-      </div>
-      ${!cc.built ? `
-        <button type="button" class="btn" id="cc-force-build" style="width:100%">
-          CONSTRUIR CENTRO DE COMANDO (850 CR / 18 MAT)
-        </button>
-      ` : `
-        <button type="button" class="btn" id="cc-force-recon" ${cc.reconReady ? "disabled" : ""} style="width:100%">
-          ${cc.reconReady ? "RECONHECIMENTO ATIVO ✓" : "VARREDURA DE RECONHECIMENTO (200 CR)"}
-        </button>
-        <button type="button" class="btn" id="cc-force-upg" ${(cc.level || 1) >= 2 ? "disabled" : ""} style="width:100%">
-          ${(cc.level || 1) >= 2 ? "CENTRO DE COMANDO NÍVEL MÁXIMO (2/2)" : "MELHORAR PARA NÍVEL 2 (950 CR / 24 MAT)"}
-        </button>
-      `}
-    `;
-
-    const resetBtn = Array.from(container.querySelectorAll("button")).find(b =>
-      b.textContent && b.textContent.toUpperCase().includes("RESET")
-    );
-    if (resetBtn && resetBtn.parentElement === container) {
-      container.insertBefore(card, resetBtn);
-    } else if (card.parentElement !== container) {
-      container.appendChild(card);
-    }
-
-    const buildBtn = card.querySelector("#cc-force-build");
-    if (buildBtn) {
-      buildBtn.onclick = () => {
-        if (state.credits < 850 || state.materials < 18) {
-          if (typeof logModal === "function") {
-            logModal("RECURSOS INSUFICIENTES", "Precisas de <b>850 CR</b> e <b>18 MAT</b>.");
-          }
-          return;
-        }
-        state.credits -= 850;
-        state.materials -= 18;
-        cc.built = true;
-        cc.level = 1;
-        if (typeof save === "function") save();
-        if (typeof renderResources === "function") renderResources();
-        ensureCommandCenterVisible();
-      };
-    }
-
-    const reconBtn = card.querySelector("#cc-force-recon");
-    if (reconBtn && !cc.reconReady) {
-      reconBtn.onclick = () => {
-        if (state.credits < 200) {
-          if (typeof logModal === "function") {
-            logModal("CRÉDITOS INSUFICIENTES", "Precisas de <b>200 CR</b>.");
-          }
-          return;
-        }
-        state.credits -= 200;
-        cc.reconReady = true;
-        if (typeof save === "function") save();
-        if (typeof renderResources === "function") renderResources();
-        ensureCommandCenterVisible();
-      };
-    }
-
-    const upgBtn = card.querySelector("#cc-force-upg");
-    if (upgBtn && (cc.level || 1) < 2) {
-      upgBtn.onclick = () => {
-        if (state.credits < 950 || state.materials < 24) {
-          if (typeof logModal === "function") {
-            logModal("RECURSOS INSUFICIENTES", "Precisas de <b>950 CR</b> e <b>24 MAT</b>.");
-          }
-          return;
-        }
-        state.credits -= 950;
-        state.materials -= 24;
-        cc.level = 2;
-        if (typeof save === "function") save();
-        if (typeof renderResources === "function") renderResources();
-        ensureCommandCenterVisible();
-      };
-    }
-  }
-
-  document.addEventListener("DOMContentLoaded", ensureCommandCenterVisible);
-  document.addEventListener("click", ev => {
-    const navBtn = ev.target && ev.target.closest ? ev.target.closest('[data-go="base"]') : null;
-    if (navBtn) {
-      setTimeout(ensureCommandCenterVisible, 30);
-    }
-  });
-  setInterval(ensureCommandCenterVisible, 600);
-  ensureCommandCenterVisible();
-})();
-        if (typeof renderBuildings === "function") renderBuildings();
-      }
-    };
-  }
-
-  if (typeof renderBuildings === "function") {
-    renderBuildings();
-  }
-})();
