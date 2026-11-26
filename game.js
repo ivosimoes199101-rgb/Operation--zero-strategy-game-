@@ -28,12 +28,26 @@ const CLASS_TRAINING_PROFILES = [
 const BUILDINGS = [
   ["Quartel", "Aumenta a capacidade de alojamento.", 500, 10],
   ["Enfermaria", "Reduz significativamente o custo de tratar ferimentos leves, graves e muito graves.", 700, 15],
-  ["Arsenal", "Melhora a preparação e equipamento.", 900, 20],
+  ["Arsenal", "Desconta 20% nas armas e fardas da loja da base.", 900, 20],
   ["Laboratório", "Investiga tecnologia recuperada.", 1200, 25],
   ["Hangar", "Desbloqueia operações de transporte.", 1500, 35],
   ["Centro de inteligência", "Melhora a informação de missão.", 1000, 20],
   ["Academia militar", "Reduz o custo de treino e melhora a preparação das classes.", 1100, 25],
   ["Central de energia", "Aumenta a capacidade energética.", 1300, 30]
+];
+
+const WEAPONS_SHOP = [
+  { id: "wpn_std", name: "ARMA PADRÃO", credits: 0, materials: 0, dmgBonus: 0, magBonus: 0, hitBonus: 0, desc: "Equipamento base da classe." },
+  { id: "wpn_vanguard", name: "CARABINA VANGUARDA MK.II", credits: 450, materials: 12, dmgBonus: 8, magBonus: 4, hitBonus: 4, desc: "+8 dano, +4 munição, +4% precisão." },
+  { id: "wpn_marksman", name: "PRECISÃO ZERO-X", credits: 700, materials: 18, dmgBonus: 16, magBonus: 2, hitBonus: 8, desc: "+16 dano, +2 munição, +8% precisão." },
+  { id: "wpn_heavy", name: "ASSALTO PESADO TITAN", credits: 950, materials: 25, dmgBonus: 22, magBonus: 10, hitBonus: 5, desc: "+22 dano, +10 munição, +5% precisão." }
+];
+
+const OUTFITS_SHOP = [
+  { id: "out_std", name: "FARDA OPERACIONAL", credits: 0, materials: 0, dmgRed: 0, hpBonus: 0, dodgeBonus: 0, desc: "Farda padrão sem blindagem extra." },
+  { id: "out_recon", name: "FATO FURTIVO SHADOW", credits: 400, materials: 10, dmgRed: 2, hpBonus: 10, dodgeBonus: 8, desc: "+10 HP máx., -2 dano recebido, +8% evasão." },
+  { id: "out_tactical", name: "COLETE TÁTICO AEGIS", credits: 650, materials: 16, dmgRed: 5, hpBonus: 20, dodgeBonus: 4, desc: "+20 HP máx., -5 dano recebido, +4% evasão." },
+  { id: "out_exo", name: "EXOFARDA SENTINELA", credits: 950, materials: 24, dmgRed: 8, hpBonus: 35, dodgeBonus: 6, desc: "+35 HP máx., -8 dano recebido, +6% evasão." }
 ];
 
 const MISSIONS = [
@@ -114,51 +128,87 @@ const defaults = {
   hp: {},
   pos: 0,
   opProgress: {},
-  opHp: {}
+  opHp: {},
+  opGear: {}
 };
 
 let state = load();
 let pendingReturnScreen = null;
 let selectedTrainOpIndex = 0;
 let selectedHealOpIndex = 0;
+let selectedShopOpIndex = 0;
 
 function load() {
   try {
     const parsed = { ...defaults, ...JSON.parse(localStorage.getItem("oz_save") || "{}") };
     if (!parsed.opProgress || typeof parsed.opProgress !== "object") parsed.opProgress = {};
     if (!parsed.opHp || typeof parsed.opHp !== "object") parsed.opHp = {};
+    if (!parsed.opGear || typeof parsed.opGear !== "object") parsed.opGear = {};
     return parsed;
   } catch (e) {
-    return { ...defaults, opProgress: {}, opHp: {} };
+    return { ...defaults, opProgress: {}, opHp: {}, opGear: {} };
   }
 }
 
+function getOpGear(opIndex) {
+  if (!state.opGear[opIndex]) {
+    state.opGear[opIndex] = { weaponId: "wpn_std", outfitId: "out_std" };
+  }
+  return state.opGear[opIndex];
+}
+
+function getEquippedWeaponItem(opIndex) {
+  const g = getOpGear(opIndex);
+  return WEAPONS_SHOP.find(w => w.id === g.weaponId) || WEAPONS_SHOP[0];
+}
+
+function getEquippedOutfitItem(opIndex) {
+  const g = getOpGear(opIndex);
+  return OUTFITS_SHOP.find(o => o.id === g.outfitId) || OUTFITS_SHOP[0];
+}
+
+function getMaxHp(opIndex) {
+  return 100 + (getEquippedOutfitItem(opIndex).hpBonus || 0);
+}
+
+function getShopItemCost(item) {
+  const armoryBuilt = state.built.includes(2);
+  const mult = armoryBuilt ? 0.8 : 1;
+  return {
+    credits: Math.ceil(item.credits * mult),
+    materials: Math.ceil(item.materials * mult)
+  };
+}
 function getOpHp(opIndex) {
+  const maxHp = getMaxHp(opIndex);
   const raw = state.opHp[opIndex];
   if (typeof raw !== "number" || Number.isNaN(raw)) {
-    state.opHp[opIndex] = 100;
-    return 100;
+    state.opHp[opIndex] = maxHp;
+    return maxHp;
   }
-  return Math.max(1, Math.min(100, Math.round(raw)));
+  return Math.max(1, Math.min(maxHp, Math.round(raw)));
 }
 
 function setOpHp(opIndex, value) {
-  state.opHp[opIndex] = Math.max(1, Math.min(100, Math.round(value)));
+  const maxHp = getMaxHp(opIndex);
+  state.opHp[opIndex] = Math.max(1, Math.min(maxHp, Math.round(value)));
 }
 
-function getInjurySeverity(hp) {
-  if (hp >= 100) return { label: "Íntegro", color: "var(--lime)", mult: 1, baseCr: 0, baseMat: 0 };
-  if (hp >= 70) return { label: "Ferimento Leve", color: "#9be564", mult: 1, baseCr: 10, baseMat: 1 };
-  if (hp >= 40) return { label: "Ferimento Grave", color: "#ffb84d", mult: 1.6, baseCr: 35, baseMat: 3 };
+function getInjurySeverity(hp, maxHp = 100) {
+  const ratio = hp / Math.max(1, maxHp);
+  if (hp >= maxHp) return { label: "Íntegro", color: "var(--lime)", mult: 1, baseCr: 0, baseMat: 0 };
+  if (ratio >= 0.7) return { label: "Ferimento Leve", color: "#9be564", mult: 1, baseCr: 10, baseMat: 1 };
+  if (ratio >= 0.4) return { label: "Ferimento Grave", color: "#ffb84d", mult: 1.6, baseCr: 35, baseMat: 3 };
   return { label: "Ferimento Muito Grave", color: "#ff6b6b", mult: 2.4, baseCr: 75, baseMat: 6 };
 }
 
 function getHealCost(opIndex) {
+  const maxHp = getMaxHp(opIndex);
   const hp = getOpHp(opIndex);
-  const missing = Math.max(0, 100 - hp);
-  const sev = getInjurySeverity(hp);
+  const missing = Math.max(0, maxHp - hp);
+  const sev = getInjurySeverity(hp, maxHp);
   if (missing === 0) {
-    return { missing: 0, credits: 0, materials: 0, severity: sev };
+    return { missing: 0, credits: 0, materials: 0, severity: sev, maxHp };
   }
   const infirmaryBuilt = state.built.includes(1);
   const discount = infirmaryBuilt ? 0.55 : 1;
@@ -172,7 +222,8 @@ function getHealCost(opIndex) {
     missing,
     credits,
     materials,
-    severity: sev
+    severity: sev,
+    maxHp
   };
 }
 
@@ -240,12 +291,13 @@ function renderRoster() {
   OPERATIVES.forEach((o, i) => {
     const selected = state.selected.includes(i);
     const prog = getOpProgress(i);
+    const maxHp = getMaxHp(i);
     const hp = getOpHp(i);
-    const sev = getInjurySeverity(hp);
+    const sev = getInjurySeverity(hp, maxHp);
     const ptsBadge = prog.trainPts > 0 ? ` · +${prog.trainPts} PT` : "";
-    const hpBadge = hp < 100
-      ? ` · <span style="color:${sev.color}">${hp} HP (${sev.label})</span>`
-      : ` · 100 HP`;
+    const hpBadge = hp < maxHp
+      ? ` · <span style="color:${sev.color}">${hp}/${maxHp} HP (${sev.label})</span>`
+      : ` · ${maxHp} HP`;
     const d = document.createElement("div");
     d.className = "operator" + (selected ? " selected" : "");
     d.innerHTML = `<span class="portrait">${o[0].split(" ").map(x => x[0]).slice(0, 2).join("")}</span><span style="min-width:0;flex:1;text-align:left"><b>${o[0]}</b><small>NV.${prog.level} · ${o[2]}${hpBadge} · ${prog.xp}/100 XP${ptsBadge}</small></span><button type="button" class="op-info-btn">INFO</button><span class="pick">${selected ? "✓" : "＋"}</span>`;
@@ -271,7 +323,64 @@ function renderRoster() {
   });
   const countEl = document.getElementById("team-count");
   if (countEl) countEl.textContent = `EQUIPA ${state.selected.length}/5`;
+}
+
+function buyOrEquipGear(opIndex, type, itemId) {
+  const idx = Number(opIndex);
+  if (Number.isNaN(idx) || !OPERATIVES[idx]) return;
+  const op = OPERATIVES[idx];
+  const gear = getOpGear(idx);
+  const catalog = type === "weapon" ? WEAPONS_SHOP : OUTFITS_SHOP;
+  const item = catalog.find(x => x.id === itemId);
+  if (!item) return;
+
+  const isOwned = (item.credits === 0 && item.materials === 0) || (
+    type === "weapon" ? gear.weaponId === item.id : gear.outfitId === item.id
+  );
+
+  if (type === "weapon" && gear.weaponId === item.id) {
+    logModal("JÁ EQUIPADO", `${op[0]} já tem <b>${item.name}</b> equipada.`);
+    return;
   }
+  if (type === "outfit" && gear.outfitId === item.id) {
+    logModal("JÁ EQUIPADO", `${op[0]} já tem <b>${item.name}</b> equipada.`);
+    return;
+  }
+
+  const cost = getShopItemCost(item);
+  const needsPayment = !(type === "weapon" && item.id === "wpn_std") && !(type === "outfit" && item.id === "out_std");
+  if (needsPayment && (state.credits < cost.credits || state.materials < cost.materials)) {
+    logModal("RECURSOS INSUFICIENTES", `Comprar <b>${item.name}</b> custa <b>${cost.credits} créditos</b> e <b>${cost.materials} materiais</b>.`);
+    return;
+  }
+
+  if (needsPayment) {
+    state.credits -= cost.credits;
+    state.materials -= cost.materials;
+  }
+
+  if (type === "weapon") {
+    gear.weaponId = item.id;
+  } else {
+    const oldMax = getMaxHp(idx);
+    const currentHp = getOpHp(idx);
+    gear.outfitId = item.id;
+    const newMax = getMaxHp(idx);
+    if (newMax > oldMax) {
+      setOpHp(idx, currentHp + (newMax - oldMax));
+    } else if (currentHp > newMax) {
+      setOpHp(idx, newMax);
+    }
+  }
+
+  save();
+  renderBuildings();
+  renderRoster();
+  logModal(
+    isOwned ? "EQUIPAMENTO ATUALIZADO" : "COMPRA CONCLUÍDA",
+    `${op[0]} equipou <b>${item.name}</b>${needsPayment ? ` (${cost.credits} cr e ${cost.materials} mat gastos)` : ""}.`
+  );
+      }
 function trainOpStat(opIndex, statIdx, fromAcademy = false) {
   const prog = getOpProgress(opIndex);
   const currentStats = getEffectiveStats(opIndex);
@@ -336,10 +445,11 @@ function healOperativeOnBase(opIndex) {
   const idx = Number(opIndex);
   if (Number.isNaN(idx) || !OPERATIVES[idx]) return;
   const op = OPERATIVES[idx];
+  const maxHp = getMaxHp(idx);
   const cost = getHealCost(idx);
 
   if (cost.missing <= 0) {
-    logModal("SEM FERIMENTOS", `${op[0]} já está com 100 HP.`);
+    logModal("SEM FERIMENTOS", `${op[0]} já está com ${maxHp} HP.`);
     return;
   }
 
@@ -353,21 +463,24 @@ function healOperativeOnBase(opIndex) {
 
   state.credits -= cost.credits;
   state.materials -= cost.materials;
-  setOpHp(idx, 100);
+  setOpHp(idx, maxHp);
   save();
   renderBuildings();
   renderRoster();
   logModal(
     "FERIMENTOS TRATADOS",
-    `${op[0]} (${cost.severity.label}) recuperou até 100 HP (${cost.credits} cr e ${cost.materials} mat gastos).`
+    `${op[0]} (${cost.severity.label}) recuperou até ${maxHp} HP (${cost.credits} cr e ${cost.materials} mat gastos).`
   );
 }
 
 function showOperator(i) {
   const o = OPERATIVES[i];
   const prog = getOpProgress(i);
+  const maxHp = getMaxHp(i);
   const hp = getOpHp(i);
-  const sev = getInjurySeverity(hp);
+  const sev = getInjurySeverity(hp, maxHp);
+  const wpnItem = getEquippedWeaponItem(i);
+  const outItem = getEquippedOutfitItem(i);
   const stats = getEffectiveStats(i);
   const perk = ROLE_PERKS[o[2]] || "";
   const academyBuilt = state.built.includes(6);
@@ -384,15 +497,15 @@ function showOperator(i) {
     return `<div class="stat"><span>${STAT_NAMES[j]}</span><span><b>${v}</b>${btnHtml}</span></div>`;
   }).join("");
 
-  const hpLine = hp < 100
-    ? `<span style="color:${sev.color}">${hp}/100 HP · ${sev.label}</span>`
-    : `100/100 HP · Íntegro`;
+  const hpLine = hp < maxHp
+    ? `<span style="color:${sev.color}">${hp}/${maxHp} HP · ${sev.label}</span>`
+    : `${maxHp}/${maxHp} HP · Íntegro`;
 
   const headerInfo = prog.trainPts > 0
     ? `NV.${prog.level} · ${hpLine} · ${prog.xp}/100 XP · <span style="color:var(--lime)">${prog.trainPts} PONTO(S) DE TREINO LIVRE</span>`
     : `NV.${prog.level} · ${hpLine} · ${prog.xp}/100 XP · Treino direto: ${drillCost} cr/ponto${academyBuilt ? " (Academia ativa)" : ""}`;
 
-  document.getElementById("modal-content").innerHTML = `<div class="eyebrow">${o[1]} // ${o[2]}</div><h2 style="font:800 32px var(--display);margin:0">${o[0]}</h2><p class="muted">${o[4]}<br><span style="color:var(--lime)">${perk}</span><br><small style="color:var(--muted)">${headerInfo}</small></p><div class="stats">${statsHtml}</div>`;
+  document.getElementById("modal-content").innerHTML = `<div class="eyebrow">${o[1]} // ${o[2]}</div><h2 style="font:800 32px var(--display);margin:0">${o[0]}</h2><p class="muted">${o[4]}<br><span style="color:var(--lime)">${perk}</span><br><small style="color:#9ec5d8">Arma: <b>${wpnItem.name}</b> · Farda: <b>${outItem.name}</b></small><br><small style="color:var(--muted)">${headerInfo}</small></p><div class="stats">${statsHtml}</div>`;
 
   document.querySelectorAll("#modal-content [data-train-stat]").forEach(btn => {
     btn.onclick = () => {
@@ -449,13 +562,15 @@ function renderBuildings() {
   const infirmaryBuilt = state.built.includes(1);
   if (!OPERATIVES[selectedHealOpIndex]) selectedHealOpIndex = 0;
   const healOp = OPERATIVES[selectedHealOpIndex];
+  const healMaxHp = getMaxHp(selectedHealOpIndex);
   const healHp = getOpHp(selectedHealOpIndex);
   const healCost = getHealCost(selectedHealOpIndex);
 
   const healOptionsHtml = OPERATIVES.map((o, idx) => {
+    const mHp = getMaxHp(idx);
     const h = getOpHp(idx);
-    const s = getInjurySeverity(h);
-    const status = h < 100 ? ` (${h} HP · ${s.label})` : " (100 HP · Íntegro)";
+    const s = getInjurySeverity(h, mHp);
+    const status = h < mHp ? ` (${h}/${mHp} HP · ${s.label})` : ` (${mHp}/${mHp} HP · Íntegro)`;
     return `<option value="${idx}" ${idx === selectedHealOpIndex ? "selected" : ""}>${o[0]} · ${o[2]}${status}</option>`;
   }).join("");
 
@@ -468,7 +583,7 @@ function renderBuildings() {
   healBox.innerHTML = `
     <div>
       <b>ENFERMARIA E CURA — BASE MILITAR</b><br>
-      <small>Leve (70–99 HP) · Grave (40–69 HP) · Muito Grave (1–39 HP)${infirmaryBuilt ? " · <span style='color:var(--lime)'>Enfermaria ativa (-45% custo)</span>" : " · Constrói a Enfermaria para reduzir custos"}</small>
+      <small>Leve (≥70% HP) · Grave (≥40% HP) · Muito Grave (<40% HP)${infirmaryBuilt ? " · <span style='color:var(--lime)'>Enfermaria ativa (-45% custo)</span>" : " · Constrói a Enfermaria para reduzir custos"}</small>
     </div>
     <div style="display:flex;flex-direction:column;gap:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.07)">
       <label style="font-size:11px;color:var(--muted)">Seleciona o operacional:</label>
@@ -476,10 +591,10 @@ function renderBuildings() {
         ${healOptionsHtml}
       </select>
       <small style="color:var(--muted)">
-        ${healOp[0]}: <b style="color:${healCost.severity.color}">${healHp}/100 HP (${healCost.severity.label})</b> · ${healCost.missing > 0 ? `Custo: <b>${healCost.credits} créditos</b> e <b>${healCost.materials} materiais</b>` : "Sem ferimentos para tratar"}
+        ${healOp[0]}: <b style="color:${healCost.severity.color}">${healHp}/${healMaxHp} HP (${healCost.severity.label})</b> · ${healCost.missing > 0 ? `Custo: <b>${healCost.credits} créditos</b> e <b>${healCost.materials} materiais</b>` : "Sem ferimentos para tratar"}
       </small>
       <button type="button" id="heal-op-btn" ${healCost.missing <= 0 ? "disabled" : ""} style="padding:8px 10px;font-size:10px">
-        ${healCost.missing > 0 ? `CURAR ATÉ 100 HP (${healCost.credits} CR / ${healCost.materials} MAT)` : "TOTALMENTE RECUPERADO"}
+        ${healCost.missing > 0 ? `CURAR ATÉ ${healMaxHp} HP (${healCost.credits} CR / ${healCost.materials} MAT)` : "TOTALMENTE RECUPERADO"}
       </button>
     </div>
   `;
@@ -492,6 +607,76 @@ function renderBuildings() {
     healOperativeOnBase(selectedHealOpIndex);
   };
   el.appendChild(healBox);
+  const armoryBuilt = state.built.includes(2);
+  if (!OPERATIVES[selectedShopOpIndex]) selectedShopOpIndex = 0;
+  const shopOp = OPERATIVES[selectedShopOpIndex];
+  const shopGear = getOpGear(selectedShopOpIndex);
+  const eqWpn = getEquippedWeaponItem(selectedShopOpIndex);
+  const eqOut = getEquippedOutfitItem(selectedShopOpIndex);
+
+  const shopOpOptions = OPERATIVES.map((o, idx) => {
+    return `<option value="${idx}" ${idx === selectedShopOpIndex ? "selected" : ""}>${o[0]} · ${o[2]}</option>`;
+  }).join("");
+
+  const weaponsHtml = WEAPONS_SHOP.map(w => {
+    const equipped = shopGear.weaponId === w.id;
+    const cost = getShopItemCost(w);
+    const label = equipped
+      ? "EQUIPADA"
+      : (w.credits === 0 && w.materials === 0 ? "EQUIPAR" : `COMPRAR (${cost.credits} CR / ${cost.materials} MAT)`);
+    return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-top:1px solid rgba(255,255,255,.06)">
+      <div style="min-width:0;flex:1"><b>${w.name}</b><br><small>${w.desc}</small></div>
+      <button type="button" data-buy-weapon="${w.id}" ${equipped ? "disabled" : ""} style="padding:6px 8px;font-size:9px">${label}</button>
+    </div>`;
+  }).join("");
+
+  const outfitsHtml = OUTFITS_SHOP.map(oItem => {
+    const equipped = shopGear.outfitId === oItem.id;
+    const cost = getShopItemCost(oItem);
+    const label = equipped
+      ? "EQUIPADA"
+      : (oItem.credits === 0 && oItem.materials === 0 ? "EQUIPAR" : `COMPRAR (${cost.credits} CR / ${cost.materials} MAT)`);
+    return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-top:1px solid rgba(255,255,255,.06)">
+      <div style="min-width:0;flex:1"><b>${oItem.name}</b><br><small>${oItem.desc}</small></div>
+      <button type="button" data-buy-outfit="${oItem.id}" ${equipped ? "disabled" : ""} style="padding:6px 8px;font-size:9px">${label}</button>
+    </div>`;
+  }).join("");
+
+  const shopBox = document.createElement("div");
+  shopBox.className = "building";
+  shopBox.style.flexDirection = "column";
+  shopBox.style.alignItems = "stretch";
+  shopBox.style.gap = "10px";
+
+  shopBox.innerHTML = `
+    <div>
+      <b>LOJA DE ARMAS E FARDAS — BASE MILITAR</b><br>
+      <small>${armoryBuilt ? "<span style='color:var(--lime)'>Arsenal construído: -20% nos custos de armas e fardas</span>" : "Constrói o Arsenal para 20% de desconto em armas e fardas"}</small>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.07)">
+      <label style="font-size:11px;color:var(--muted)">Equipar para:</label>
+      <select id="shop-op-select" style="width:100%;padding:9px;background:#0e161d;color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:6px;font-size:12px">
+        ${shopOpOptions}
+      </select>
+      <small style="color:var(--muted)">${shopOp[0]} · Atual: <b>${eqWpn.name}</b> + <b>${eqOut.name}</b></small>
+      <div style="font-size:11px;color:var(--lime);margin-top:2px">ARMAS</div>
+      ${weaponsHtml}
+      <div style="font-size:11px;color:var(--lime);margin-top:6px">FARDAS / ROUPAS</div>
+      ${outfitsHtml}
+    </div>
+  `;
+
+  shopBox.querySelector("#shop-op-select").onchange = ev => {
+    selectedShopOpIndex = Number(ev.target.value);
+    renderBuildings();
+  };
+  shopBox.querySelectorAll("[data-buy-weapon]").forEach(btn => {
+    btn.onclick = () => buyOrEquipGear(selectedShopOpIndex, "weapon", btn.dataset.buyWeapon);
+  });
+  shopBox.querySelectorAll("[data-buy-outfit]").forEach(btn => {
+    btn.onclick = () => buyOrEquipGear(selectedShopOpIndex, "outfit", btn.dataset.buyOutfit);
+  });
+  el.appendChild(shopBox);
 
   const academyBuilt = state.built.includes(6);
   const trainCost = academyBuilt ? 160 : 250;
@@ -569,7 +754,8 @@ function renderMissions() {
     d.querySelector("button").onclick = () => startMission(i);
     el.appendChild(d);
   });
-                                                                           }
+}
+
 let battle = {
   units: [],
   enemies: [],
@@ -581,7 +767,15 @@ let battle = {
 
 function getWeapon(opIndex) {
   const role = OPERATIVES[opIndex][2];
-  return WEAPONS_BY_ROLE[role] || { name: "PISTOLA ZERO", mag: 15, dmg: 20, optRange: 4 };
+  const baseWpn = WEAPONS_BY_ROLE[role] || { name: "PISTOLA ZERO", mag: 15, dmg: 20, optRange: 4 };
+  const shopWpn = getEquippedWeaponItem(opIndex);
+  return {
+    name: shopWpn.id !== "wpn_std" ? `${baseWpn.name} + ${shopWpn.name}` : baseWpn.name,
+    mag: baseWpn.mag + (shopWpn.magBonus || 0),
+    dmg: baseWpn.dmg + (shopWpn.dmgBonus || 0),
+    optRange: baseWpn.optRange,
+    hitBonus: shopWpn.hitBonus || 0
+  };
 }
 
 function getCoverAt(x, y) {
@@ -658,7 +852,7 @@ function calcHitChance(unit, enemy, isOverwatch = false) {
   const stats = getEffectiveStats(unit.id);
   const wpn = getWeapon(unit.id);
   const dist = Math.abs(unit.x - enemy.x) + Math.abs(unit.y - enemy.y);
-  const base = stats[0] * 0.45 + stats[1] * 0.55;
+  const base = stats[0] * 0.45 + stats[1] * 0.55 + (wpn.hitBonus || 0);
   const rangeLoss = Math.abs(dist - wpn.optRange) * 6;
   let coverLoss = getCoverPenalty(enemy.x, enemy.y, unit.x, unit.y);
   if (role === "Engenheira" && coverLoss > 0) {
@@ -736,11 +930,13 @@ function startMission(i) {
   battle = {
     units: state.selected.map((id, n) => {
       const wpn = getWeapon(id);
+      const maxHp = getMaxHp(id);
       return {
         id,
         x: 1,
         y: Math.min(5, n + 1),
-        hp: getOpHp(id),
+        hp: Math.min(maxHp, getOpHp(id)),
+        maxHp,
         ap: 2,
         ammo: wpn.mag,
         maxAmmo: wpn.mag,
@@ -763,7 +959,7 @@ function startMission(i) {
   document.getElementById("battle-log").textContent = `Turno 1 · Secundário: ${m.secondaryLabel}. Escolhe mover, disparar, vigiar ou Hunker Down (-1 PA).`;
   go("tactical");
   renderBattle();
-}
+    }
 function positionBattleLogBelowGrid() {
   const grid = document.getElementById("battle-grid");
   const logEl = document.getElementById("battle-log");
@@ -818,7 +1014,7 @@ function renderBattle() {
     if (unit.hunker) flags.push("HUNKER");
     const statusSuffix = flags.length ? " · " + flags.join(" + ") : "";
     document.getElementById("selected-unit").textContent = OPERATIVES[unit.id][0].toUpperCase();
-    document.getElementById("unit-hp").textContent = unit.hp + " HP";
+    document.getElementById("unit-hp").textContent = `${unit.hp}/${unit.maxHp} HP`;
     document.getElementById("unit-ap").textContent = unit.ap + " PA";
     document.getElementById("unit-ammo").textContent = unit.ammo + "/" + unit.maxAmmo + " MUN" + statusSuffix;
   }
@@ -852,7 +1048,7 @@ function renderBattle() {
   if (hunkerBtn) {
     hunkerBtn.disabled = battle.finished || !unit || unit.hp <= 0 || unit.ap < 1 || unit.hunker;
   }
-  medBtn.disabled = battle.finished || !unit || unit.hp <= 0 || unit.ap < 1 || unit.hp >= 100;
+  medBtn.disabled = battle.finished || !unit || unit.hp <= 0 || unit.ap < 1 || unit.hp >= unit.maxHp;
 }
 
 function tileAction(x, y, uIdx, eIdx) {
@@ -948,11 +1144,11 @@ if (hunkerBtnEl) {
 document.getElementById("medkit").onclick = () => {
   if (battle.finished) return;
   const unit = battle.units[battle.selected];
-  if (!unit || unit.ap < 1 || unit.hp >= 100) return;
+  if (!unit || unit.ap < 1 || unit.hp >= unit.maxHp) return;
   const role = OPERATIVES[unit.id][2];
   const healAmount = role === "Médico" ? 35 : 25;
   unit.ap = Math.max(0, unit.ap - 1);
-  unit.hp = Math.min(100, unit.hp + healAmount);
+  unit.hp = Math.min(unit.maxHp, unit.hp + healAmount);
   battleLog(`Kit médico aplicado a ${OPERATIVES[unit.id][0]}: +${healAmount} HP (-1 PA).`);
   renderBattle();
 };
@@ -1029,13 +1225,16 @@ function runEnemyTurn() {
 
     if (e.hp > 0 && hasLineOfSight(e.x, e.y, target.x, target.y)) {
       const targetRole = OPERATIVES[target.id][2];
+      const outfit = getEquippedOutfitItem(target.id);
       const dist = Math.abs(target.x - e.x) + Math.abs(target.y - e.y);
       const targetCovPen = getCoverPenalty(target.x, target.y, e.x, e.y);
       const hunkerExtra = target.hunker ? (targetCovPen > 0 ? 35 : 25) : 0;
-      const hitProb = Math.max(10, Math.min(85, 72 - Math.max(0, dist - 4) * 6 - targetCovPen - hunkerExtra));
+      const dodgeExtra = outfit.dodgeBonus || 0;
+      const hitProb = Math.max(10, Math.min(85, 72 - Math.max(0, dist - 4) * 6 - targetCovPen - hunkerExtra - dodgeExtra));
       if (Math.random() * 100 <= hitProb) {
         const roleMitigation = targetRole === "Armas pesadas" ? 2 : 0;
-        const dmgTaken = Math.max(1, e.dmg - roleMitigation);
+        const outfitMitigation = outfit.dmgRed || 0;
+        const dmgTaken = Math.max(1, e.dmg - roleMitigation - outfitMitigation);
         target.hp = Math.max(0, target.hp - dmgTaken);
         logs.push(`${e.name} acertou em ${OPERATIVES[target.id][0]} (${hitProb}%): -${dmgTaken} HP${targetCovPen ? " [cobertura]" : ""}${target.hunker ? " [hunker]" : ""}.`);
       } else {
@@ -1051,7 +1250,7 @@ function runEnemyTurn() {
 
 function persistBattleInjuries(minDownHp = 25) {
   battle.units.forEach(u => {
-    const savedHp = u.hp > 0 ? u.hp : minDownHp;
+    const savedHp = u.hp > 0 ? u.hp : Math.min(u.maxHp, minDownHp);
     setOpHp(u.id, savedHp);
   });
 }
@@ -1118,12 +1317,13 @@ function checkWin() {
       const gained = m.xpBase + survivedBonus + secBonus;
       const lvUps = grantOpXp(u.id, gained);
       const prog = getOpProgress(u.id);
+      const maxHp = getMaxHp(u.id);
       const finalHp = getOpHp(u.id);
-      const sev = getInjurySeverity(finalHp);
+      const sev = getInjurySeverity(finalHp, maxHp);
       totalLevelsGained += lvUps;
-      const hpNote = finalHp < 100
-        ? ` · <span style="color:${sev.color}">${finalHp} HP (${sev.label})</span>`
-        : ` · 100 HP`;
+      const hpNote = finalHp < maxHp
+        ? ` · <span style="color:${sev.color}">${finalHp}/${maxHp} HP (${sev.label})</span>`
+        : ` · ${maxHp} HP`;
       return `<div><b>${OPERATIVES[u.id][0]}</b>: +${gained} XP → NV.${prog.level} (${prog.xp}/100 XP)${hpNote}${lvUps ? ` · <span style="color:var(--lime)">+${lvUps * 2} PT</span>` : ""}</div>`;
     });
 
