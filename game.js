@@ -944,6 +944,15 @@ function isInSmoke(battle, x, y) {
   return (battle.smokes || []).some((s) => s.x === x && s.y === y && s.turns > 0);
 }
 
+function estimateUnitDamage(unit, target) {
+  if (!unit) return 0;
+  const armoryBonus = getBuildingLevel("b-armory") * 4;
+  const baseDmg = unit.role === "Atirador de Elite" ? 42 : unit.role === "Pesado" ? 36 : 28;
+  const rawDmg = baseDmg + armoryBonus;
+  const armorMitigation = target ? Math.floor((target.armor || 0) * 0.45) : 0;
+  return Math.max(8, rawDmg - armorMitigation);
+}
+
 function calculateHitChance(unit, target, battle) {
   if (!unit || !target) return 0;
   const dist = Math.abs(unit.x - target.x) + Math.abs(unit.y - target.y);
@@ -1070,7 +1079,14 @@ function renderFloatingUnitOrders(battle, selUnit, gridEl) {
       <button type="button" id="close-floating-orders" style="background:none;border:none;color:#fff;cursor:pointer;font-size:1em;padding:0 2px;">✕</button>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:4px;">
-      <button type="button" data-float-act="fire" class="primary" style="font-size:0.72em;padding:4px 7px;">DISPARAR</button>
+      <button type="button" data-float-act="fire" class="primary" style="font-size:0.72em;padding:4px 7px;">${
+        battle.selectedTargetId
+          ? (() => {
+              const t = battle.enemies.find((e) => e.id === battle.selectedTargetId && e.hp > 0);
+              return t ? `DISPARAR (${calculateHitChance(selUnit, t, battle)}% · ~${estimateUnitDamage(selUnit, t)}D)` : "DISPARAR";
+            })()
+          : "DISPARAR"
+      }</button>
       <button type="button" data-float-act="frag" class="secondary" style="font-size:0.72em;padding:4px 7px;">FRAG (${selUnit.frags})</button>
       <button type="button" data-float-act="smoke" class="secondary" style="font-size:0.72em;padding:4px 7px;">FUMO (${selUnit.smokes})</button>
       <button type="button" data-float-act="overwatch" class="secondary" style="font-size:0.72em;padding:4px 7px;">VIGILÂNCIA</button>
@@ -1215,27 +1231,70 @@ function renderBattle() {
           bg = "rgba(180,200,220,0.28)";
         }
 
+        const cellCover = (!unitHere && !enemyHere && tileType !== 3) ? getTileCoverAt(b, x, y) : 0;
+        let subHint = "";
+
         if (canMoveHere) {
           border = "#4ef2a1";
-          bg = "rgba(78,242,161,0.14)";
+          bg = cellCover === 2
+            ? "rgba(78,242,161,0.22)"
+            : cellCover === 1
+              ? "rgba(78,242,161,0.18)"
+              : "rgba(78,242,161,0.13)";
+          if (!label) {
+            label = "·";
+            if (cellCover === 2) subHint = "COB+";
+            else if (cellCover === 1) subHint = "COB";
+          }
+        } else if (!label && cellCover > 0) {
+          subHint = cellCover === 2 ? "COB+" : "COB";
         }
 
         if (unitHere) {
           const isSel = selUnit && selUnit.id === unitHere.id;
+          const uCover = getTileCoverAt(b, unitHere.x, unitHere.y);
           bg = isSel ? "rgba(78,242,161,0.35)" : "rgba(64,158,255,0.3)";
           border = isSel ? "#ffffff" : "#409eff";
           label = `${unitHere.name.split(" ")[0].slice(0, 4)} ${unitHere.hp}`;
+          if (uCover === 2) subHint = "COB+";
+          else if (uCover === 1) subHint = "COB";
         }
 
         if (enemyHere) {
           const isTarget = b.selectedTargetId === enemyHere.id;
+          const eCover = getTileCoverAt(b, enemyHere.x, enemyHere.y);
           bg = isTarget ? "rgba(255,82,82,0.42)" : "rgba(255,82,82,0.22)";
           border = isTarget ? "#ffd166" : "#ff5252";
           label = `${enemyHere.name.split(" ")[0].slice(0, 4)} ${enemyHere.hp}`;
+          if (selUnit) {
+            const hChance = calculateHitChance(selUnit, enemyHere, b);
+            const eDmg = estimateUnitDamage(selUnit, enemyHere);
+            subHint = `${hChance}% · ~${eDmg}D`;
+          } else if (eCover > 0) {
+            subHint = eCover === 2 ? "COB+" : "COB";
+          }
         }
 
-        cell.style.cssText = `min-height:42px;background:${bg};border:1px solid ${border};border-radius:4px;color:#fff;font-size:0.72em;padding:2px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;`;
-        cell.textContent = label || (smokeHere ? "☁" : "");
+        cell.style.cssText = `min-height:44px;background:${bg};border:1px solid ${border};border-radius:4px;color:#fff;font-size:0.72em;padding:2px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;`;
+        if (subHint) {
+          cell.innerHTML = `<span>${label || (smokeHere ? "☁" : "")}</span><span style="font-size:0.82em;opacity:0.85;color:#ffd166;">${subHint}</span>`;
+        } else {
+          cell.textContent = label || (smokeHere ? "☁" : "");
+        }
+
+        cell.addEventListener("mouseenter", () => {
+          if (enemyHere && selUnit && b.phase === "player") {
+            const hChance = calculateHitChance(selUnit, enemyHere, b);
+            const eDmg = estimateUnitDamage(selUnit, enemyHere);
+            const eCover = getTileCoverAt(b, enemyHere.x, enemyHere.y);
+            const covTxt = eCover === 2 ? "cobertura pesada" : eCover === 1 ? "meia cobertura" : "sem cobertura";
+            addBattleLog(`Alvo: ${enemyHere.name} (${enemyHere.hp} HP, ${covTxt}) — Chance ${hChance}%, dano estimado ~${eDmg} HP.`);
+          } else if (canMoveHere && selUnit) {
+            const cCov = getTileCoverAt(b, x, y);
+            const covTxt = cCov === 2 ? " com cobertura pesada" : cCov === 1 ? " com meia cobertura" : "";
+            addBattleLog(`Mover ${selUnit.name} para (${x + 1},${y + 1})${covTxt} (1 PA).`);
+          }
+        });
 
         cell.addEventListener("click", () => handleCellClick(x, y));
         gridEl.appendChild(cell);
@@ -1261,9 +1320,10 @@ function renderBattle() {
   ensureEndTurnVisible(b);
 
   if (selUnit) {
+    const maxMove = selUnit.stunned ? 2 : 3;
     setText("selected-unit", `${selUnit.name} (${selUnit.role})`);
     setText("unit-hp", `${selUnit.hp}/${selUnit.maxHp} HP`);
-    setText("unit-ap", `${selUnit.ap}/${selUnit.maxAp} PA`);
+    setText("unit-ap", `${selUnit.ap}/${selUnit.maxAp} PA · MOV ${maxMove}`);
     setText("unit-ammo", `${selUnit.ammo}/${selUnit.maxAmmo} MUN`);
   } else {
     setText("selected-unit", "SEM OPERACIONAL");
@@ -1275,12 +1335,18 @@ function renderBattle() {
   if (selUnit && selEnemy) {
     const chance = calculateHitChance(selUnit, selEnemy, b);
     const cover = getTileCoverAt(b, selEnemy.x, selEnemy.y);
+    const coverText = cover === 2 ? "COB. PESADA (-40%)" : cover === 1 ? "MEIA COB. (-25%)" : "SEM COB. (0%)";
+    const estDmg = estimateUnitDamage(selUnit, selEnemy);
+    setText("target-info", `${selEnemy.name} (${selEnemy.hp} HP · ${coverText})`);
+    setText("hit-chance", `CHANCE: ${chance}% · DANO EST.: ~${estDmg}`);
+  } else if (selEnemy) {
+    const cover = getTileCoverAt(b, selEnemy.x, selEnemy.y);
     const coverText = cover === 2 ? "COB. PESADA" : cover === 1 ? "MEIA COB." : "SEM COB.";
     setText("target-info", `${selEnemy.name} (${selEnemy.hp} HP · ${coverText})`);
-    setText("hit-chance", `CHANCE: ${chance}%`);
+    setText("hit-chance", "CHANCE: --% · DANO EST.: --");
   } else {
     setText("target-info", "NENHUM ALVO");
-    setText("hit-chance", "CHANCE: --%");
+    setText("hit-chance", "CHANCE: --% · DANO EST.: --");
   }
 
   const logEl = document.getElementById("battle-log");
