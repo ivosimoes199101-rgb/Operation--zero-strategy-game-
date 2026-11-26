@@ -1701,3 +1701,481 @@ renderResources();
 renderRoster();
 renderBuildings();
 renderMissions();
+(function initBaseFacilitiesExpansion() {
+  if (!state.facilities || typeof state.facilities !== "object") {
+    state.facilities = {
+      armoryTier: 0,
+      labIntelDecoded: 0,
+      piercingAmmo: false,
+      medProphylaxis: {}
+    };
+  }
+  if (!state.facilities.medProphylaxis || typeof state.facilities.medProphylaxis !== "object") {
+    state.facilities.medProphylaxis = {};
+  }
+
+  let expTrainOp = 0;
+  let expTrainStat = 0;
+  let expMedOp = 0;
+  let expLabTarget = "flanker";
+
+  function syncExpansionState() {
+    if (!state.facilities || typeof state.facilities !== "object") {
+      state.facilities = { armoryTier: 0, labIntelDecoded: 0, piercingAmmo: false, medProphylaxis: {} };
+    }
+    if (!state.facilities.medProphylaxis || typeof state.facilities.medProphylaxis !== "object") {
+      state.facilities.medProphylaxis = {};
+    }
+  }
+
+  const origGetMaxHp = typeof getMaxHp === "function" ? getMaxHp : null;
+  if (origGetMaxHp) {
+    getMaxHp = function(opIndex) {
+      syncExpansionState();
+      const baseMax = origGetMaxHp(opIndex);
+      const op = OPERATIVES[opIndex];
+      const statArmorBonus = op ? Math.max(0, Math.round(((op[3][2] || 68) - 68) * 0.4)) : 0;
+      const prophBonus = state.facilities.medProphylaxis[opIndex] ? 8 : 0;
+      return baseMax + statArmorBonus + prophBonus;
+    };
+  }
+
+  const origGetWeapon = typeof getWeapon === "function" ? getWeapon : null;
+  if (origGetWeapon) {
+    getWeapon = function(opIndex) {
+      syncExpansionState();
+      const wpn = { ...origGetWeapon(opIndex) };
+      const armTier = Number(state.facilities.armoryTier) || 0;
+      if (armTier > 0) {
+        wpn.dmg += armTier * 4;
+        wpn.hitBonus = (wpn.hitBonus || 0) + armTier * 4;
+        wpn.name = `${wpn.name} [AR-NV${armTier}]`;
+      }
+      if (state.facilities.piercingAmmo) {
+        wpn.dmg += 4;
+        wpn.piercing = true;
+      }
+      return wpn;
+    };
+  }
+
+  const origGetLabIntelDebuff = typeof getLabIntelDebuff === "function" ? getLabIntelDebuff : null;
+  if (origGetLabIntelDebuff) {
+    getLabIntelDebuff = function() {
+      syncExpansionState();
+      const baseIntel = { ...origGetLabIntelDebuff() };
+      const decoded = Number(state.facilities.labIntelDecoded) || 0;
+      if (decoded > 0) {
+        baseIntel.aimPen += decoded * 5;
+        baseIntel.dmgRed += decoded * 1;
+      }
+      return baseIntel;
+    };
+  }
+
+  const origCalcHitChance = typeof calcHitChance === "function" ? calcHitChance : null;
+  if (origCalcHitChance) {
+    calcHitChance = function(unit, enemy, isOverwatch = false) {
+      syncExpansionState();
+      let chance = origCalcHitChance(unit, enemy, isOverwatch);
+      const decoded = Number(state.facilities.labIntelDecoded) || 0;
+      if (decoded > 0 && enemy) {
+        if (expLabTarget === enemy.role) {
+          chance += decoded * 6;
+        } else {
+          chance += decoded * 2;
+        }
+      }
+      const wpn = typeof getWeapon === "function" ? getWeapon(unit.opIndex) : null;
+      if (wpn && wpn.piercing && typeof getTargetCoverBonus === "function") {
+        const covBonus = getTargetCoverBonus(unit.x, unit.y, enemy.x, enemy.y);
+        if (covBonus > 0) chance += Math.round(covBonus * 0.4);
+      }
+      return Math.max(5, Math.min(98, Math.round(chance)));
+    };
+  }
+
+  function trainOperativeStat(opIndex, statIndex) {
+    syncExpansionState();
+    const prog = getOpProgress(opIndex);
+    const op = OPERATIVES[opIndex];
+    const currentVal = op[3][statIndex];
+    if (currentVal >= 99) {
+      logModal("MÁXIMO ATINGIDO", `${STAT_NAMES[statIndex]} de ${op[0]} já está no máximo.`);
+      return;
+    }
+
+    if (prog.trainPoints > 0) {
+      prog.trainPoints -= 1;
+      op[3][statIndex] = Math.min(99, currentVal + 3);
+      save();
+      renderResources();
+      renderRoster();
+      renderBuildings();
+      logModal("TREINO CONCLUÍDO", `${op[0]} recebeu <b>+3 em ${STAT_NAMES[statIndex]}</b> usando 1 Ponto de Treino.`);
+      return;
+    }
+
+    const creditCost = 260;
+    const matCost = 7;
+    if (state.credits < creditCost || state.materials < matCost) {
+      logModal("RECURSOS INSUFICIENTES", `Sem pontos de treino livres. Treinar custa <b>${creditCost} CR</b> e <b>${matCost} MAT</b>.`);
+      return;
+    }
+    state.credits -= creditCost;
+    state.materials -= matCost;
+    op[3][statIndex] = Math.min(99, currentVal + 2);
+    save();
+    renderResources();
+    renderRoster();
+    renderBuildings();
+    logModal("TREINO INTENSIVO", `${op[0]} recebeu <b>+2 em ${STAT_NAMES[statIndex]}</b>.`);
+  }
+
+  function restOperativeNow(opIndex) {
+    if (state.selected.includes(opIndex)) {
+      logModal("EM SERVIÇO ATIVO", `${OPERATIVES[opIndex][0]} está na equipa ativa. Retira da equipa ou usa a Enfermaria.`);
+      return;
+    }
+    const maxHp = getMaxHp(opIndex);
+    const curHp = getOpHp(opIndex);
+    if (curHp >= maxHp) {
+      logModal("SEM DESGASTE", `${OPERATIVES[opIndex][0]} já está com HP máximo.`);
+      return;
+    }
+    const cost = 90;
+    if (state.credits < cost) {
+      logModal("CRÉDITOS INSUFICIENTES", `Descanso imediato no Quartel custa <b>${cost} créditos</b>.`);
+      return;
+    }
+    const healAmt = getBarracksRestHeal() + 10;
+    state.credits -= cost;
+    setOpHp(opIndex, curHp + healAmt);
+    save();
+    renderResources();
+    renderRoster();
+    renderBuildings();
+    logModal("DESCANSO NO QUARTEL", `${OPERATIVES[opIndex][0]} recuperou <b>+${Math.min(maxHp - curHp, healAmt)} HP</b>.`);
+  }
+
+  function urgentInfirmaryCare(opIndex) {
+    if (!state.built.includes(1)) {
+      logModal("ENFERMARIA EM FALTA", "Constrói primeiro a <b>Enfermaria</b>.");
+      return;
+    }
+    const maxHp = getMaxHp(opIndex);
+    const curHp = getOpHp(opIndex);
+    if (curHp >= maxHp) {
+      logModal("SAÚDE COMPLETA", `${OPERATIVES[opIndex][0]} não precisa de cuidados.`);
+      return;
+    }
+    const cost = Math.max(120, Math.round(getHealCost(opIndex) * 1.35));
+    if (state.credits < cost) {
+      logModal("CRÉDITOS INSUFICIENTES", `Cuidado urgente custa <b>${cost} créditos</b>.`);
+      return;
+    }
+    state.credits -= cost;
+    setOpHp(opIndex, maxHp);
+    save();
+    renderResources();
+    renderRoster();
+    renderBuildings();
+    logModal("CUIDADO URGENTE CONCLUÍDO", `${OPERATIVES[opIndex][0]} estabilizado com <b>${maxHp}/${maxHp} HP</b>.`);
+  }
+
+  function applyMedicalProphylaxis(opIndex) {
+    syncExpansionState();
+    if (!state.built.includes(1)) {
+      logModal("ENFERMARIA EM FALTA", "Constrói primeiro a <b>Enfermaria</b>.");
+      return;
+    }
+    if (state.facilities.medProphylaxis[opIndex]) {
+      logModal("PROFILAXIA ATIVA", `${OPERATIVES[opIndex][0]} já tem profilaxia médica pronta para a próxima missão.`);
+      return;
+    }
+    const costCredits = 180;
+    const costMat = 4;
+    if (state.credits < costCredits || state.materials < costMat) {
+      logModal("RECURSOS INSUFICIENTES", `Profilaxia médica custa <b>${costCredits} CR</b> e <b>${costMat} MAT</b>.`);
+      return;
+    }
+    state.credits -= costCredits;
+    state.materials -= costMat;
+    state.facilities.medProphylaxis[opIndex] = true;
+    const newMax = getMaxHp(opIndex);
+    setOpHp(opIndex, Math.min(newMax, getOpHp(opIndex) + 8));
+    save();
+    renderResources();
+    renderRoster();
+    renderBuildings();
+    logModal("PROFILAXIA APLICADA", `${OPERATIVES[opIndex][0]} recebeu <b>+8 HP</b> de reforço para a próxima saída.`);
+  }
+
+  function resupplyActiveSquad() {
+    if (!state.built.includes(2)) {
+      logModal("ARSENAL EM FALTA", "Constrói primeiro o <b>Arsenal</b>.");
+      return;
+    }
+    const squad = Array.isArray(state.selected) ? state.selected : [];
+    if (squad.length === 0) {
+      logModal("SEM ESQUADRA", "Seleciona operacionais na equipa antes de reabastecer.");
+      return;
+    }
+    const totalCredits = squad.length * 150;
+    const totalMat = squad.length * 3;
+    if (state.credits < totalCredits || state.materials < totalMat) {
+      logModal("RECURSOS INSUFICIENTES", `Reabastecer ${squad.length} operacionais custa <b>${totalCredits} CR</b> e <b>${totalMat} MAT</b>.`);
+      return;
+    }
+    state.credits -= totalCredits;
+    state.materials -= totalMat;
+    squad.forEach(idx => {
+      const g = getOpGear(idx);
+      g.frag = Math.max(g.frag || 0, 1);
+      g.smoke = Math.max(g.smoke || 0, 1);
+      g.medkit = Math.max(g.medkit || 0, 1);
+    });
+    save();
+    renderResources();
+    renderRoster();
+    renderBuildings();
+    logModal("ESQUADRA REABASTECIDA", `Cada operacional ativo recebeu pelo menos <b>1 Frag, 1 Fumo e 1 Kit de Saúde</b>.`);
+  }
+
+  function upgradeArmoryTier() {
+    syncExpansionState();
+    if (!state.built.includes(2)) {
+      logModal("ARSENAL EM FALTA", "Constrói primeiro o <b>Arsenal</b>.");
+      return;
+    }
+    const cur = Number(state.facilities.armoryTier) || 0;
+    if (cur >= 2) {
+      logModal("ARSENAL NO MÁXIMO", "O Arsenal já atingiu o Nível 2 de equipamento.");
+      return;
+    }
+    const costCr = cur === 0 ? 550 : 900;
+    const costMat = cur === 0 ? 14 : 22;
+    if (state.credits < costCr || state.materials < costMat) {
+      logModal("RECURSOS INSUFICIENTES", `Melhoria de Arsenal custa <b>${costCr} CR</b> e <b>${costMat} MAT</b>.`);
+      return;
+    }
+    state.credits -= costCr;
+    state.materials -= costMat;
+    state.facilities.armoryTier = cur + 1;
+    save();
+    renderResources();
+    renderRoster();
+    renderBuildings();
+    logModal("ARSENAL MELHORADO", `Armamento agora no <b>Nível ${state.facilities.armoryTier}</b> (+4 dano e +4% precisão).`);
+  }
+
+  function decodeAlienSample() {
+    syncExpansionState();
+    if (!state.built.includes(3)) {
+      logModal("LABORATÓRIO EM FALTA", "Constrói primeiro o <b>Laboratório</b>.");
+      return;
+    }
+    const decoded = Number(state.facilities.labIntelDecoded) || 0;
+    if (decoded >= 2) {
+      logModal("ANÁLISE COMPLETA", "Já descodificaste o máximo de relatórios alienígenas (2/2).");
+      return;
+    }
+    const alienCost = 1;
+    const crCost = 220;
+    if ((state.alien || 0) < alienCost || state.credits < crCost) {
+      logModal("RECURSOS INSUFICIENTES", `Descodificar amostra custa <b>${alienCost} Tec. Alienígena</b> e <b>${crCost} CR</b>.`);
+      return;
+    }
+    state.alien -= alienCost;
+    state.credits -= crCost;
+    state.facilities.labIntelDecoded = decoded + 1;
+    save();
+    renderResources();
+    renderBuildings();
+    logModal("AMOSTRA DESCODIFICADA", `Relatório Tático <b>${state.facilities.labIntelDecoded}/2</b> ativo: maior precisão e menor precisão/dano inimigo.`);
+  }
+
+  function researchPiercingAmmo() {
+    syncExpansionState();
+    if (!state.built.includes(3)) {
+      logModal("LABORATÓRIO EM FALTA", "Constrói primeiro o <b>Laboratório</b>.");
+      return;
+    }
+    if (state.facilities.piercingAmmo) {
+      logModal("JÁ PESQUISADO", "A <b>Munição Perfurante Xeno</b> já está ativa.");
+      return;
+    }
+    const alienCost = 2;
+    const crCost = 650;
+    const matCost = 16;
+    if ((state.alien || 0) < alienCost || state.credits < crCost || state.materials < matCost) {
+      logModal("RECURSOS INSUFICIENTES", `Munição Perfurante Xeno custa <b>${alienCost} XENO</b>, <b>${crCost} CR</b> e <b>${matCost} MAT</b>.`);
+      return;
+    }
+    state.alien -= alienCost;
+    state.credits -= crCost;
+    state.materials -= matCost;
+    state.facilities.piercingAmmo = true;
+    save();
+    renderResources();
+    renderRoster();
+    renderBuildings();
+    logModal("PROJETO EXPERIMENTAL CONCLUÍDO", "<b>Munição Perfurante Xeno</b> ativa (+4 dano e ignora parte da cobertura).");
+  }
+
+  function renderExtraFacilitiesPanel() {
+    syncExpansionState();
+    const el = document.getElementById("buildings");
+    if (!el) return;
+
+    const old = document.getElementById("oz-extra-facilities-panel");
+    if (old) old.remove();
+
+    const infBuilt = state.built.includes(1);
+    const armBuilt = state.built.includes(2);
+    const labBuilt = state.built.includes(3);
+
+    const opOpts = OPERATIVES.map((op, i) => {
+      const p = getOpProgress(i);
+      return `<option value="${i}" ${i === expTrainOp ? "selected" : ""}>${op[0]} (Nv.${p.level} · PT:${p.trainPoints})</option>`;
+    }).join("");
+
+    const statOpts = STAT_NAMES.map((s, i) => {
+      return `<option value="${i}" ${i === expTrainStat ? "selected" : ""}>${s} (${OPERATIVES[expTrainOp][3][i]})</option>`;
+    }).join("");
+
+    const medOpts = OPERATIVES.map((op, i) => {
+      const hp = getOpHp(i);
+      const maxHp = getMaxHp(i);
+      const proph = state.facilities.medProphylaxis[i] ? " · PROFILAXIA ✓" : "";
+      return `<option value="${i}" ${i === expMedOp ? "selected" : ""}>${op[0]} (${hp}/${maxHp} HP${proph})</option>`;
+    }).join("");
+
+    const panel = document.createElement("div");
+    panel.id = "oz-extra-facilities-panel";
+    panel.style.display = "flex";
+    panel.style.flexDirection = "column";
+    panel.style.gap = "10px";
+    panel.style.marginTop = "10px";
+
+    panel.innerHTML = `
+      <div class="building" style="flex-direction:column;align-items:stretch;gap:8px">
+        <div>
+          <b>QUARTEL — TREINO DE ATRIBUTOS E DESCANSO RÁPIDO</b><br>
+          <small style="color:var(--muted)">Usa Pontos de Treino (gratuitos) ou 260 CR / 7 MAT para +2 atributo.</small>
+        </div>
+        <select id="exp-train-op" style="width:100%;padding:8px;background:#0e161d;color:#f2f7fa;border:1px solid rgba(255,255,255,.22);border-radius:6px;font-size:12px">${opOpts}</select>
+        <select id="exp-train-stat" style="width:100%;padding:8px;background:#0e161d;color:#f2f7fa;border:1px solid rgba(255,255,255,.22);border-radius:6px;font-size:12px">${statOpts}</select>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" id="exp-btn-train" style="flex:1">TREINAR ATRIBUTO</button>
+          <button class="btn" id="exp-btn-rest" style="flex:1">DESCANSO (90 CR)</button>
+        </div>
+      </div>
+
+      <div class="building" style="flex-direction:column;align-items:stretch;gap:8px">
+        <div>
+          <b>ENFERMARIA — CUIDADO URGENTE E PROFILAXIA</b><br>
+          <small style="color:var(--muted)">${infBuilt ? "Tratamento de urgência e reforço médico (+8 HP) antes da saída." : "Constrói a Enfermaria para usar estas funções."}</small>
+        </div>
+        <select id="exp-med-op" ${!infBuilt ? "disabled" : ""} style="width:100%;padding:8px;background:#0e161d;color:#f2f7fa;border:1px solid rgba(255,255,255,.22);border-radius:6px;font-size:12px">${medOpts}</select>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" id="exp-btn-urgent" ${!infBuilt ? "disabled" : ""} style="flex:1">CUIDADO URGENTE</button>
+          <button class="btn" id="exp-btn-proph" ${!infBuilt ? "disabled" : ""} style="flex:1">PROFILAXIA (180 CR / 4 MAT)</button>
+        </div>
+      </div>
+
+      <div class="building" style="flex-direction:column;align-items:stretch;gap:8px">
+        <div>
+          <b>ARSENAL — REABASTECIMENTO E NÍVEL DE ARMAMENTO</b><br>
+          <small style="color:var(--muted)">Nível de Armamento: <b>${state.facilities.armoryTier || 0}/2</b> · Equipa ativa: <b>${state.selected.length}</b> operacionais.</small>
+        </div>
+        <button class="btn" id="exp-btn-resupply" ${!armBuilt ? "disabled" : ""} style="width:100%">
+          REABASTECER EQUIPA ATIVA (${state.selected.length * 150} CR / ${state.selected.length * 3} MAT)
+        </button>
+        <button class="btn" id="exp-btn-arm-tier" ${!armBuilt || (state.facilities.armoryTier || 0) >= 2 ? "disabled" : ""} style="width:100%">
+          ${(state.facilities.armoryTier || 0) >= 2 ? "ARMAMENTO NO NÍVEL MÁXIMO (2/2)" : `MELHORAR ARMAMENTO (${(state.facilities.armoryTier || 0) === 0 ? "550 CR / 14 MAT" : "900 CR / 22 MAT"})`}
+        </button>
+      </div>
+
+      <div class="building" style="flex-direction:column;align-items:stretch;gap:8px">
+        <div>
+          <b>LABORATÓRIO — DESCODIFICAÇÃO E MUNIÇÃO PERFURANTE</b><br>
+          <small style="color:var(--muted)">Relatórios descodificados: <b>${state.facilities.labIntelDecoded || 0}/2</b> · Perfurante: <b>${state.facilities.piercingAmmo ? "ATIVA ✓" : "INATIVA"}</b></small>
+        </div>
+        <select id="exp-lab-target" ${!labBuilt ? "disabled" : ""} style="width:100%;padding:8px;background:#0e161d;color:#f2f7fa;border:1px solid rgba(255,255,255,.22);border-radius:6px;font-size:12px">
+          <option value="flanker" ${expLabTarget === "flanker" ? "selected" : ""}>Foco de Análise: Flanqueadores / Sentinela</option>
+          <option value="skirmisher" ${expLabTarget === "skirmisher" ? "selected" : ""}>Foco de Análise: Pesados / Caçadores</option>
+        </select>
+        <button class="btn" id="exp-btn-decode" ${!labBuilt || (state.facilities.labIntelDecoded || 0) >= 2 ? "disabled" : ""} style="width:100%">
+          ${(state.facilities.labIntelDecoded || 0) >= 2 ? "DESCODIFICAÇÃO COMPLETA (2/2)" : "DESCODIFICAR AMOSTRA (1 XENO / 220 CR)"}
+        </button>
+        <button class="btn" id="exp-btn-piercing" ${!labBuilt || state.facilities.piercingAmmo ? "disabled" : ""} style="width:100%">
+          ${state.facilities.piercingAmmo ? "MUNIÇÃO PERFURANTE ATIVA ✓" : "PESQUISAR PERFURANTE (2 XENO / 650 CR / 16 MAT)"}
+        </button>
+      </div>
+    `;
+
+    panel.querySelector("#exp-train-op").onchange = e => {
+      expTrainOp = Number(e.target.value);
+      renderExtraFacilitiesPanel();
+    };
+    panel.querySelector("#exp-train-stat").onchange = e => {
+      expTrainStat = Number(e.target.value);
+    };
+    panel.querySelector("#exp-btn-train").onclick = () => trainOperativeStat(expTrainOp, expTrainStat);
+    panel.querySelector("#exp-btn-rest").onclick = () => restOperativeNow(expTrainOp);
+
+    panel.querySelector("#exp-med-op").onchange = e => {
+      expMedOp = Number(e.target.value);
+    };
+    panel.querySelector("#exp-btn-urgent").onclick = () => urgentInfirmaryCare(expMedOp);
+    panel.querySelector("#exp-btn-proph").onclick = () => applyMedicalProphylaxis(expMedOp);
+
+    panel.querySelector("#exp-btn-resupply").onclick = resupplyActiveSquad;
+    panel.querySelector("#exp-btn-arm-tier").onclick = upgradeArmoryTier;
+
+    panel.querySelector("#exp-lab-target").onchange = e => {
+      expLabTarget = e.target.value;
+    };
+    panel.querySelector("#exp-btn-decode").onclick = decodeAlienSample;
+    panel.querySelector("#exp-btn-piercing").onclick = researchPiercingAmmo;
+
+    panel.querySelectorAll("select option").forEach(opt => {
+      opt.style.backgroundColor = "#0e161d";
+      opt.style.color = "#f2f7fa";
+    });
+
+    const resetBtn = Array.from(el.querySelectorAll("button")).find(b => b.textContent.includes("RESET PROGRESSO"));
+    if (resetBtn) {
+      el.insertBefore(panel, resetBtn);
+    } else {
+      el.appendChild(panel);
+    }
+  }
+
+  const origRenderBuildings = typeof renderBuildings === "function" ? renderBuildings : null;
+  if (origRenderBuildings) {
+    renderBuildings = function() {
+      origRenderBuildings();
+      renderExtraFacilitiesPanel();
+    };
+  }
+
+  const origCheckWin = typeof checkWin === "function" ? checkWin : null;
+  if (origCheckWin) {
+    checkWin = function() {
+      const wasFinished = battle && battle.finished;
+      origCheckWin();
+      if (!wasFinished && battle && battle.finished) {
+        syncExpansionState();
+        state.facilities.medProphylaxis = {};
+        save();
+        if (typeof renderBuildings === "function") renderBuildings();
+      }
+    };
+  }
+
+  if (typeof renderBuildings === "function") {
+    renderBuildings();
+  }
+})();
