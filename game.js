@@ -25,9 +25,39 @@ const BUILDINGS = [
 ];
 
 const MISSIONS = [
-  ["FIRST CONTACT", "Investiga o local da primeira queda. Recupera dados e alcança a extração.", "Disponível"],
-  ["DEAD SIGNAL", "Localiza a equipa de reconhecimento desaparecida.", "Bloqueada"],
-  ["THE BREACH", "Contém a ameaça antes que alcance a zona urbana.", "Bloqueada"]
+  {
+    title: "FIRST CONTACT",
+    desc: "Principal: Alcança a extração ou elimina a patrulha. Secundário: Neutraliza todos os inimigos antes de sair.",
+    status: "Disponível",
+    rewardCredits: 500,
+    rewardMaterials: 15,
+    bonusCredits: 300,
+    bonusMaterials: 10,
+    secondaryType: "clear_all",
+    secondaryLabel: "Eliminar todos os inimigos"
+  },
+  {
+    title: "DEAD SIGNAL",
+    desc: "Principal: Sobrevive e extrai dados. Secundário: Concluir sem qualquer operacional abatido.",
+    status: "Bloqueada",
+    rewardCredits: 650,
+    rewardMaterials: 20,
+    bonusCredits: 350,
+    bonusMaterials: 12,
+    secondaryType: "no_casualties",
+    secondaryLabel: "Concluir sem baixas na equipa"
+  },
+  {
+    title: "THE BREACH",
+    desc: "Principal: Contém a brecha inimiga. Secundário: Neutraliza todos os alvos em até 6 turnos.",
+    status: "Bloqueada",
+    rewardCredits: 800,
+    rewardMaterials: 25,
+    bonusCredits: 450,
+    bonusMaterials: 15,
+    secondaryType: "fast_clear",
+    secondaryLabel: "Eliminar todos em até 6 turnos"
+  }
 ];
 
 const WEAPONS_BY_ROLE = {
@@ -38,6 +68,16 @@ const WEAPONS_BY_ROLE = {
   "Armas pesadas": { name: "METRALHADORA H-1", mag: 40, dmg: 30, optRange: 5 },
   "Batedora": { name: "SUBMETRALHADORA S-3", mag: 28, dmg: 24, optRange: 3 },
   "Batedor": { name: "SUBMETRALHADORA S-3", mag: 28, dmg: 24, optRange: 3 }
+};
+
+const ROLE_PERKS = {
+  "Assalto": "Bónus discreto: +5% precisão a curta/média distância (≤ 4 casas).",
+  "Sniper": "Bónus discreto: +6% precisão e +5% crítico à distância (≥ 5 casas).",
+  "Médico": "Bónus discreto: kit médico recupera +35 HP em vez de +25 HP.",
+  "Engenheira": "Bónus discreto: reduz em 5% a proteção de cobertura dos inimigos.",
+  "Armas pesadas": "Bónus discreto: reduz em 2 pontos o dano recebido em combate.",
+  "Batedora": "Bónus discreto: +6% precisão em flancos e +5% em vigilância.",
+  "Batedor": "Bónus discreto: +6% precisão em flancos e +5% em vigilância."
 };
 
 const COVERS = [
@@ -132,7 +172,8 @@ function renderRoster() {
 function showOperator(i) {
   const o = OPERATIVES[i];
   const names = ["Precisão", "Pontaria", "Mobilidade", "Resistência", "Perceção", "Técnica", "Furtividade", "Disciplina"];
-  document.getElementById("modal-content").innerHTML = `<div class="eyebrow">${o[1]} // ${o[2]}</div><h2 style="font:800 32px var(--display);margin:0">${o[0]}</h2><p class="muted">${o[4]}</p><div class="stats">${o[3].map((v, j) => `<div class="stat">${names[j]} <b>${v}</b></div>`).join("")}</div><p class="muted">Toca em INFO ou faz duplo toque num operacional para consultar a ficha.</p>`;
+  const perk = ROLE_PERKS[o[2]] || "";
+  document.getElementById("modal-content").innerHTML = `<div class="eyebrow">${o[1]} // ${o[2]}</div><h2 style="font:800 32px var(--display);margin:0">${o[0]}</h2><p class="muted">${o[4]}<br><span style="color:var(--lime)">${perk}</span></p><div class="stats">${o[3].map((v, j) => `<div class="stat">${names[j]} <b>${v}</b></div>`).join("")}</div>`;
   document.getElementById("modal").classList.remove("hidden");
 }
 
@@ -178,11 +219,11 @@ function renderMissions() {
     const unlocked = i === 0 || state.completed.includes(i - 1);
     const d = document.createElement("div");
     d.className = "mission";
-    d.innerHTML = `<div class="mission-main"><span class="num">0${i + 1}</span><div><b>${m[0]}</b><small>${m[1]}</small></div></div><button ${(!unlocked || done) ? "disabled" : ""}>${done ? "CONCLUÍDA" : unlocked ? "INICIAR" : "BLOQUEADA"}</button>`;
+    d.innerHTML = `<div class="mission-main"><span class="num">0${i + 1}</span><div><b>${m.title}</b><small>${m.desc}<br>Base: ${m.rewardCredits} cr / ${m.rewardMaterials} mat · Bónus Sec.: +${m.bonusCredits} cr</small></div></div><button ${(!unlocked || done) ? "disabled" : ""}>${done ? "CONCLUÍDA" : unlocked ? "INICIAR" : "BLOQUEADA"}</button>`;
     d.querySelector("button").onclick = () => startMission(i);
     el.appendChild(d);
   });
-              }
+    }
 let battle = {
   units: [],
   enemies: [],
@@ -267,21 +308,37 @@ function isFlanked(tx, ty, ax, ay) {
 function calcHitChance(unit, enemy, isOverwatch = false) {
   if (!unit || !enemy || enemy.hp <= 0 || unit.hp <= 0) return 0;
   if (!hasLineOfSight(unit.x, unit.y, enemy.x, enemy.y)) return 0;
+  const role = OPERATIVES[unit.id][2];
   const stats = OPERATIVES[unit.id][3];
   const wpn = getWeapon(unit.id);
   const dist = Math.abs(unit.x - enemy.x) + Math.abs(unit.y - enemy.y);
   const base = stats[0] * 0.45 + stats[1] * 0.55;
   const rangeLoss = Math.abs(dist - wpn.optRange) * 6;
-  const coverLoss = getCoverPenalty(enemy.x, enemy.y, unit.x, unit.y);
-  const flankBonus = coverLoss === 0 && isFlanked(enemy.x, enemy.y, unit.x, unit.y) ? 12 : 0;
+  let coverLoss = getCoverPenalty(enemy.x, enemy.y, unit.x, unit.y);
+  if (role === "Engenheira" && coverLoss > 0) {
+    coverLoss = Math.max(0, coverLoss - 5);
+  }
+  const flanked = coverLoss === 0 && isFlanked(enemy.x, enemy.y, unit.x, unit.y);
+  let flankBonus = flanked ? 12 : 0;
+  if ((role === "Batedora" || role === "Batedor") && flanked) {
+    flankBonus += 6;
+  }
+  let roleBonus = 0;
+  if (role === "Assalto" && dist <= 4) roleBonus += 5;
+  if (role === "Sniper" && dist >= 5) roleBonus += 6;
+  if ((role === "Batedora" || role === "Batedor") && isOverwatch) roleBonus += 5;
+
   const reactionLoss = isOverwatch ? 10 : 0;
-  return Math.max(5, Math.min(98, Math.round(base - rangeLoss - coverLoss + flankBonus - reactionLoss)));
+  return Math.max(5, Math.min(98, Math.round(base - rangeLoss - coverLoss + flankBonus + roleBonus - reactionLoss)));
 }
 
 function calcCritChance(unit, enemy, isOverwatch = false) {
   if (!unit || !enemy) return 0;
+  const role = OPERATIVES[unit.id][2];
+  const dist = Math.abs(unit.x - enemy.x) + Math.abs(unit.y - enemy.y);
   const flanked = isFlanked(enemy.x, enemy.y, unit.x, unit.y);
-  const baseCrit = flanked ? 30 : 8;
+  let baseCrit = flanked ? 30 : 8;
+  if (role === "Sniper" && dist >= 5) baseCrit += 5;
   return isOverwatch ? Math.max(0, baseCrit - 5) : baseCrit;
 }
 
@@ -329,6 +386,7 @@ function startMission(i) {
     logModal("EQUIPA NÃO SELECIONADA", "Vai a Operacionais e escolhe até cinco elementos antes de iniciar.");
     return;
   }
+  const m = MISSIONS[i];
   battle = {
     units: state.selected.map((id, n) => {
       const wpn = getWeapon(id);
@@ -354,13 +412,12 @@ function startMission(i) {
     finished: false
   };
   state.mission = i;
-  document.getElementById("battle-title").textContent = MISSIONS[i][0];
+  document.getElementById("battle-title").textContent = m.title;
   document.getElementById("turn-label").textContent = "TURNO 1";
-  document.getElementById("battle-log").textContent = "Turno 1: Escolhe uma casa destacada para mover (-1 PA) ou seleciona um alvo para disparar (-1 PA).";
+  document.getElementById("battle-log").textContent = `Turno 1 · Secundário: ${m.secondaryLabel}. Escolhe mover, disparar, vigiar ou Hunker Down (-1 PA).`;
   go("tactical");
   renderBattle();
 }
-
 function renderBattle() {
   const grid = document.getElementById("battle-grid");
   grid.innerHTML = "";
@@ -535,9 +592,11 @@ document.getElementById("medkit").onclick = () => {
   if (battle.finished) return;
   const unit = battle.units[battle.selected];
   if (!unit || unit.ap < 1 || unit.hp >= 100) return;
+  const role = OPERATIVES[unit.id][2];
+  const healAmount = role === "Médico" ? 35 : 25;
   unit.ap = Math.max(0, unit.ap - 1);
-  unit.hp = Math.min(100, unit.hp + 25);
-  battleLog(`Kit médico aplicado a ${OPERATIVES[unit.id][0]}: +25 HP (-1 PA).`);
+  unit.hp = Math.min(100, unit.hp + healAmount);
+  battleLog(`Kit médico aplicado a ${OPERATIVES[unit.id][0]}: +${healAmount} HP (-1 PA).`);
   renderBattle();
 };
 
@@ -612,13 +671,16 @@ function runEnemyTurn() {
     }
 
     if (e.hp > 0 && hasLineOfSight(e.x, e.y, target.x, target.y)) {
+      const targetRole = OPERATIVES[target.id][2];
       const dist = Math.abs(target.x - e.x) + Math.abs(target.y - e.y);
       const targetCovPen = getCoverPenalty(target.x, target.y, e.x, e.y);
       const hunkerExtra = target.hunker ? (targetCovPen > 0 ? 35 : 25) : 0;
       const hitProb = Math.max(10, Math.min(85, 72 - Math.max(0, dist - 4) * 6 - targetCovPen - hunkerExtra));
       if (Math.random() * 100 <= hitProb) {
-        target.hp = Math.max(0, target.hp - e.dmg);
-        logs.push(`${e.name} acertou em ${OPERATIVES[target.id][0]} (${hitProb}%): -${e.dmg} HP${targetCovPen ? " [cobertura]" : ""}${target.hunker ? " [hunker]" : ""}.`);
+        const roleMitigation = targetRole === "Armas pesadas" ? 2 : 0;
+        const dmgTaken = Math.max(1, e.dmg - roleMitigation);
+        target.hp = Math.max(0, target.hp - dmgTaken);
+        logs.push(`${e.name} acertou em ${OPERATIVES[target.id][0]} (${hitProb}%): -${dmgTaken} HP${targetCovPen ? " [cobertura]" : ""}${target.hunker ? " [hunker]" : ""}.`);
       } else {
         logs.push(`${e.name} falhou contra ${OPERATIVES[target.id][0]} (${hitProb}%).`);
       }
@@ -661,19 +723,41 @@ document.getElementById("end-turn").onclick = () => {
   checkWin();
 };
 
+function isSecondaryCompleted(m) {
+  const allEnemiesDown = battle.enemies.every(e => e.hp <= 0);
+  const noCasualties = battle.units.every(u => u.hp > 0);
+  if (m.secondaryType === "clear_all") return allEnemiesDown;
+  if (m.secondaryType === "no_casualties") return noCasualties;
+  if (m.secondaryType === "fast_clear") return allEnemiesDown && battle.turn <= 6;
+  return false;
+}
+
 function checkWin() {
+  if (battle.finished) return;
   const reachedExit = battle.units.some(u => u.hp > 0 && u.x === 7 && u.y === 5);
   const allEnemiesDown = battle.enemies.every(e => e.hp <= 0);
   if (reachedExit || allEnemiesDown) {
     battle.finished = true;
-    battleLog("OBJETIVO CUMPRIDO. A equipa regressa à base.");
+    const m = MISSIONS[state.mission];
+    const secDone = isSecondaryCompleted(m);
+    const totalCredits = m.rewardCredits + (secDone ? m.bonusCredits : 0);
+    const totalMaterials = m.rewardMaterials + (secDone ? m.bonusMaterials : 0);
+
+    battleLog(`OBJETIVO PRINCIPAL CUMPRIDO${secDone ? " + SECUNDÁRIO!" : "."}`);
     if (!state.completed.includes(state.mission)) state.completed.push(state.mission);
-    state.credits += 500;
-    state.materials += 15;
+    state.credits += totalCredits;
+    state.materials += totalMaterials;
     state.alien += 1;
     save();
+
     setTimeout(() => {
-      logModal("OPERAÇÃO CONCLUÍDA", "A equipa regressou à base. Recompensa: 500 créditos, 15 materiais e 1 tecnologia alienígena.");
+      const secText = secDone
+        ? `<br><span style="color:var(--lime)">Secundário concluído (${m.secondaryLabel}): +${m.bonusCredits} créditos e +${m.bonusMaterials} materiais extra!</span>`
+        : `<br>Secundário (${m.secondaryLabel}): não concluído.`;
+      logModal(
+        "OPERAÇÃO CONCLUÍDA",
+        `Objetivo principal cumprido.<br>Total recebido: <b>${totalCredits} créditos</b>, <b>${totalMaterials} materiais</b> e <b>1 tecnologia alienígena</b>.${secText}`
+      );
       renderMissions();
     }, 250);
   }
