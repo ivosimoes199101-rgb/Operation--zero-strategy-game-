@@ -1820,3 +1820,305 @@ if (document.readyState === "loading") {
 } else {
   initOperationZero();
 }
+// --- Expansão Campanha, Inimigos e Finais (OPERATION ZERO) ---
+
+const CAMPAIGN_METRICS = {
+  trust: 50,      // Confiança (0-100)
+  resources: 50,  // Recursos (0-100)
+  research: 20,   // Investigação (0-100)
+  threat: 20      // Ameaça (0-100)
+};
+
+const ENEMY_ARCHETYPES = {
+  scout: {
+    id: "scout",
+    name: "Scout",
+    role: "Batedor rápido",
+    maxHp: 50,
+    damage: 16,
+    moveRange: 5,
+    armor: 0,
+    trait: "Alta mobilidade; abre caminho e sinaliza posições."
+  },
+  stalker: {
+    id: "stalker",
+    name: "Stalker",
+    role: "Flanqueador / emboscada",
+    maxHp: 65,
+    damage: 24,
+    moveRange: 4,
+    armor: 5,
+    trait: "Bónus de dano em alvos sem cobertura ou flanqueados."
+  },
+  swarm: {
+    id: "swarm",
+    name: "Swarm",
+    role: "Pressão em grupo",
+    maxHp: 40,
+    damage: 14,
+    moveRange: 4,
+    armor: 0,
+    trait: "Atua em matilha; ganha precisão extra quando há aliados perto."
+  },
+  psycher: {
+    id: "psycher",
+    name: "Psycher",
+    role: "Perturbação mental",
+    maxHp: 70,
+    damage: 18,
+    moveRange: 3,
+    armor: 5,
+    trait: "Aplica perturbação que reduz precisão ou ação do alvo por 1 turno."
+  },
+  brute: {
+    id: "brute",
+    name: "Brute",
+    role: "Tanque pesado",
+    maxHp: 140,
+    damage: 34,
+    moveRange: 2,
+    armor: 20,
+    trait: "Alta resistência e explosivos/flanqueio recomendados para quebrar a guarda."
+  },
+  overlord: {
+    id: "overlord",
+    name: "Overlord Omega",
+    role: "Boss Final",
+    maxHp: 260,
+    damage: 38,
+    moveRange: 3,
+    armor: 25,
+    trait: "Chefe da invasão com ataque em área e reforços."
+  }
+};
+
+const CAMPAIGN_MISSIONS = [
+  {
+    id: "m01_first_contact",
+    chapter: "I — Primeiro Contacto",
+    number: 1,
+    title: "Primeiro Contacto",
+    type: "Resgate / Contenção",
+    objective: "Resgatar a equipa desaparecida e eliminar a patrulha inicial.",
+    secondaryObjective: "Recuperar registos sem baixas no esquadrão.",
+    enemies: ["scout", "swarm"],
+    rewards: { credits: 150, materials: 40, research: 10, recruit: "Medic / Veteran" },
+    choice: {
+      prompt: "Encontraste sobreviventes e equipamento militar sob fogo.",
+      optionA: {
+        label: "Priorizar resgate total de sobreviventes",
+        effects: { trust: 12, resources: 5, threat: 3 }
+      },
+      optionB: {
+        label: "Extrair rápido com os registos essenciais",
+        effects: { trust: -4, resources: 12, research: 10, threat: 2 }
+      }
+    }
+  },
+  {
+    id: "m02_dead_signal",
+    chapter: "I — Primeiro Contacto",
+    number: 2,
+    title: "Sinal Morto",
+    type: "Recuperação",
+    objective: "Reativar o relé de comunicações e recolher dados encriptados.",
+    secondaryObjective: "Eliminar batedores antes de o alarme disparar.",
+    enemies: ["scout", "stalker"],
+    rewards: { credits: 180, materials: 55, research: 15 },
+    choice: {
+      prompt: "Os dados estão prontos para envio imediato ou transmissão segura.",
+      optionA: {
+        label: "Transmitir dados de imediato para a base",
+        effects: { research: 15, threat: 10 }
+      },
+      optionB: {
+        label: "Encriptar localmente e levar em silêncio",
+        effects: { trust: 8, research: 8, threat: 3 }
+      }
+    }
+  },
+  {
+    id: "m03_quarantine_zone",
+    chapter: "II — Zona de Quarentena",
+    number: 3,
+    title: "Zona de Quarentena",
+    type: "Defesa",
+    objective: "Defender o perímetro urbano durante as vagas iniciais.",
+    secondaryObjective: "Manter civis e barricadas intactos.",
+    enemies: ["scout", "stalker", "swarm"],
+    rewards: { credits: 220, materials: 70, trust: 10 },
+    choice: {
+      prompt: "A pressão aumenta em dois pontos do setor urbano.",
+      optionA: {
+        label: "Defender ambos os pontos até ao fim",
+        effects: { trust: 15, resources: -10, threat: 5 }
+      },
+      optionB: {
+        label: "Recuar de um setor para preservar tropas",
+        effects: { trust: -8, resources: 10, threat: 10 }
+      }
+    }
+  },
+  {
+    id: "m04_black_lab",
+    chapter: "II — Zona de Quarentena",
+    number: 4,
+    title: "Laboratório Negro",
+    type: "Sabotagem / Recuperação",
+    objective: "Extrair amostras xeno ou sabotar os reatores de contenção.",
+    secondaryObjective: "Neutralizar alvos Psycher sem perder o objetivo.",
+    enemies: ["stalker", "swarm", "psycher"],
+    rewards: { credits: 250, materials: 85, research: 20 },
+    choice: {
+      prompt: "No núcleo do laboratório, podes levar amostras ou destruir os reatores.",
+      optionA: {
+        label: "Extrair amostras para estudo avançado",
+        effects: { research: 20, threat: 14 }
+      },
+      optionB: {
+        label: "Sabotar os reatores e conter a ameaça",
+        effects: { research: 5, threat: -8, resources: 8 }
+      }
+    }
+  },
+  {
+    id: "m05_the_hive",
+    chapter: "III — A Verdade",
+    number: 5,
+    title: "A Colmeia",
+    type: "Sabotagem / Eliminação",
+    objective: "Destruir o núcleo biológico da colmeia.",
+    secondaryObjective: "Evitar flanqueamentos e recolher amostra pura.",
+    enemies: ["swarm", "psycher", "brute"],
+    rewards: { credits: 300, materials: 100, research: 15 },
+    choice: {
+      prompt: "Tens cargas explosivas pesadas junto ao núcleo biológico.",
+      optionA: {
+        label: "Detonar cargas pesadas para destruir tudo rápido",
+        effects: { resources: -8, threat: 12, research: 8 }
+      },
+      optionB: {
+        label: "Avançar com precisão tática e contenção",
+        effects: { trust: 10, threat: 4, research: 12 }
+      }
+    }
+  },
+  {
+    id: "m06_ghost_protocol",
+    chapter: "III — A Verdade",
+    number: 6,
+    title: "Protocolo Fantasma",
+    type: "Infiltração / Resgate",
+    objective: "Resgatar o especialista ligado ao Projeto ZERO e extrair.",
+    secondaryObjective: "Aceder ao arquivo confidencial sem alarme total.",
+    enemies: ["stalker", "psycher", "brute"],
+    rewards: { credits: 320, materials: 90, research: 20, recruit: "Specialist" },
+    choice: {
+      prompt: "O especialista pede acesso livre aos ficheiros e proteção da unidade.",
+      optionA: {
+        label: "Partilhar os ficheiros e apoiar a aliança",
+        effects: { trust: 15, research: 15, threat: -4 }
+      },
+      optionB: {
+        label: "Reter os ficheiros sob controlo estrito da ZERO",
+        effects: { resources: 15, trust: -10, research: 10 }
+      }
+    }
+  },
+  {
+    id: "m07_last_stand",
+    chapter: "IV — Operation Zero",
+    number: 7,
+    title: "Última Defesa",
+    type: "Defesa Crítica",
+    objective: "Resistir ao assalto coordenado e proteger o comando.",
+    secondaryObjective: "Eliminar os comandantes de campo inimigos.",
+    enemies: ["brute", "psycher", "stalker"],
+    rewards: { credits: 400, materials: 130, research: 15 },
+    choice: {
+      prompt: "As forças principais convergem para a última linha antes do assalto final.",
+      optionA: {
+        label: "Empenhar reservas totais para segurar a linha",
+        effects: { trust: 10, resources: -15, threat: -5 }
+      },
+      optionB: {
+        label: "Manter reserva estratégica para o golpe decisivo",
+        effects: { resources: 10, threat: 8 }
+      }
+    }
+  },
+  {
+    id: "m08_operation_zero",
+    chapter: "IV — Operation Zero",
+    number: 8,
+    title: "Operation Zero",
+    type: "Assalto Final / Boss",
+    objective: "Derrotar o Overlord Omega e decidir o desfecho da invasão.",
+    secondaryObjective: "Manter todos os operadores ativos até ao confronto final.",
+    enemies: ["brute", "psycher", "overlord"],
+    rewards: { credits: 500, materials: 150, research: 25 },
+    choice: {
+      prompt: "Núcleo exposto e Overlord neutralizado: qual é a diretiva final da ZERO?",
+      optionA: {
+        label: "Ativar protocolo de defesa e salvar a Terra",
+        finalTag: "earth_saved"
+      },
+      optionB: {
+        label: "Abrir canal de negociação e pacto de coexistência",
+        finalTag: "alien_alliance"
+      },
+      optionC: {
+        label: "Sobrecarregar o núcleo num sacrifício total da operação",
+        finalTag: "final_sacrifice"
+      }
+    }
+  }
+];
+
+function resolveCampaignEnding(metrics, finalChoiceTag) {
+  if (metrics.threat >= 85 && metrics.trust < 35) {
+    return {
+      id: "earth_conquered",
+      title: "Terra Conquistada",
+      summary: "A pressão da invasão superou as defesas e a humanidade caiu sob domínio alienígena."
+    };
+  }
+
+  if (finalChoiceTag === "final_sacrifice") {
+    return {
+      id: "final_sacrifice",
+      title: "Sacrifício Final",
+      summary: "A operação ZERO pagou o preço máximo para travar a ameaça e proteger o que restava."
+    };
+  }
+
+  if (finalChoiceTag === "alien_alliance" && metrics.research >= 55 && metrics.threat < 80) {
+    return {
+      id: "alien_alliance",
+      title: "Aliança Extraterrestre",
+      summary: "Com base na investigação e numa postura diplomática, abriu-se uma via de coexistência."
+    };
+  }
+
+  if (finalChoiceTag === "earth_saved" && metrics.threat < 85) {
+    return {
+      id: "earth_saved",
+      title: "Salvação da Terra",
+      summary: "A unidade ZERO repeliu a invasão e garantiu a sobrevivência da Terra."
+    };
+  }
+
+  if (metrics.threat >= 75) {
+    return {
+      id: "earth_conquered",
+      title: "Terra Conquistada",
+      summary: "Apesar do esforço final, o nível de ameaça acumulado inviabilizou a vitória limpa."
+    };
+  }
+
+  return {
+    id: "final_sacrifice",
+    title: "Sacrifício Final",
+    summary: "A vitória só foi possível através de um sacrifício duro e definitivo da linha de frente."
+  };
+      }
