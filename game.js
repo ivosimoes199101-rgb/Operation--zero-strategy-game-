@@ -1643,3 +1643,198 @@ document.getElementById("retreat").onclick = () => {
 renderResources();
 renderRoster();
 document.getElementById("clock").textContent = "2089";
+function ensureBarracksInitialized() {
+  if (!Array.isArray(state.built)) state.built = [];
+  if (!state.built.includes(0)) {
+    state.built.push(0);
+  }
+  if (!state.barracksLevel || typeof state.barracksLevel !== "number") {
+    state.barracksLevel = 1;
+  }
+}
+
+function getBarracksLevel() {
+  ensureBarracksInitialized();
+  return Math.max(1, Math.min(3, state.barracksLevel));
+}
+
+function getBarracksUpgradeCost() {
+  const lv = getBarracksLevel();
+  if (lv === 1) return { credits: 650, materials: 15, nextLv: 2, hpBonus: 10, restHeal: 14 };
+  if (lv === 2) return { credits: 1050, materials: 25, nextLv: 3, hpBonus: 20, restHeal: 20 };
+  return null;
+}
+
+function getBarracksHpBonus() {
+  const lv = getBarracksLevel();
+  if (lv === 2) return 10;
+  if (lv === 3) return 20;
+  return 0;
+}
+
+function getBarracksRestHeal() {
+  const lv = getBarracksLevel();
+  if (lv === 1) return 8;
+  if (lv === 2) return 14;
+  return 20;
+}
+
+function getSquadSynergyBonus() {
+  const count = Array.isArray(state.selected) ? state.selected.length : 0;
+  if (count >= 4) return 6;
+  if (count >= 2) return 3;
+  return 0;
+}
+
+const _baseGetMaxHp = getMaxHp;
+getMaxHp = function(opIndex) {
+  return _baseGetMaxHp(opIndex) + getBarracksHpBonus();
+};
+
+const _baseCalcHitChance = calcHitChance;
+calcHitChance = function(unit, enemy, isOverwatch = false) {
+  const raw = _baseCalcHitChance(unit, enemy, isOverwatch);
+  if (raw <= 0) return 0;
+  const syn = getSquadSynergyBonus();
+  return Math.max(5, Math.min(98, raw + syn));
+};
+
+function toggleSquadMemberFromBarracks(opIndex) {
+  if (state.selected.includes(opIndex)) {
+    state.selected = state.selected.filter(x => x !== opIndex);
+  } else if (state.selected.length < 5) {
+    state.selected.push(opIndex);
+  } else {
+    logModal("LIMITE DO QUARTEL", "Só podes escalar até 5 operacionais por missão.");
+    return;
+  }
+  save();
+  renderRoster();
+  renderBuildings();
+}
+
+function upgradeBarracks() {
+  const upg = getBarracksUpgradeCost();
+  if (!upg) return;
+  if (state.credits < upg.credits || state.materials < upg.materials) {
+    logModal("RECURSOS INSUFICIENTES", `Melhorar o Quartel para o Nível ${upg.nextLv} custa ${upg.credits} créditos e ${upg.materials} materiais.`);
+    return;
+  }
+  state.credits -= upg.credits;
+  state.materials -= upg.materials;
+  state.barracksLevel = upg.nextLv;
+  OPERATIVES.forEach((_, idx) => {
+    const mHp = getMaxHp(idx);
+    const cur = getOpHp(idx);
+    setOpHp(idx, Math.min(mHp, cur + 10));
+  });
+  save();
+  renderRoster();
+  renderBuildings();
+  logModal("QUARTEL MELHORADO", `Quartel agora no <b>Nível ${upg.nextLv}</b> (+${upg.hpBonus} HP base e descanso de +${upg.restHeal} HP entre missões).`);
+}
+
+function applyBarracksRestAfterMission() {
+  const restHeal = getBarracksRestHeal();
+  const restedNames = [];
+  OPERATIVES.forEach((op, idx) => {
+    if (state.selected.includes(idx)) return;
+    const mHp = getMaxHp(idx);
+    const cur = getOpHp(idx);
+    if (cur < mHp) {
+      const nextHp = Math.min(mHp, cur + restHeal);
+      setOpHp(idx, nextHp);
+      restedNames.push(`${op[0]} (+${nextHp - cur} HP)`);
+    }
+  });
+  return restedNames;
+}
+
+const _baseCheckWin = checkWin;
+checkWin = function() {
+  const wasFinished = battle.finished;
+  _baseCheckWin();
+  if (!wasFinished && battle.finished) {
+    const rested = applyBarracksRestAfterMission();
+    save();
+    renderRoster();
+    if (rested.length > 0) {
+      battleLog(`${document.getElementById("battle-log").textContent} Descanso no Quartel: ${rested.join(", ")}.`.trim());
+    }
+  }
+};
+
+const _baseRenderBuildings = renderBuildings;
+renderBuildings = function() {
+  ensureBarracksInitialized();
+  _baseRenderBuildings();
+
+  const el = document.getElementById("buildings");
+  if (!el) return;
+
+  const firstCard = el.querySelector(".building");
+  if (firstCard) {
+    const lv = getBarracksLevel();
+    firstCard.querySelector("b").textContent = `Quartel · Nível ${lv}`;
+    firstCard.querySelector("button").textContent = `NV.${lv} ATIVO`;
+  }
+
+  const lv = getBarracksLevel();
+  const upg = getBarracksUpgradeCost();
+  const synergy = getSquadSynergyBonus();
+  const restHeal = getBarracksRestHeal();
+
+  const rosterRows = OPERATIVES.map((op, idx) => {
+    const picked = state.selected.includes(idx);
+    const mHp = getMaxHp(idx);
+    const hp = getOpHp(idx);
+    const sev = getInjurySeverity(hp, mHp);
+    const gear = getOpGear(idx);
+    const bagCount = (gear.frag || 0) + (gear.smoke || 0) + (gear.medkit || 0);
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 8px;background:#0b1218;border:1px solid ${picked ? "var(--lime)" : "rgba(255,255,255,.08)"};border-radius:6px">
+        <div style="min-width:0;flex:1">
+          <b style="font-size:12px">${op[0]}</b> <small style="color:var(--muted)">· ${op[2]}</small><br>
+          <small style="color:${sev.color}">${hp}/${mHp} HP (${sev.label})</small>
+          <small style="color:var(--muted)"> · Mochila: ${bagCount}</small>
+        </div>
+        <button type="button" data-barracks-pick="${idx}" style="padding:6px 9px;font-size:10px;white-space:nowrap">${picked ? "NA EQUIPA ✓" : "ESCALAR +"}</button>
+      </div>
+    `;
+  }).join("");
+
+  const barracksHub = document.createElement("div");
+  barracksHub.className = "building";
+  barracksHub.style.flexDirection = "column";
+  barracksHub.style.alignItems = "stretch";
+  barracksHub.style.gap = "10px";
+
+  barracksHub.innerHTML = `
+    <div>
+      <b>GESTÃO DO QUARTEL (NV.${lv}/3) · EQUIPA ${state.selected.length}/5</b><br>
+      <small style="color:var(--muted)">
+        Bónus HP: <b>+${getBarracksHpBonus()} HP</b> · Camaradagem: <b>+${synergy}% precisão</b> · Descanso fora da missão: <b>+${restHeal} HP</b>
+      </small>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      ${rosterRows}
+    </div>
+    <button type="button" id="upgrade-barracks-btn" ${!upg ? "disabled" : ""} style="padding:8px 10px;font-size:10px">
+      ${upg ? `MELHORAR QUARTEL PARA NV.${upg.nextLv} (${upg.credits} CR / ${upg.materials} MAT)` : "QUARTEL NO NÍVEL MÁXIMO (3)"}
+    </button>
+  `;
+
+  barracksHub.querySelectorAll("[data-barracks-pick]").forEach(btn => {
+    btn.onclick = () => toggleSquadMemberFromBarracks(Number(btn.dataset.barracksPick));
+  });
+
+  const upgBtn = barracksHub.querySelector("#upgrade-barracks-btn");
+  if (upgBtn && upg) {
+    upgBtn.onclick = () => upgradeBarracks();
+  }
+
+  el.prepend(barracksHub);
+};
+
+ensureBarracksInitialized();
+renderBuildings();
