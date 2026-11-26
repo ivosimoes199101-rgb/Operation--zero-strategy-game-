@@ -9,7 +9,13 @@ const OPERATIVES = [
   ["Ronan Thorne", "Metralhadora Pesada", "Armas pesadas", [72, 62, 84, 76], 115],
   ["Soraia Lind", "Submetralhadora", "Batedora", [80, 84, 65, 70], 90],
   ["Darius Kade", "Carabina Tática", "Engenheira", [76, 72, 72, 78], 95],
-  ["Elena Rostova", "Espingarda Médica", "Médico", [75, 76, 68, 82], 95]
+  ["Elena Rostova", "Espingarda Médica", "Médico", [75, 76, 68, 82], 95],
+  ["Marcus Sterling", "Rifle de Assalto", "Assalto", [77, 75, 73, 74], 102],
+  ["Nadia Kowalski", "Rifle de Precisão", "Sniper", [85, 70, 64, 76], 88],
+  ["Victor Chen", "Metralhadora Pesada", "Armas pesadas", [74, 64, 82, 75], 112],
+  ["Zoe Vance", "Submetralhadora", "Batedora", [82, 85, 66, 72], 92],
+  ["Tessa Moreau", "Carabina Tática", "Engenheira", [78, 74, 74, 80], 96],
+  ["Henrik Lindqvist", "Espingarda Médica", "Médico", [76, 75, 70, 84], 98]
 ];
 
 const BUILDINGS = [
@@ -84,8 +90,8 @@ const COVERS = [
 
 function createDefaultState() {
   return {
-    credits: 1200,
-    materials: 35,
+    credits: 2500,
+    materials: 80,
     alien: 2,
     selected: [0, 1, 2],
     built: [0],
@@ -165,6 +171,7 @@ let selectedOpIndex = 0;
 let selectedShopOpIndex = 0;
 let selectedShopCategory = "weapon";
 let activeCombatMode = null;
+let selectedTargetId = null;
 let expTrainOp = 0;
 let expTrainStat = 0;
 let expMedOp = 0;
@@ -190,11 +197,15 @@ function save() {
 
 function resolveScreenElement(screenName) {
   const aliases = {
-    equipa: ["equipa", "squad", "team", "roster", "operacionais"],
-    roster: ["roster", "equipa", "squad", "team", "operacionais"],
-    base: ["base", "hq", "quartel"],
-    missions: ["missions", "missoes", "missões", "ops"],
-    battle: ["battle", "screen-battle", "combat", "combate", "mission-screen"]
+    battle: ["tactical", "battle", "screen-battle", "combat"],
+    tactical: ["tactical", "battle", "screen-battle", "combat"],
+    squad: ["squad", "roster", "equipa"],
+    roster: ["squad", "roster", "equipa"],
+    base: ["base", "command"],
+    command: ["command", "base"],
+    missions: ["missions"],
+    home: ["home"],
+    brief: ["brief"]
   };
   const candidates = aliases[screenName] || [screenName];
   for (const id of candidates) {
@@ -217,7 +228,7 @@ function go(screenName) {
 
   document.querySelectorAll(".screen").forEach(sec => {
     sec.classList.remove("active");
-    sec.style.display = "none";
+    sec.style.display = "";
   });
 
   const target = resolveScreenElement(screenName);
@@ -226,14 +237,12 @@ function go(screenName) {
     target.style.display = "block";
     target.style.opacity = "1";
     target.style.visibility = "visible";
-    target.style.position = "relative";
-    target.style.zIndex = "5";
   }
 
-  if (screenName === "roster" || screenName === "equipa") renderRoster();
+  if (screenName === "squad" || screenName === "roster") renderRoster();
   if (screenName === "base") renderBuildings();
   if (screenName === "missions") renderMissions();
-  if (screenName === "battle") renderBattle();
+  if (screenName === "battle" || screenName === "tactical") renderBattle();
 }
 
 function bindNavigation() {
@@ -244,29 +253,17 @@ function bindNavigation() {
     };
   });
 
-  document.querySelectorAll("button").forEach(btn => {
-    if (btn.hasAttribute("data-go") || btn.onclick) return;
-    const txt = (btn.textContent || "").trim().toLowerCase();
-    if (txt === "equipa" || txt === "operacionais") {
-      btn.onclick = () => go("equipa");
-    } else if (txt === "base") {
-      btn.onclick = () => go("base");
-    } else if (txt === "missões" || txt === "missoes") {
-      btn.onclick = () => go("missions");
-    }
-  });
-
   const closeModalBtn = document.getElementById("close-modal");
   if (closeModalBtn) closeModalBtn.onclick = closeModal;
 }
 
 function logModal(title, htmlMessage, returnScreen = null) {
   const modal = document.getElementById("modal");
-  const titleEl = document.getElementById("modal-title");
-  const bodyEl = document.getElementById("modal-body");
+  const contentEl = document.getElementById("modal-content");
   modalReturnScreen = returnScreen;
-  if (titleEl) titleEl.textContent = title;
-  if (bodyEl) bodyEl.innerHTML = htmlMessage;
+  if (contentEl) {
+    contentEl.innerHTML = `<h3 style="margin-top:0">${title}</h3><div>${htmlMessage}</div>`;
+  }
   if (modal) {
     modal.classList.remove("hidden");
     modal.style.display = "flex";
@@ -401,27 +398,13 @@ function getHealCost(opIndex) {
   return Math.max(40, missing * 4);
 }
 
-function findRosterContainer() {
-  const direct = document.getElementById("roster-list") || document.getElementById("equipa-list") || document.getElementById("squad-list");
-  if (direct) return direct;
-
-  const sec = resolveScreenElement("equipa") || resolveScreenElement("roster");
-  if (!sec) return null;
-
-  let inner = sec.querySelector(".list, .cards, [data-roster-list]");
-  if (!inner) {
-    inner = document.createElement("div");
-    inner.id = "roster-list";
-    sec.appendChild(inner);
-  }
-  return inner;
-}
-
 function renderRoster() {
-  const listEl = findRosterContainer();
+  const listEl = document.getElementById("roster");
+  const countEl = document.getElementById("team-count");
+  const cap = 5;
+  if (countEl) countEl.textContent = `EQUIPA ${state.selected.length}/${cap}`;
   if (!listEl) return;
 
-  const cap = 5;
   const opActive = OPERATIVES[selectedOpIndex] || OPERATIVES[0];
   const maxHpActive = getMaxHp(selectedOpIndex);
   const curHpActive = getOpHp(selectedOpIndex);
@@ -432,7 +415,7 @@ function renderRoster() {
   const statsHtml = opActive[3].map((val, idx) => `<span><b>${STAT_NAMES[idx]}:</b> ${val}</span>`).join(" · ");
 
   listEl.innerHTML = `
-    <div style="margin-bottom:10px;padding:10px;border:1px solid rgba(255,255,255,.14);border-radius:8px;background:rgba(14,22,29,.75)">
+    <div style="margin-bottom:10px;padding:10px;border:1px solid rgba(255,255,255,.16);border-radius:8px;background:rgba(14,22,29,.8)">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
         <div><b style="color:var(--lime)">${opActive[0]}</b> · <span>${opActive[2]}</span> (${opActive[1]})</div>
         <div style="font-size:12px">Nv.<b>${progActive.level}</b> · XP: <b>${progActive.xp}/${getXpNeededForLevel(progActive.level)}</b> · PT: <b>${progActive.trainPoints}</b></div>
@@ -441,7 +424,6 @@ function renderRoster() {
       <div style="font-size:11px;color:var(--muted);margin-top:4px">Mochila: Frag x${gearActive.frag} · Fumo x${gearActive.smoke} · Kit x${gearActive.medkit}</div>
       <div style="font-size:11px;color:var(--muted);margin-top:4px;display:flex;flex-wrap:wrap;gap:8px">${statsHtml}</div>
     </div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Equipa selecionada para missão: <b>${state.selected.length}/${cap}</b> · Camaradagem: <b>+${getSquadSynergyBonus()}%</b> precisão</div>
   `;
 
   OPERATIVES.forEach((op, idx) => {
@@ -453,7 +435,7 @@ function renderRoster() {
 
     const card = document.createElement("div");
     card.className = "building";
-    card.style.cssText = `display:flex;flex-direction:column;align-items:stretch;gap:8px;margin-bottom:8px;padding:10px;border:1px solid ${isFocused ? "var(--lime)" : "rgba(255,255,255,.14)"};border-radius:8px;background:rgba(14,22,29,.65)`;
+    card.style.cssText = `display:flex;flex-direction:column;align-items:stretch;gap:8px;margin-bottom:8px;padding:10px;border:1px solid ${isFocused ? "var(--lime)" : "rgba(255,255,255,.14)"};border-radius:8px`;
 
     card.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
@@ -462,41 +444,35 @@ function renderRoster() {
           <small style="color:var(--muted)">${op[1]} · HP: ${hp}/${maxHp} · PT: ${prog.trainPoints}</small>
         </div>
         <div style="display:flex;gap:6px">
-          <button type="button" class="btn" data-inspect="${idx}">DETALHES</button>
-          <button type="button" class="btn" data-toggle="${idx}">${isSelected ? "SELECIONADO ✓" : "SELECIONAR"}</button>
+          <button type="button" class="btn" data-inspect="${idx}">VER</button>
+          <button type="button" class="btn" data-toggle="${idx}">${isSelected ? "NA EQUIPA ✓" : "CONVOCAR"}</button>
         </div>
       </div>
     `;
 
-    const inspectBtn = card.querySelector(`[data-inspect="${idx}"]`);
-    if (inspectBtn) {
-      inspectBtn.onclick = () => {
-        selectedOpIndex = idx;
-        renderRoster();
-      };
-    }
+    card.querySelector(`[data-inspect="${idx}"]`).onclick = () => {
+      selectedOpIndex = idx;
+      renderRoster();
+    };
 
-    const toggleBtn = card.querySelector(`[data-toggle="${idx}"]`);
-    if (toggleBtn) {
-      toggleBtn.onclick = () => {
-        if (isSelected) {
-          if (state.selected.length <= 1) {
-            logModal("EQUIPA MÍNIMA", "Mantém pelo menos 1 operacional selecionado.");
-            return;
-          }
-          state.selected = state.selected.filter(i => i !== idx);
-        } else {
-          if (state.selected.length >= cap) {
-            logModal("LIMITE DA EQUIPA", `Só podes selecionar até ${cap} operacionais por missão.`);
-            return;
-          }
-          state.selected.push(idx);
+    card.querySelector(`[data-toggle="${idx}"]`).onclick = () => {
+      if (isSelected) {
+        if (state.selected.length <= 1) {
+          logModal("EQUIPA MÍNIMA", "Mantém pelo menos 1 operacional selecionado.");
+          return;
         }
-        selectedOpIndex = idx;
-        save();
-        renderRoster();
-      };
-    }
+        state.selected = state.selected.filter(i => i !== idx);
+      } else {
+        if (state.selected.length >= cap) {
+          logModal("LIMITE DA EQUIPA", `Só podes convocar até ${cap} operacionais por missão.`);
+          return;
+        }
+        state.selected.push(idx);
+      }
+      selectedOpIndex = idx;
+      save();
+      renderRoster();
+    };
 
     listEl.appendChild(card);
   });
@@ -646,7 +622,7 @@ function renderBuildings() {
     renderRoster();
     renderBuildings();
     renderMissions();
-    logModal("PROGRESSO REINICIADO", "Estado inicial restaurado com o Quartel no Nível 1.", "base");
+    logModal("PROGRESSO REINICIADO", "Estado inicial restaurado com os 12 operacionais e o Quartel no Nível 1.", "command");
   };
   el.appendChild(resetBtn);
 }
@@ -1016,10 +992,6 @@ function bindFacilityExtraEvents(container, armBuilt) {
       const squad = state.selected;
       const needCr = squad.length * 150;
       const needMat = squad.length * 3;
-      if (squad.length === 0) {
-        logModal("SEM EQUIPA", "Seleciona operacionais antes de reabastecer.");
-        return;
-      }
       if (state.credits < needCr || state.materials < needMat) {
         logModal("RECURSOS INSUFICIENTES", `Reabastecer custa <b>${needCr} CR</b> e <b>${needMat} MAT</b>.`);
         return;
@@ -1200,7 +1172,7 @@ function renderMissions() {
         <small style="color:var(--muted)">${m.desc}</small><br>
         <small style="color:#6ef7ff">Recompensa: ${m.rewardCredits} CR · ${m.rewardMaterials} MAT · ${m.xpBase} XP · Bónus: ${m.secondaryLabel} (+${m.bonusCredits} CR / +${m.bonusMaterials} MAT)</small>
       </div>
-      <button type="button" class="btn" data-launch="${idx}">INICIAR OPERAÇÃO</button>
+      <button type="button" class="btn primary" data-launch="${idx}">INICIAR OPERAÇÃO</button>
     `;
 
     const launchBtn = card.querySelector(`[data-launch="${idx}"]`);
@@ -1266,6 +1238,7 @@ function startMission(missionIndex) {
 
   state.mission = idx;
   activeCombatMode = null;
+  selectedTargetId = null;
 
   battle = {
     missionIndex: idx,
@@ -1278,7 +1251,7 @@ function startMission(missionIndex) {
     commandReconTurn1: hasRecon
   };
 
-  go("battle");
+  go("tactical");
   const reconMsg = hasRecon ? " · Reconhecimento ativo (+15% precisão T1)" : "";
   battleLog(`Operação iniciada: ${MISSIONS[idx].title}${reconMsg}.`);
 }
@@ -1386,104 +1359,151 @@ function selectNextUnitWithAp() {
   if (nextIdx !== -1) battle.activeUnitIdx = nextIdx;
 }
 
-function ensureBattleElements(sec) {
-  let statusEl = document.getElementById("battle-status");
-  let gridEl = document.getElementById("battle-grid");
-  let actEl = document.getElementById("battle-actions");
-  let logEl = document.getElementById("battle-log");
+function updateBattleSidePanel(active) {
+  const titleEl = document.getElementById("battle-title");
+  const turnEl = document.getElementById("turn-label");
+  const selUnitEl = document.getElementById("selected-unit");
+  const hpEl = document.getElementById("unit-hp");
+  const apEl = document.getElementById("unit-ap");
+  const ammoEl = document.getElementById("unit-ammo");
+  const targetEl = document.getElementById("target-info");
+  const chanceEl = document.getElementById("hit-chance");
 
-  if (sec && (!statusEl || !gridEl || !actEl || !logEl)) {
-    if (!statusEl) {
-      statusEl = document.createElement("div");
-      statusEl.id = "battle-status";
-      sec.appendChild(statusEl);
-    }
-    if (!gridEl) {
-      gridEl = document.createElement("div");
-      gridEl.id = "battle-grid";
-      sec.appendChild(gridEl);
-    }
-    if (!actEl) {
-      actEl = document.createElement("div");
-      actEl.id = "battle-actions";
-      sec.appendChild(actEl);
-    }
-    if (!logEl) {
-      logEl = document.createElement("div");
-      logEl.id = "battle-log";
-      sec.appendChild(logEl);
-    }
+  const mission = MISSIONS[battle.missionIndex] || MISSIONS[0];
+  if (titleEl) titleEl.textContent = mission.title;
+  if (turnEl) turnEl.textContent = `TURNO ${battle.turn}`;
+
+  if (active) {
+    if (selUnitEl) selUnitEl.textContent = active.name.toUpperCase();
+    if (hpEl) hpEl.textContent = `${active.hp}/${active.maxHp} HP`;
+    if (apEl) apEl.textContent = `${active.ap} PA`;
+    if (ammoEl) ammoEl.textContent = `${active.ammo}/${active.maxAmmo} MUN`;
   }
 
-  if (statusEl) {
-    statusEl.style.cssText = "display:block;padding:8px 10px;margin-bottom:8px;border:1px solid rgba(255,255,255,.16);border-radius:6px;background:#0e161d;color:#f2f7fa;font-size:12px";
-  }
-  if (gridEl) {
-    gridEl.style.cssText = "display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px;background:#091016;padding:6px;border-radius:8px;width:100%";
-  }
-  if (actEl) {
-    actEl.style.cssText = "display:flex;flex-wrap:wrap;gap:6px;margin-top:10px";
-  }
-  if (logEl) {
-    logEl.style.cssText = "display:block;margin-top:8px;padding:8px 10px;border:1px solid rgba(255,255,255,.14);border-radius:6px;background:#091016;color:#cbd8e2;font-size:12px";
+  let targetEnemy = battle.enemies.find(e => e.hp > 0 && e.id === selectedTargetId) || null;
+  if (!targetEnemy) targetEnemy = battle.enemies.find(e => e.hp > 0) || null;
+
+  if (targetEnemy && active) {
+    if (targetEl) targetEl.textContent = `${targetEnemy.name.toUpperCase()} (${targetEnemy.hp} HP)`;
+    if (chanceEl) chanceEl.textContent = `CHANCE: ${calcHitChance(active, targetEnemy, false)}%`;
+  } else {
+    if (targetEl) targetEl.textContent = "NENHUM ALVO";
+    if (chanceEl) chanceEl.textContent = "CHANCE: --%";
   }
 
-  return { statusEl, gridEl, actEl, logEl };
+  const fireBtn = document.getElementById("fire-btn");
+  const reloadBtn = document.getElementById("reload-btn");
+  const overwatchBtn = document.getElementById("overwatch-btn");
+  const hunkerBtn = document.getElementById("hunker-btn");
+  const medkitBtn = document.getElementById("medkit");
+  const endTurnBtn = document.getElementById("end-turn");
+  const retreatBtn = document.getElementById("retreat");
+
+  if (fireBtn) {
+    fireBtn.disabled = !active || battle.finished || active.ap <= 0 || active.ammo <= 0;
+    fireBtn.onclick = () => {
+      if (!active || !targetEnemy) return;
+      performShot(active, targetEnemy);
+    };
+  }
+
+  if (reloadBtn) {
+    reloadBtn.disabled = !active || battle.finished || active.ap <= 0 || active.ammo >= active.maxAmmo;
+    reloadBtn.onclick = () => {
+      if (!active) return;
+      active.ammo = active.maxAmmo;
+      active.ap = Math.max(0, active.ap - 1);
+      activeCombatMode = null;
+      battleLog(`${active.name} recarregou (${active.ammo}/${active.maxAmmo}).`);
+      if (active.ap <= 0) selectNextUnitWithAp();
+      renderBattle();
+    };
+  }
+
+  if (overwatchBtn) {
+    overwatchBtn.disabled = !active || battle.finished || active.ap <= 0 || active.ammo <= 0 || active.overwatch;
+    overwatchBtn.onclick = () => {
+      if (!active) return;
+      active.overwatch = true;
+      active.hunker = false;
+      active.ap = 0;
+      activeCombatMode = null;
+      battleLog(`${active.name} entrou em VIGILÂNCIA.`);
+      selectNextUnitWithAp();
+      renderBattle();
+    };
+  }
+
+  if (hunkerBtn) {
+    hunkerBtn.disabled = !active || battle.finished || active.ap <= 0 || active.hunker;
+    hunkerBtn.onclick = () => {
+      if (!active) return;
+      active.hunker = true;
+      active.overwatch = false;
+      active.ap = 0;
+      activeCombatMode = null;
+      battleLog(`${active.name} em cobertura (HUNKER DOWN).`);
+      selectNextUnitWithAp();
+      renderBattle();
+    };
+  }
+
+  if (medkitBtn) {
+    medkitBtn.disabled = !active || battle.finished || active.ap <= 0 || active.medkit <= 0;
+    medkitBtn.onclick = () => {
+      if (!active) return;
+      const wounded = battle.units.find(u => u.hp > 0 && u.hp < u.maxHp && manhattanDist(active.x, active.y, u.x, u.y) <= 2);
+      if (!wounded) {
+        battleLog("Nenhum aliado ferido a até 2 células de distância.");
+        return;
+      }
+      useMedkit(active, wounded);
+    };
+  }
+
+  if (endTurnBtn) {
+    endTurnBtn.disabled = battle.finished;
+    endTurnBtn.onclick = () => {
+      activeCombatMode = null;
+      runEnemyTurn();
+    };
+  }
+
+  if (retreatBtn) {
+    retreatBtn.onclick = () => {
+      battle.finished = true;
+      go("command");
+    };
+  }
 }
 
 function renderBattle() {
-  const battleSec = resolveScreenElement("battle");
-  const { statusEl, gridEl } = ensureBattleElements(battleSec);
+  const gridEl = document.getElementById("battle-grid");
   if (!gridEl) return;
 
   battle.smokes = battle.smokes.filter(s => s.turns > 0);
   const active = getActiveUnit();
 
-  if (statusEl) {
-    const aliveEnemies = battle.enemies.filter(e => e.hp > 0).length;
-    const aliveUnits = battle.units.filter(u => u.hp > 0).length;
-    statusEl.textContent = active
-      ? `TURNO ${battle.turn} · ATIVO: ${active.name} (AP ${active.ap}/2 · HP ${active.hp}/${active.maxHp} · Mun ${active.ammo}/${active.maxAmmo}) · Esquadra: ${aliveUnits} · Alvos: ${aliveEnemies}`
-      : `TURNO ${battle.turn} · SEM UNIDADES ATIVAS · Alvos: ${aliveEnemies}`;
-  }
-
+  gridEl.style.display = "grid";
+  gridEl.style.gridTemplateColumns = `repeat(${GRID_W}, minmax(0, 1fr))`;
+  gridEl.style.gap = "4px";
   gridEl.innerHTML = "";
 
   for (let y = 0; y < GRID_H; y++) {
     for (let x = 0; x < GRID_W; x++) {
       const cell = document.createElement("div");
       cell.className = "cell";
-      cell.style.cssText = "min-height:42px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.14);border-radius:4px;background:#121d26;color:#f2f7fa;font-size:10px;padding:2px;text-align:center";
+      cell.style.cssText = "min-height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.16);border-radius:4px;background:#121d26;color:#f2f7fa;font-size:10px;padding:2px;text-align:center";
 
       const unitHere = getUnitAt(x, y);
       const enemyHere = getEnemyAt(x, y);
       const covHere = getCoverAt(x, y);
       const smokeHere = isSmokeAt(x, y);
 
-      let movable = false;
-      let targetableEnemy = null;
-
-      if (active && !battle.finished) {
-        if (activeCombatMode === "move" && active.ap > 0 && canMoveTo(active, x, y)) {
-          movable = true;
-          cell.classList.add("move");
-          cell.style.background = "#153624";
-          cell.style.borderColor = "#42e88b";
-        } else if (activeCombatMode === "shoot" && active.ap > 0 && enemyHere) {
-          targetableEnemy = enemyHere;
-          cell.classList.add("shoot");
-          cell.style.background = "#3b171b";
-          cell.style.borderColor = "#ff5c6c";
-        } else if (activeCombatMode === "frag" && active.ap > 0 && active.frag > 0 && manhattanDist(active.x, active.y, x, y) <= 6) {
-          cell.classList.add("shoot");
-          cell.style.borderColor = "#ff9d42";
-        } else if (activeCombatMode === "smoke" && active.ap > 0 && active.smoke > 0 && manhattanDist(active.x, active.y, x, y) <= 6) {
-          cell.classList.add("move");
-          cell.style.borderColor = "#9ad8ff";
-        } else if (activeCombatMode === "medkit" && active.ap > 0 && active.medkit > 0 && unitHere && unitHere.hp < unitHere.maxHp && manhattanDist(active.x, active.y, x, y) <= 2) {
-          cell.classList.add("move");
-          cell.style.borderColor = "#6ef7ff";
-        }
+      const movable = Boolean(active && !battle.finished && active.ap > 0 && canMoveTo(active, x, y));
+      if (movable) {
+        cell.classList.add("move");
+        cell.style.borderColor = "#42e88b";
       }
 
       if (smokeHere) cell.style.boxShadow = "inset 0 0 0 2px rgba(200,220,235,.65)";
@@ -1506,7 +1526,7 @@ function renderBattle() {
       if (enemyHere) {
         const eBadge = document.createElement("div");
         eBadge.className = "unit enemy";
-        eBadge.style.cssText = "background:#6b1d29;color:#fff;padding:1px 3px;border-radius:3px;font-weight:bold";
+        eBadge.style.cssText = `background:#6b1d29;color:#fff;padding:1px 3px;border-radius:3px;font-weight:bold;${selectedTargetId === enemyHere.id ? "outline:2px solid #ff9d42;" : ""}`;
         eBadge.textContent = `${enemyHere.name.split(" ")[0]} (${enemyHere.hp})`;
         cell.appendChild(eBadge);
       }
@@ -1514,35 +1534,21 @@ function renderBattle() {
       cell.onclick = () => {
         if (!active || battle.finished) return;
 
-        if (activeCombatMode === "move" && movable) {
-          active.x = x;
-          active.y = y;
-          active.ap = Math.max(0, active.ap - 1);
-          active.hunker = false;
-          activeCombatMode = null;
-          battleLog(`${active.name} deslocou-se para (${x + 1}, ${y + 1}).`);
-          if (active.ap <= 0) selectNextUnitWithAp();
+        if (enemyHere) {
+          selectedTargetId = enemyHere.id;
+          battleLog(`Alvo selecionado: ${enemyHere.name} (${calcHitChance(active, enemyHere, false)}% precisão).`);
           renderBattle();
           return;
         }
 
-        if (activeCombatMode === "shoot" && targetableEnemy) {
-          performShot(active, targetableEnemy);
-          return;
-        }
-
-        if (activeCombatMode === "frag" && active.ap > 0 && active.frag > 0 && manhattanDist(active.x, active.y, x, y) <= 6) {
-          throwFragGrenade(active, x, y);
-          return;
-        }
-
-        if (activeCombatMode === "smoke" && active.ap > 0 && active.smoke > 0 && manhattanDist(active.x, active.y, x, y) <= 6) {
-          throwSmokeGrenade(active, x, y);
-          return;
-        }
-
-        if (activeCombatMode === "medkit" && active.ap > 0 && active.medkit > 0 && unitHere && unitHere.hp < unitHere.maxHp && manhattanDist(active.x, active.y, x, y) <= 2) {
-          useMedkit(active, unitHere);
+        if (movable) {
+          active.x = x;
+          active.y = y;
+          active.ap = Math.max(0, active.ap - 1);
+          active.hunker = false;
+          battleLog(`${active.name} moveu-se para (${x + 1}, ${y + 1}).`);
+          if (active.ap <= 0) selectNextUnitWithAp();
+          renderBattle();
           return;
         }
 
@@ -1550,7 +1556,6 @@ function renderBattle() {
           const idx = battle.units.findIndex(u => u.opIndex === unitHere.opIndex);
           if (idx !== -1 && unitHere.ap > 0) {
             battle.activeUnitIdx = idx;
-            activeCombatMode = null;
             battleLog(`${unitHere.name} selecionado.`);
             renderBattle();
           }
@@ -1561,155 +1566,12 @@ function renderBattle() {
     }
   }
 
-  renderBattleActions();
-}
-
-function renderBattleActions() {
-  const actEl = document.getElementById("battle-actions");
-  if (!actEl) return;
-  actEl.innerHTML = "";
-
-  if (battle.finished) {
-    const backBtn = document.createElement("button");
-    backBtn.type = "button";
-    backBtn.className = "btn";
-    backBtn.textContent = "VOLTAR À BASE";
-    backBtn.onclick = () => go("base");
-    actEl.appendChild(backBtn);
-    return;
-  }
-
-  const active = getActiveUnit();
-  if (!active) return;
-
-  const buttons = [
-    {
-      label: activeCombatMode === "move" ? "MOVER (ATIVO)" : "MOVER",
-      disabled: active.ap <= 0,
-      onClick: () => {
-        activeCombatMode = activeCombatMode === "move" ? null : "move";
-        battleLog(activeCombatMode === "move" ? `Seleciona uma célula verde para mover ${active.name}.` : "Modo de movimento cancelado.");
-        renderBattle();
-      }
-    },
-    {
-      label: activeCombatMode === "shoot" ? "DISPARAR (ATIVO)" : "DISPARAR",
-      disabled: active.ap <= 0 || active.ammo <= 0,
-      onClick: () => {
-        activeCombatMode = activeCombatMode === "shoot" ? null : "shoot";
-        battleLog(activeCombatMode === "shoot" ? `Seleciona um inimigo destacado para ${active.name} disparar.` : "Modo de disparo cancelado.");
-        renderBattle();
-      }
-    },
-    {
-      label: "VIGILÂNCIA",
-      disabled: active.ap <= 0 || active.ammo <= 0 || active.overwatch,
-      onClick: () => {
-        active.overwatch = true;
-        active.hunker = false;
-        active.ap = 0;
-        activeCombatMode = null;
-        battleLog(`${active.name} entrou em VIGILÂNCIA.`);
-        selectNextUnitWithAp();
-        renderBattle();
-      }
-    },
-    {
-      label: "HUNKER",
-      disabled: active.ap <= 0 || active.hunker,
-      onClick: () => {
-        active.hunker = true;
-        active.overwatch = false;
-        active.ap = 0;
-        activeCombatMode = null;
-        battleLog(`${active.name} protegeu-se em cobertura (HUNKER).`);
-        selectNextUnitWithAp();
-        renderBattle();
-      }
-    },
-    {
-      label: `RECARREGAR (${active.ammo}/${active.maxAmmo})`,
-      disabled: active.ap <= 0 || active.ammo >= active.maxAmmo,
-      onClick: () => {
-        active.ammo = active.maxAmmo;
-        active.ap = Math.max(0, active.ap - 1);
-        activeCombatMode = null;
-        battleLog(`${active.name} recarregou a arma (${active.ammo}/${active.maxAmmo}).`);
-        if (active.ap <= 0) selectNextUnitWithAp();
-        renderBattle();
-      }
-    },
-    {
-      label: `FRAG (${active.frag})`,
-      disabled: active.ap <= 0 || active.frag <= 0,
-      onClick: () => {
-        activeCombatMode = activeCombatMode === "frag" ? null : "frag";
-        battleLog(activeCombatMode === "frag" ? "Seleciona a célula alvo para a granada de fragmentação." : "Granada cancelada.");
-        renderBattle();
-      }
-    },
-    {
-      label: `FUMO (${active.smoke})`,
-      disabled: active.ap <= 0 || active.smoke <= 0,
-      onClick: () => {
-        activeCombatMode = activeCombatMode === "smoke" ? null : "smoke";
-        battleLog(activeCombatMode === "smoke" ? "Seleciona a célula alvo para lançar fumo." : "Fumo cancelado.");
-        renderBattle();
-      }
-    },
-    {
-      label: `KIT (${active.medkit})`,
-      disabled: active.ap <= 0 || active.medkit <= 0,
-      onClick: () => {
-        activeCombatMode = activeCombatMode === "medkit" ? null : "medkit";
-        battleLog(activeCombatMode === "medkit" ? "Seleciona um aliado ferido próximo para curar." : "Kit cancelado.");
-        renderBattle();
-      }
-    },
-    {
-      label: "PRÓXIMO",
-      disabled: battle.units.filter(u => u.hp > 0 && u.ap > 0).length <= 1,
-      onClick: () => {
-        const len = battle.units.length;
-        for (let step = 1; step <= len; step++) {
-          const candIdx = (battle.activeUnitIdx + step) % len;
-          const cand = battle.units[candIdx];
-          if (cand && cand.hp > 0 && cand.ap > 0) {
-            battle.activeUnitIdx = candIdx;
-            activeCombatMode = null;
-            battleLog(`Unidade ativa: ${cand.name}.`);
-            renderBattle();
-            return;
-          }
-        }
-      }
-    },
-    {
-      label: "TERMINAR TURNO",
-      disabled: false,
-      onClick: () => {
-        activeCombatMode = null;
-        runEnemyTurn();
-      }
-    }
-  ];
-
-  buttons.forEach(cfg => {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "btn";
-    b.textContent = cfg.label;
-    b.disabled = Boolean(cfg.disabled);
-    b.onclick = cfg.onClick;
-    actEl.appendChild(b);
-  });
+  updateBattleSidePanel(active);
 }
 
 function performShot(unit, enemy) {
   if (unit.ammo <= 0) {
     battleLog(`${unit.name} está sem munição — usa RECARREGAR.`);
-    activeCombatMode = null;
-    renderBattleActions();
     return;
   }
 
@@ -1717,7 +1579,6 @@ function performShot(unit, enemy) {
   unit.ammo = Math.max(0, unit.ammo - 1);
   unit.ap = 0;
   unit.hunker = false;
-  activeCombatMode = null;
 
   if (Math.random() * 100 <= hitChance) {
     const dmg = calcDamage(unit);
@@ -1734,50 +1595,11 @@ function performShot(unit, enemy) {
   }
 }
 
-function throwFragGrenade(unit, tx, ty) {
-  const gear = getOpGear(unit.opIndex);
-  unit.frag = Math.max(0, unit.frag - 1);
-  gear.frag = Math.max(0, (gear.frag || 0) - 1);
-  unit.ap = 0;
-  activeCombatMode = null;
-
-  let hits = 0;
-  battle.enemies.forEach(e => {
-    if (e.hp > 0 && manhattanDist(e.x, e.y, tx, ty) <= 1) {
-      e.hp = Math.max(0, e.hp - 32);
-      hits += 1;
-    }
-  });
-
-  save();
-  battleLog(`${unit.name} lançou Granada Frag em (${tx + 1}, ${ty + 1}) — ${hits} alvo(s) atingido(s).`);
-  checkWin();
-  if (!battle.finished) {
-    selectNextUnitWithAp();
-    renderBattle();
-  }
-}
-
-function throwSmokeGrenade(unit, tx, ty) {
-  const gear = getOpGear(unit.opIndex);
-  unit.smoke = Math.max(0, unit.smoke - 1);
-  gear.smoke = Math.max(0, (gear.smoke || 0) - 1);
-  unit.ap = Math.max(0, unit.ap - 1);
-  activeCombatMode = null;
-
-  battle.smokes.push({ x: tx, y: ty, turns: 2 });
-  save();
-  battleLog(`${unit.name} lançou Granada de Fumo em (${tx + 1}, ${ty + 1}) por 2 turnos.`);
-  if (unit.ap <= 0) selectNextUnitWithAp();
-  renderBattle();
-}
-
 function useMedkit(unit, targetUnit) {
   const gear = getOpGear(unit.opIndex);
   unit.medkit = Math.max(0, unit.medkit - 1);
   gear.medkit = Math.max(0, (gear.medkit || 0) - 1);
   unit.ap = Math.max(0, unit.ap - 1);
-  activeCombatMode = null;
 
   const healAmt = unit.role === "Médico" ? 50 : 40;
   const before = targetUnit.hp;
@@ -1800,7 +1622,7 @@ function triggerOverwatchReactions(enemy) {
         enemy.hp = Math.max(0, enemy.hp - dmg);
         battleLog(`VIGILÂNCIA: ${unit.name} atingiu ${enemy.name} (${hitChance}%) por ${dmg} de dano.`);
       } else {
-        battleLog(`VIGILÂNCIA: ${unit.name} falhou o disparo de reação contra ${enemy.name} (${hitChance}%).`);
+        battleLog(`VIGILÂNCIA: ${unit.name} falhou contra ${enemy.name} (${hitChance}%).`);
       }
     }
   }
@@ -1966,7 +1788,7 @@ function checkWin() {
     logModal(
       "OPERAÇÃO CONCLUÍDA",
       `Vitória em <b>${mission.title}</b>!<br>Recompensa: <b>+${totalCr} CR · +${totalMat} MAT · +${alienGain} Tec. Alienígena</b>${secHtml}${ccNote}${lvlHtml}`,
-      "base"
+      "command"
     );
   } else {
     save();
@@ -1978,8 +1800,8 @@ function checkWin() {
 
     logModal(
       "ESQUADRA INCAPACITADA",
-      "Todos os operacionais caíram em combate. Recupera a equipa no Quartel ou na Enfermaria.",
-      "base"
+      "Todos os operacionais caíram em combate. Recupera a equipa nas Instalações.",
+      "command"
     );
   }
 }
