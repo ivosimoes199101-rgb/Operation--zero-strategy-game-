@@ -921,9 +921,9 @@ function startMission(mission, missionIndex = 0) {
     smokes: [],
     units,
     enemies,
-    selectedUnitId: units[0] ? units[0].id : null,
+    selectedUnitId: null,
     selectedTargetId: enemies[0] ? enemies[0].id : null,
-    log: `Missão ${formatMissionNumber(mission.number)}: ${mission.title} — ${mission.objective}`
+    log: `Missão ${formatMissionNumber(mission.number)}: ${mission.title} — Clica num operacional para ver as ordens.`
   };
 
   goToScreen("tactical");
@@ -973,6 +973,14 @@ function addBattleLog(msg) {
 function ensureTacticalExtras() {
   const tactical = document.getElementById("tactical");
   if (!tactical) return;
+
+  // Mover #battle-log para logo abaixo do campo de batalha (#battle-grid)
+  const gridEl = document.getElementById("battle-grid");
+  const logEl = document.getElementById("battle-log");
+  if (gridEl && logEl && logEl.previousElementSibling !== gridEl) {
+    logEl.style.marginTop = "8px";
+    gridEl.insertAdjacentElement("afterend", logEl);
+  }
 
   let extraBar = document.getElementById("tactical-grenade-bar");
   if (!extraBar) {
@@ -1114,6 +1122,12 @@ function renderBattle() {
     const el = document.getElementById(id);
     if (el) el.textContent = txt;
   };
+
+  const ordersPanel = document.querySelector("#tactical .battle-side .side-panel:nth-of-type(3)");
+  const canShowOrders = Boolean(selUnit && b.phase === "player");
+  if (ordersPanel) {
+    ordersPanel.style.display = canShowOrders ? "" : "none";
+  }
 
   if (selUnit) {
     setText("selected-unit", `${selUnit.name} (${selUnit.role})`);
