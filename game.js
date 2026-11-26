@@ -13,6 +13,8 @@ const OPERATIVES = [
   ["Katarina Novak", "Sérvia", "Armas pesadas", [82, 62, 55, 92, 72, 58, 42, 90], "Poder de fogo"]
 ];
 
+const STAT_NAMES = ["Precisão", "Pontaria", "Mobilidade", "Resistência", "Perceção", "Técnica", "Furtividade", "Disciplina"];
+
 const BUILDINGS = [
   ["Quartel", "Aumenta a capacidade de alojamento.", 500, 10],
   ["Enfermaria", "Permite tratar ferimentos após operações.", 700, 15],
@@ -33,6 +35,7 @@ const MISSIONS = [
     rewardMaterials: 15,
     bonusCredits: 300,
     bonusMaterials: 10,
+    xpBase: 45,
     secondaryType: "clear_all",
     secondaryLabel: "Eliminar todos os inimigos"
   },
@@ -44,6 +47,7 @@ const MISSIONS = [
     rewardMaterials: 20,
     bonusCredits: 350,
     bonusMaterials: 12,
+    xpBase: 55,
     secondaryType: "no_casualties",
     secondaryLabel: "Concluir sem baixas na equipa"
   },
@@ -55,6 +59,7 @@ const MISSIONS = [
     rewardMaterials: 25,
     bonusCredits: 450,
     bonusMaterials: 15,
+    xpBase: 65,
     secondaryType: "fast_clear",
     secondaryLabel: "Eliminar todos em até 6 turnos"
   }
@@ -97,17 +102,51 @@ const defaults = {
   mission: 0,
   turn: 1,
   hp: {},
-  pos: 0
+  pos: 0,
+  opProgress: {}
 };
 
 let state = load();
 
 function load() {
   try {
-    return { ...defaults, ...JSON.parse(localStorage.getItem("oz_save") || "{}") };
+    const parsed = { ...defaults, ...JSON.parse(localStorage.getItem("oz_save") || "{}") };
+    if (!parsed.opProgress || typeof parsed.opProgress !== "object") parsed.opProgress = {};
+    return parsed;
   } catch (e) {
-    return { ...defaults };
+    return { ...defaults, opProgress: {} };
   }
+}
+
+function getOpProgress(opIndex) {
+  if (!state.opProgress[opIndex]) {
+    state.opProgress[opIndex] = {
+      xp: 0,
+      level: 1,
+      trainPts: 0,
+      bonusStats: [0, 0, 0, 0, 0, 0, 0, 0]
+    };
+  }
+  return state.opProgress[opIndex];
+}
+
+function getEffectiveStats(opIndex) {
+  const base = OPERATIVES[opIndex][3];
+  const prog = getOpProgress(opIndex);
+  return base.map((val, idx) => Math.min(99, val + (prog.bonusStats[idx] || 0)));
+}
+
+function grantOpXp(opIndex, amount) {
+  const prog = getOpProgress(opIndex);
+  prog.xp += amount;
+  let levelsGained = 0;
+  while (prog.xp >= 100) {
+    prog.xp -= 100;
+    prog.level += 1;
+    prog.trainPts += 2;
+    levelsGained += 1;
+  }
+  return levelsGained;
 }
 
 function save() {
@@ -142,9 +181,11 @@ function renderRoster() {
   el.innerHTML = "";
   OPERATIVES.forEach((o, i) => {
     const selected = state.selected.includes(i);
+    const prog = getOpProgress(i);
+    const ptsBadge = prog.trainPts > 0 ? ` · +${prog.trainPts} PT` : "";
     const d = document.createElement("div");
     d.className = "operator" + (selected ? " selected" : "");
-    d.innerHTML = `<span class="portrait">${o[0].split(" ").map(x => x[0]).slice(0, 2).join("")}</span><span style="min-width:0;flex:1;text-align:left"><b>${o[0]}</b><small>${o[2]} · ${o[1]}</small></span><button type="button" class="op-info-btn">INFO</button><span class="pick">${selected ? "✓" : "＋"}</span>`;
+    d.innerHTML = `<span class="portrait">${o[0].split(" ").map(x => x[0]).slice(0, 2).join("")}</span><span style="min-width:0;flex:1;text-align:left"><b>${o[0]}</b><small>NV.${prog.level} · ${o[2]} · ${prog.xp}/100 XP${ptsBadge}</small></span><button type="button" class="op-info-btn">INFO</button><span class="pick">${selected ? "✓" : "＋"}</span>`;
     d.onclick = ev => {
       if (ev.target.closest(".op-info-btn")) return;
       if (state.selected.includes(i)) {
@@ -169,11 +210,63 @@ function renderRoster() {
   if (countEl) countEl.textContent = `EQUIPA ${state.selected.length}/5`;
 }
 
+function trainOpStat(opIndex, statIdx, fromAcademy = false) {
+  const prog = getOpProgress(opIndex);
+  const currentStats = getEffectiveStats(opIndex);
+  if (currentStats[statIdx] >= 99) return;
+
+  if (prog.trainPts > 0) {
+    prog.trainPts -= 1;
+    prog.bonusStats[statIdx] = (prog.bonusStats[statIdx] || 0) + 1;
+    save();
+    renderRoster();
+    showOperator(opIndex);
+    return;
+  }
+
+  const academyBuilt = state.built.includes(6);
+  const cost = academyBuilt ? 150 : 250;
+  if (fromAcademy && state.credits >= cost) {
+    state.credits -= cost;
+    prog.bonusStats[statIdx] = (prog.bonusStats[statIdx] || 0) + 1;
+    save();
+    renderRoster();
+    showOperator(opIndex);
+  }
+}
+
 function showOperator(i) {
   const o = OPERATIVES[i];
-  const names = ["Precisão", "Pontaria", "Mobilidade", "Resistência", "Perceção", "Técnica", "Furtividade", "Disciplina"];
+  const prog = getOpProgress(i);
+  const stats = getEffectiveStats(i);
   const perk = ROLE_PERKS[o[2]] || "";
-  document.getElementById("modal-content").innerHTML = `<div class="eyebrow">${o[1]} // ${o[2]}</div><h2 style="font:800 32px var(--display);margin:0">${o[0]}</h2><p class="muted">${o[4]}<br><span style="color:var(--lime)">${perk}</span></p><div class="stats">${o[3].map((v, j) => `<div class="stat">${names[j]} <b>${v}</b></div>`).join("")}</div>`;
+  const academyBuilt = state.built.includes(6);
+  const drillCost = academyBuilt ? 150 : 250;
+  const canUseDrill = prog.trainPts <= 0 && state.credits >= drillCost;
+
+  const statsHtml = stats.map((v, j) => {
+    const canSpendPt = prog.trainPts > 0 && v < 99;
+    const canBuyDrill = !canSpendPt && canUseDrill && v < 99;
+    const btnLabel = canSpendPt ? "+1 PT" : canBuyDrill ? `+1 (${drillCost}cr)` : "";
+    const btnHtml = btnLabel
+      ? `<button type="button" data-train-stat="${j}" style="margin-left:6px;background:#132129;border:1px solid var(--lime);color:var(--lime);padding:2px 6px;font-size:8px">${btnLabel}</button>`
+      : "";
+    return `<div class="stat"><span>${STAT_NAMES[j]}</span><span><b>${v}</b>${btnHtml}</span></div>`;
+  }).join("");
+
+  const headerInfo = prog.trainPts > 0
+    ? `NV.${prog.level} · ${prog.xp}/100 XP · <span style="color:var(--lime)">${prog.trainPts} PONTO(S) DE TREINO LIVRE</span>`
+    : `NV.${prog.level} · ${prog.xp}/100 XP · Treino intensivo na base: ${drillCost} cr/ponto${academyBuilt ? " (Academia ativa)" : ""}`;
+
+  document.getElementById("modal-content").innerHTML = `<div class="eyebrow">${o[1]} // ${o[2]}</div><h2 style="font:800 32px var(--display);margin:0">${o[0]}</h2><p class="muted">${o[4]}<br><span style="color:var(--lime)">${perk}</span><br><small style="color:var(--muted)">${headerInfo}</small></p><div class="stats">${statsHtml}</div>`;
+
+  document.querySelectorAll("#modal-content [data-train-stat]").forEach(btn => {
+    btn.onclick = () => {
+      const sIdx = Number(btn.dataset.trainStat);
+      trainOpStat(i, sIdx, prog.trainPts <= 0);
+    };
+  });
+
   document.getElementById("modal").classList.remove("hidden");
 }
 
@@ -219,7 +312,7 @@ function renderMissions() {
     const unlocked = i === 0 || state.completed.includes(i - 1);
     const d = document.createElement("div");
     d.className = "mission";
-    d.innerHTML = `<div class="mission-main"><span class="num">0${i + 1}</span><div><b>${m.title}</b><small>${m.desc}<br>Base: ${m.rewardCredits} cr / ${m.rewardMaterials} mat · Bónus Sec.: +${m.bonusCredits} cr</small></div></div><button ${(!unlocked || done) ? "disabled" : ""}>${done ? "CONCLUÍDA" : unlocked ? "INICIAR" : "BLOQUEADA"}</button>`;
+    d.innerHTML = `<div class="mission-main"><span class="num">0${i + 1}</span><div><b>${m.title}</b><small>${m.desc}<br>Base: ${m.rewardCredits} cr / ${m.rewardMaterials} mat · Bónus Sec.: +${m.bonusCredits} cr · XP: +${m.xpBase}</small></div></div><button ${(!unlocked || done) ? "disabled" : ""}>${done ? "CONCLUÍDA" : unlocked ? "INICIAR" : "BLOQUEADA"}</button>`;
     d.querySelector("button").onclick = () => startMission(i);
     el.appendChild(d);
   });
@@ -309,7 +402,7 @@ function calcHitChance(unit, enemy, isOverwatch = false) {
   if (!unit || !enemy || enemy.hp <= 0 || unit.hp <= 0) return 0;
   if (!hasLineOfSight(unit.x, unit.y, enemy.x, enemy.y)) return 0;
   const role = OPERATIVES[unit.id][2];
-  const stats = OPERATIVES[unit.id][3];
+  const stats = getEffectiveStats(unit.id);
   const wpn = getWeapon(unit.id);
   const dist = Math.abs(unit.x - enemy.x) + Math.abs(unit.y - enemy.y);
   const base = stats[0] * 0.45 + stats[1] * 0.55;
@@ -743,7 +836,17 @@ function checkWin() {
     const totalCredits = m.rewardCredits + (secDone ? m.bonusCredits : 0);
     const totalMaterials = m.rewardMaterials + (secDone ? m.bonusMaterials : 0);
 
-    battleLog(`OBJETIVO PRINCIPAL CUMPRIDO${secDone ? " + SECUNDÁRIO!" : "."}`);
+    let totalLevelsGained = 0;
+    const xpSummary = battle.units.map(u => {
+      const survivedBonus = u.hp > 0 ? 15 : 0;
+      const secBonus = secDone ? 20 : 0;
+      const gained = m.xpBase + survivedBonus + secBonus;
+      const lvUps = grantOpXp(u.id, gained);
+      totalLevelsGained += lvUps;
+      return `${OPERATIVES[u.id][0]} (+${gained} XP${lvUps ? `, +${lvUps} NV` : ""})`;
+    });
+
+    battleLog(`OBJETIVO CUMPRIDO${secDone ? " + SECUNDÁRIO!" : "."} XP atribuído à equipa.`);
     if (!state.completed.includes(state.mission)) state.completed.push(state.mission);
     state.credits += totalCredits;
     state.materials += totalMaterials;
@@ -754,11 +857,15 @@ function checkWin() {
       const secText = secDone
         ? `<br><span style="color:var(--lime)">Secundário concluído (${m.secondaryLabel}): +${m.bonusCredits} créditos e +${m.bonusMaterials} materiais extra!</span>`
         : `<br>Secundário (${m.secondaryLabel}): não concluído.`;
+      const lvText = totalLevelsGained > 0
+        ? `<br><span style="color:var(--lime)">Subidas de nível: +${totalLevelsGained} (pontos de treino livres disponíveis na ficha dos operacionais!).</span>`
+        : "";
       logModal(
         "OPERAÇÃO CONCLUÍDA",
-        `Objetivo principal cumprido.<br>Total recebido: <b>${totalCredits} créditos</b>, <b>${totalMaterials} materiais</b> e <b>1 tecnologia alienígena</b>.${secText}`
+        `Total recebido: <b>${totalCredits} créditos</b>, <b>${totalMaterials} materiais</b> e <b>1 tecnologia alienígena</b>.${secText}${lvText}<br><small style="color:var(--muted)">${xpSummary.join(" · ")}</small>`
       );
       renderMissions();
+      renderRoster();
     }, 250);
   }
 }
