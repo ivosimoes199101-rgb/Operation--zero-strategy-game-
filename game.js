@@ -15,6 +15,16 @@ const OPERATIVES = [
 
 const STAT_NAMES = ["Precisão", "Pontaria", "Mobilidade", "Resistência", "Perceção", "Técnica", "Furtividade", "Disciplina"];
 
+const CLASS_TRAINING_PROFILES = [
+  { role: "Assalto", focusStat: 0, altStat: 2, label: "Linha de frente e mobilidade" },
+  { role: "Sniper", focusStat: 1, altStat: 4, label: "Precisão de tiro e perceção" },
+  { role: "Médico", focusStat: 7, altStat: 5, label: "Disciplina e suporte técnico" },
+  { role: "Engenheira", focusStat: 5, altStat: 3, label: "Técnica e resistência tática" },
+  { role: "Armas pesadas", focusStat: 3, altStat: 7, label: "Resistência e sangue-frio" },
+  { role: "Batedora", focusStat: 6, altStat: 2, label: "Furtividade e flanqueamento" },
+  { role: "Batedor", focusStat: 6, altStat: 2, label: "Furtividade e flanqueamento" }
+];
+
 const BUILDINGS = [
   ["Quartel", "Aumenta a capacidade de alojamento.", 500, 10],
   ["Enfermaria", "Permite tratar ferimentos após operações.", 700, 15],
@@ -22,7 +32,7 @@ const BUILDINGS = [
   ["Laboratório", "Investiga tecnologia recuperada.", 1200, 25],
   ["Hangar", "Desbloqueia operações de transporte.", 1500, 35],
   ["Centro de inteligência", "Melhora a informação de missão.", 1000, 20],
-  ["Academia militar", "Permite treinar os operacionais.", 1100, 25],
+  ["Academia militar", "Reduz o custo de treino e melhora a preparação das classes.", 1100, 25],
   ["Central de energia", "Aumenta a capacidade energética.", 1300, 30]
 ];
 
@@ -107,6 +117,7 @@ const defaults = {
 };
 
 let state = load();
+let pendingReturnScreen = null;
 
 function load() {
   try {
@@ -213,26 +224,51 @@ function renderRoster() {
 function trainOpStat(opIndex, statIdx, fromAcademy = false) {
   const prog = getOpProgress(opIndex);
   const currentStats = getEffectiveStats(opIndex);
-  if (currentStats[statIdx] >= 99) return;
+  if (currentStats[statIdx] >= 99) return false;
 
   if (prog.trainPts > 0) {
     prog.trainPts -= 1;
     prog.bonusStats[statIdx] = (prog.bonusStats[statIdx] || 0) + 1;
     save();
-    renderRoster();
-    showOperator(opIndex);
-    return;
+    return true;
   }
 
   const academyBuilt = state.built.includes(6);
-  const cost = academyBuilt ? 150 : 250;
+  const cost = academyBuilt ? 140 : 220;
   if (fromAcademy && state.credits >= cost) {
     state.credits -= cost;
     prog.bonusStats[statIdx] = (prog.bonusStats[statIdx] || 0) + 1;
     save();
-    renderRoster();
-    showOperator(opIndex);
+    return true;
   }
+  return false;
+}
+
+function trainClassRole(roleName, statIdx) {
+  const academyBuilt = state.built.includes(6);
+  const cost = academyBuilt ? 160 : 250;
+  if (state.credits < cost) {
+    logModal("CRÉDITOS INSUFICIENTES", `Precisas de ${cost} créditos para treinar a classe ${roleName}.`);
+    return;
+  }
+
+  const matchingIndices = OPERATIVES
+    .map((o, idx) => ({ o, idx }))
+    .filter(item => item.o[2] === roleName && getEffectiveStats(item.idx)[statIdx] < 99);
+
+  if (!matchingIndices.length) {
+    logModal("TREINO INDISPONÍVEL", `Nenhum operacional da classe ${roleName} pode subir ${STAT_NAMES[statIdx]}.`);
+    return;
+  }
+
+  const targetItem = matchingIndices.sort((a, b) => getEffectiveStats(a.idx)[statIdx] - getEffectiveStats(b.idx)[statIdx])[0];
+  const prog = getOpProgress(targetItem.idx);
+  state.credits -= cost;
+  prog.bonusStats[statIdx] = (prog.bonusStats[statIdx] || 0) + 1;
+  save();
+  renderBuildings();
+  renderRoster();
+  logModal("TREINO DE CLASSE CONCLUÍDO", `${targetItem.o[0]} (${roleName}) ganhou +1 em <b>${STAT_NAMES[statIdx]}</b> (${getEffectiveStats(targetItem.idx)[statIdx]}).`);
 }
 
 function showOperator(i) {
@@ -241,7 +277,7 @@ function showOperator(i) {
   const stats = getEffectiveStats(i);
   const perk = ROLE_PERKS[o[2]] || "";
   const academyBuilt = state.built.includes(6);
-  const drillCost = academyBuilt ? 150 : 250;
+  const drillCost = academyBuilt ? 140 : 220;
   const canUseDrill = prog.trainPts <= 0 && state.credits >= drillCost;
 
   const statsHtml = stats.map((v, j) => {
@@ -256,33 +292,43 @@ function showOperator(i) {
 
   const headerInfo = prog.trainPts > 0
     ? `NV.${prog.level} · ${prog.xp}/100 XP · <span style="color:var(--lime)">${prog.trainPts} PONTO(S) DE TREINO LIVRE</span>`
-    : `NV.${prog.level} · ${prog.xp}/100 XP · Treino intensivo na base: ${drillCost} cr/ponto${academyBuilt ? " (Academia ativa)" : ""}`;
+    : `NV.${prog.level} · ${prog.xp}/100 XP · Treino direto: ${drillCost} cr/ponto${academyBuilt ? " (Academia ativa)" : ""}`;
 
   document.getElementById("modal-content").innerHTML = `<div class="eyebrow">${o[1]} // ${o[2]}</div><h2 style="font:800 32px var(--display);margin:0">${o[0]}</h2><p class="muted">${o[4]}<br><span style="color:var(--lime)">${perk}</span><br><small style="color:var(--muted)">${headerInfo}</small></p><div class="stats">${statsHtml}</div>`;
 
   document.querySelectorAll("#modal-content [data-train-stat]").forEach(btn => {
     btn.onclick = () => {
       const sIdx = Number(btn.dataset.trainStat);
-      trainOpStat(i, sIdx, prog.trainPts <= 0);
+      if (trainOpStat(i, sIdx, prog.trainPts <= 0)) {
+        renderRoster();
+        showOperator(i);
+      }
     };
   });
 
   document.getElementById("modal").classList.remove("hidden");
 }
 
-function logModal(title, msg) {
+function logModal(title, msg, returnScreen = null) {
+  pendingReturnScreen = returnScreen;
   document.getElementById("modal-content").innerHTML = `<h2 style="font:800 28px var(--display)">${title}</h2><p class="muted">${msg}</p>`;
   document.getElementById("modal").classList.remove("hidden");
 }
 
 document.getElementById("close-modal").onclick = () => {
   document.getElementById("modal").classList.add("hidden");
+  if (pendingReturnScreen) {
+    const dest = pendingReturnScreen;
+    pendingReturnScreen = null;
+    go(dest);
+  }
 };
 
 function renderBuildings() {
   const el = document.getElementById("buildings");
   if (!el) return;
   el.innerHTML = "";
+
   BUILDINGS.forEach((b, i) => {
     const built = state.built.includes(i);
     const d = document.createElement("div");
@@ -301,6 +347,45 @@ function renderBuildings() {
     };
     el.appendChild(d);
   });
+
+  const academyBuilt = state.built.includes(6);
+  const trainCost = academyBuilt ? 160 : 250;
+  const trainingBox = document.createElement("div");
+  trainingBox.className = "building";
+  trainingBox.style.flexDirection = "column";
+  trainingBox.style.alignItems = "stretch";
+  trainingBox.style.gap = "10px";
+
+  const uniqueRoles = [];
+  CLASS_TRAINING_PROFILES.forEach(p => {
+    const baseRole = p.role === "Batedor" ? "Batedora" : p.role;
+    if (!uniqueRoles.includes(baseRole)) uniqueRoles.push(baseRole);
+  });
+
+  const rowsHtml = uniqueRoles.map(role => {
+    const profile = CLASS_TRAINING_PROFILES.find(p => p.role === role) || CLASS_TRAINING_PROFILES[0];
+    const focusName = STAT_NAMES[profile.focusStat];
+    const altName = STAT_NAMES[profile.altStat];
+    const opsCount = OPERATIVES.filter(o => o[2] === role || (role === "Batedora" && o[2] === "Batedor")).length;
+    return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:1px solid rgba(255,255,255,.07)">
+      <div style="min-width:0;flex:1">
+        <b>${role}</b> <small>(${opsCount} operacionais)</small><br>
+        <small>${profile.label}</small>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button type="button" data-role-train="${role}" data-stat-idx="${profile.focusStat}" style="padding:7px 9px;font-size:9px">+1 ${focusName} (${trainCost}cr)</button>
+        <button type="button" data-role-train="${role}" data-stat-idx="${profile.altStat}" class="secondary" style="padding:7px 9px;font-size:9px">+1 ${altName} (${trainCost}cr)</button>
+      </div>
+    </div>`;
+  }).join("");
+
+  trainingBox.innerHTML = `<div><b>TREINO POR CLASSE — BASE MILITAR</b><small>Treina operacionais por função (${trainCost} cr por treino${academyBuilt ? " · desconto da Academia militar ativo" : ""}).</small></div>${rowsHtml}`;
+  trainingBox.querySelectorAll("[data-role-train]").forEach(btn => {
+    btn.onclick = () => {
+      trainClassRole(btn.dataset.roleTrain, Number(btn.dataset.statIdx));
+    };
+  });
+  el.appendChild(trainingBox);
 }
 
 function renderMissions() {
@@ -316,7 +401,7 @@ function renderMissions() {
     d.querySelector("button").onclick = () => startMission(i);
     el.appendChild(d);
   });
-    }
+      }
 let battle = {
   units: [],
   enemies: [],
@@ -510,7 +595,7 @@ function startMission(i) {
   document.getElementById("battle-log").textContent = `Turno 1 · Secundário: ${m.secondaryLabel}. Escolhe mover, disparar, vigiar ou Hunker Down (-1 PA).`;
   go("tactical");
   renderBattle();
-}
+    }
 function renderBattle() {
   const grid = document.getElementById("battle-grid");
   grid.innerHTML = "";
@@ -793,7 +878,7 @@ document.getElementById("end-turn").onclick = () => {
     battle.finished = true;
     battleLog(enemyLogs.join(" ") + " Toda a equipa ficou inconsciente. Operação falhada.");
     renderBattle();
-    logModal("OPERAÇÃO FALHADA", "Os operacionais ficaram sem condições de combate. Regressa às missões para tentar novamente.");
+    logModal("OPERAÇÃO FALHADA", "Os operacionais ficaram sem condições de combate. A regressar à base.", "command");
     return;
   }
 
@@ -837,16 +922,17 @@ function checkWin() {
     const totalMaterials = m.rewardMaterials + (secDone ? m.bonusMaterials : 0);
 
     let totalLevelsGained = 0;
-    const xpSummary = battle.units.map(u => {
+    const reportRows = battle.units.map(u => {
       const survivedBonus = u.hp > 0 ? 15 : 0;
       const secBonus = secDone ? 20 : 0;
       const gained = m.xpBase + survivedBonus + secBonus;
       const lvUps = grantOpXp(u.id, gained);
+      const prog = getOpProgress(u.id);
       totalLevelsGained += lvUps;
-      return `${OPERATIVES[u.id][0]} (+${gained} XP${lvUps ? `, +${lvUps} NV` : ""})`;
+      return `<div><b>${OPERATIVES[u.id][0]}</b>: +${gained} XP → NV.${prog.level} (${prog.xp}/100 XP)${lvUps ? ` · <span style="color:var(--lime)">+${lvUps * 2} PT</span>` : ""}</div>`;
     });
 
-    battleLog(`OBJETIVO CUMPRIDO${secDone ? " + SECUNDÁRIO!" : "."} XP atribuído à equipa.`);
+    battleLog(`OBJETIVO CUMPRIDO${secDone ? " + SECUNDÁRIO!" : "."} A regressar à base.`);
     if (!state.completed.includes(state.mission)) state.completed.push(state.mission);
     state.credits += totalCredits;
     state.materials += totalMaterials;
@@ -858,11 +944,13 @@ function checkWin() {
         ? `<br><span style="color:var(--lime)">Secundário concluído (${m.secondaryLabel}): +${m.bonusCredits} créditos e +${m.bonusMaterials} materiais extra!</span>`
         : `<br>Secundário (${m.secondaryLabel}): não concluído.`;
       const lvText = totalLevelsGained > 0
-        ? `<br><span style="color:var(--lime)">Subidas de nível: +${totalLevelsGained} (pontos de treino livres disponíveis na ficha dos operacionais!).</span>`
+        ? `<br><span style="color:var(--lime)">Subidas de nível: +${totalLevelsGained} (pontos de treino livres adicionados!).</span>`
         : "";
+      const xpReportHtml = `<div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,.1);font-size:12px">${reportRows.join("")}</div>`;
       logModal(
         "OPERAÇÃO CONCLUÍDA",
-        `Total recebido: <b>${totalCredits} créditos</b>, <b>${totalMaterials} materiais</b> e <b>1 tecnologia alienígena</b>.${secText}${lvText}<br><small style="color:var(--muted)">${xpSummary.join(" · ")}</small>`
+        `Recompensas: <b>${totalCredits} créditos</b>, <b>${totalMaterials} materiais</b> e <b>1 tecnologia alienígena</b>.${secText}${lvText}${xpReportHtml}<br><small style="color:var(--muted)">Fecha esta janela para regressar à base.</small>`,
+        "command"
       );
       renderMissions();
       renderRoster();
