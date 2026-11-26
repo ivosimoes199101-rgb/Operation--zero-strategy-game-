@@ -188,11 +188,37 @@ function save() {
   } catch (_) {}
 }
 
+function resolveScreenElement(screenName) {
+  const aliases = {
+    equipa: ["equipa", "squad", "team", "roster", "operacionais"],
+    roster: ["roster", "equipa", "squad", "team", "operacionais"],
+    base: ["base", "hq", "quartel"],
+    missions: ["missions", "missoes", "missões", "ops"],
+    battle: ["battle", "combat", "combate", "mission-screen"]
+  };
+  const candidates = aliases[screenName] || [screenName];
+  for (const id of candidates) {
+    const el = document.getElementById(id);
+    if (el) return el;
+  }
+  return null;
+}
+
 function go(screenName) {
-  document.querySelectorAll(".screen").forEach(sec => sec.classList.remove("active"));
-  const target = document.getElementById(screenName);
-  if (target) target.classList.add("active");
-  if (screenName === "roster") renderRoster();
+  document.querySelectorAll(".screen").forEach(sec => {
+    sec.classList.remove("active");
+    sec.style.display = "none";
+  });
+
+  const target = resolveScreenElement(screenName);
+  if (target) {
+    target.classList.add("active");
+    target.style.display = "block";
+    target.style.opacity = "1";
+    target.style.visibility = "visible";
+  }
+
+  if (screenName === "roster" || screenName === "equipa") renderRoster();
   if (screenName === "base") renderBuildings();
   if (screenName === "missions") renderMissions();
   if (screenName === "battle") renderBattle();
@@ -205,6 +231,19 @@ function bindNavigation() {
       if (dest) go(dest);
     };
   });
+
+  document.querySelectorAll("button").forEach(btn => {
+    if (btn.hasAttribute("data-go") || btn.onclick) return;
+    const txt = (btn.textContent || "").trim().toLowerCase();
+    if (txt === "equipa" || txt === "operacionais") {
+      btn.onclick = () => go("equipa");
+    } else if (txt === "base") {
+      btn.onclick = () => go("base");
+    } else if (txt === "missões" || txt === "missoes") {
+      btn.onclick = () => go("missions");
+    }
+  });
+
   const closeModalBtn = document.getElementById("close-modal");
   if (closeModalBtn) closeModalBtn.onclick = closeModal;
 }
@@ -216,12 +255,18 @@ function logModal(title, htmlMessage, returnScreen = null) {
   modalReturnScreen = returnScreen;
   if (titleEl) titleEl.textContent = title;
   if (bodyEl) bodyEl.innerHTML = htmlMessage;
-  if (modal) modal.classList.remove("hidden");
+  if (modal) {
+    modal.classList.remove("hidden");
+    modal.style.display = "flex";
+  }
 }
 
 function closeModal() {
   const modal = document.getElementById("modal");
-  if (modal) modal.classList.add("hidden");
+  if (modal) {
+    modal.classList.add("hidden");
+    modal.style.display = "none";
+  }
   if (modalReturnScreen) {
     const dest = modalReturnScreen;
     modalReturnScreen = null;
@@ -348,8 +393,24 @@ function getHealCost(opIndex) {
   return Math.max(40, missing * 4);
 }
 
+function findRosterContainer() {
+  const direct = document.getElementById("roster-list") || document.getElementById("equipa-list") || document.getElementById("squad-list");
+  if (direct) return direct;
+
+  const sec = resolveScreenElement("equipa") || resolveScreenElement("roster");
+  if (!sec) return null;
+
+  let inner = sec.querySelector(".list, .cards, [data-roster-list]");
+  if (!inner) {
+    inner = document.createElement("div");
+    inner.id = "roster-list";
+    sec.appendChild(inner);
+  }
+  return inner;
+}
+
 function renderRoster() {
-  const listEl = document.getElementById("roster-list");
+  const listEl = findRosterContainer();
   if (!listEl) return;
 
   const cap = 5;
@@ -372,7 +433,7 @@ function renderRoster() {
       <div style="font-size:11px;color:var(--muted);margin-top:4px">Mochila: Frag x${gearActive.frag} · Fumo x${gearActive.smoke} · Kit x${gearActive.medkit}</div>
       <div style="font-size:11px;color:var(--muted);margin-top:4px;display:flex;flex-wrap:wrap;gap:8px">${statsHtml}</div>
     </div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Equipa ativa: <b>${state.selected.length}/${cap}</b> · Camaradagem: <b>+${getSquadSynergyBonus()}%</b> precisão</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Equipa selecionada para missão: <b>${state.selected.length}/${cap}</b> · Camaradagem: <b>+${getSquadSynergyBonus()}%</b> precisão</div>
   `;
 
   OPERATIVES.forEach((op, idx) => {
@@ -384,21 +445,17 @@ function renderRoster() {
 
     const card = document.createElement("div");
     card.className = "building";
-    card.style.flexDirection = "column";
-    card.style.alignItems = "stretch";
-    card.style.gap = "8px";
-    card.style.marginBottom = "8px";
-    if (isFocused) card.style.borderColor = "var(--lime)";
+    card.style.cssText = `display:flex;flex-direction:column;align-items:stretch;gap:8px;margin-bottom:8px;padding:10px;border:1px solid ${isFocused ? "var(--lime)" : "rgba(255,255,255,.14)"};border-radius:8px;background:rgba(14,22,29,.65)`;
 
     card.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
         <div>
           <b>${op[0]}</b> · <span style="color:var(--lime)">${op[2]}</span> (Nv.${prog.level})<br>
           <small style="color:var(--muted)">${op[1]} · HP: ${hp}/${maxHp} · PT: ${prog.trainPoints}</small>
         </div>
         <div style="display:flex;gap:6px">
           <button type="button" class="btn" data-inspect="${idx}">DETALHES</button>
-          <button type="button" class="btn" data-toggle="${idx}">${isSelected ? "NA EQUIPA ✓" : "CONVOCAR"}</button>
+          <button type="button" class="btn" data-toggle="${idx}">${isSelected ? "SELECIONADO ✓" : "SELECIONAR"}</button>
         </div>
       </div>
     `;
@@ -422,7 +479,7 @@ function renderRoster() {
           state.selected = state.selected.filter(i => i !== idx);
         } else {
           if (state.selected.length >= cap) {
-            logModal("LIMITE DA EQUIPA", `Só podes convocar até ${cap} operacionais por missão.`);
+            logModal("LIMITE DA EQUIPA", `Só podes selecionar até ${cap} operacionais por missão.`);
             return;
           }
           state.selected.push(idx);
@@ -450,10 +507,7 @@ function renderBuildings() {
 
     const row = document.createElement("div");
     row.className = "building";
-    row.style.flexDirection = "column";
-    row.style.alignItems = "stretch";
-    row.style.gap = "8px";
-    row.style.marginBottom = "10px";
+    row.style.cssText = "display:flex;flex-direction:column;align-items:stretch;gap:8px;margin-bottom:10px";
 
     let levelInfo = "";
     if (i === 0) levelInfo = ` · Nível ${state.barracksLevel || 1}/3`;
@@ -462,9 +516,7 @@ function renderBuildings() {
     row.innerHTML = `<div><b>${name}${levelInfo}</b><br><small style="color:var(--muted)">${desc}</small></div>`;
 
     const actionWrap = document.createElement("div");
-    actionWrap.style.display = "flex";
-    actionWrap.style.flexWrap = "wrap";
-    actionWrap.style.gap = "8px";
+    actionWrap.style.cssText = "display:flex;flex-wrap:wrap;gap:8px";
 
     if (!built) {
       const buildBtn = document.createElement("button");
@@ -492,9 +544,7 @@ function renderBuildings() {
       actionWrap.appendChild(buildBtn);
     } else {
       const tag = document.createElement("span");
-      tag.style.fontSize = "12px";
-      tag.style.color = "var(--lime)";
-      tag.style.alignSelf = "center";
+      tag.style.cssText = "font-size:12px;color:var(--lime);align-self:center";
       tag.textContent = "OPERACIONAL ✓";
       actionWrap.appendChild(tag);
 
@@ -575,8 +625,7 @@ function renderBuildings() {
   const resetBtn = document.createElement("button");
   resetBtn.type = "button";
   resetBtn.className = "btn";
-  resetBtn.style.width = "100%";
-  resetBtn.style.marginTop = "14px";
+  resetBtn.style.cssText = "width:100%;margin-top:14px";
   resetBtn.textContent = "RESET PROGRESSO (TESTE)";
   resetBtn.onclick = () => {
     try { localStorage.removeItem(SAVE_KEY); } catch (_) {}
@@ -615,10 +664,7 @@ function renderFacilityExtras(container) {
 
   const barracksBox = document.createElement("div");
   barracksBox.className = "building";
-  barracksBox.style.flexDirection = "column";
-  barracksBox.style.alignItems = "stretch";
-  barracksBox.style.gap = "8px";
-  barracksBox.style.marginBottom = "10px";
+  barracksBox.style.cssText = "display:flex;flex-direction:column;align-items:stretch;gap:8px;margin-bottom:10px";
   barracksBox.innerHTML = `
     <div><b>QUARTEL — TREINO DE ATRIBUTOS E DESCANSO RÁPIDO</b><br><small style="color:var(--muted)">Usa 1 Ponto de Treino (gratuito) ou 260 CR · 7 MAT para subir +2 num atributo.</small></div>
     <select id="oz-train-op" style="width:100%;padding:8px;background:#0e161d;color:#f2f7fa;border:1px solid rgba(255,255,255,.22);border-radius:6px;font-size:12px">${opOpts}</select>
@@ -632,10 +678,7 @@ function renderFacilityExtras(container) {
 
   const medBox = document.createElement("div");
   medBox.className = "building";
-  medBox.style.flexDirection = "column";
-  medBox.style.alignItems = "stretch";
-  medBox.style.gap = "8px";
-  medBox.style.marginBottom = "10px";
+  medBox.style.cssText = "display:flex;flex-direction:column;align-items:stretch;gap:8px;margin-bottom:10px";
   medBox.innerHTML = `
     <div><b>ENFERMARIA — TRATAMENTO, URGÊNCIA E PROFILAXIA</b><br><small style="color:var(--muted)">${infBuilt ? "Cura padrão, recuperação de urgência (HP completo) e reforço +8 HP para a próxima saída." : "Constrói a Enfermaria para usar estas opções."}</small></div>
     <select id="oz-med-op" ${!infBuilt ? "disabled" : ""} style="width:100%;padding:8px;background:#0e161d;color:#f2f7fa;border:1px solid rgba(255,255,255,.22);border-radius:6px;font-size:12px">${medOpts}</select>
@@ -649,10 +692,7 @@ function renderFacilityExtras(container) {
 
   const armoryBox = document.createElement("div");
   armoryBox.className = "building";
-  armoryBox.style.flexDirection = "column";
-  armoryBox.style.alignItems = "stretch";
-  armoryBox.style.gap = "8px";
-  armoryBox.style.marginBottom = "10px";
+  armoryBox.style.cssText = "display:flex;flex-direction:column;align-items:stretch;gap:8px;margin-bottom:10px";
 
   const shopOpOpts = OPERATIVES.map((op, i) => `<option value="${i}" ${i === selectedShopOpIndex ? "selected" : ""}>${op[0]} (${op[2]})</option>`).join("");
   const armTier = Number(state.armoryTier) || 0;
@@ -676,10 +716,7 @@ function renderFacilityExtras(container) {
 
   const labBox = document.createElement("div");
   labBox.className = "building";
-  labBox.style.flexDirection = "column";
-  labBox.style.alignItems = "stretch";
-  labBox.style.gap = "8px";
-  labBox.style.marginBottom = "10px";
+  labBox.style.cssText = "display:flex;flex-direction:column;align-items:stretch;gap:8px;margin-bottom:10px";
 
   const wTier = state.lab.weaponTier || 0;
   const iTier = state.lab.intelTier || 0;
@@ -971,6 +1008,10 @@ function bindFacilityExtraEvents(container, armBuilt) {
       const squad = state.selected;
       const needCr = squad.length * 150;
       const needMat = squad.length * 3;
+      if (squad.length === 0) {
+        logModal("SEM EQUIPA", "Seleciona operacionais antes de reabastecer.");
+        return;
+      }
       if (state.credits < needCr || state.materials < needMat) {
         logModal("RECURSOS INSUFICIENTES", `Reabastecer custa <b>${needCr} CR</b> e <b>${needMat} MAT</b>.`);
         return;
@@ -1143,10 +1184,7 @@ function renderMissions() {
     const done = state.completed.includes(idx);
     const card = document.createElement("div");
     card.className = "building";
-    card.style.flexDirection = "column";
-    card.style.alignItems = "stretch";
-    card.style.gap = "8px";
-    card.style.marginBottom = "10px";
+    card.style.cssText = "display:flex;flex-direction:column;align-items:stretch;gap:8px;margin-bottom:10px";
 
     card.innerHTML = `
       <div>
@@ -1340,9 +1378,53 @@ function selectNextUnitWithAp() {
   if (nextIdx !== -1) battle.activeUnitIdx = nextIdx;
 }
 
+function ensureBattleElements(sec) {
+  let statusEl = document.getElementById("battle-status");
+  let gridEl = document.getElementById("battle-grid");
+  let actEl = document.getElementById("battle-actions");
+  let logEl = document.getElementById("battle-log");
+
+  if (sec && (!statusEl || !gridEl || !actEl || !logEl)) {
+    if (!statusEl) {
+      statusEl = document.createElement("div");
+      statusEl.id = "battle-status";
+      statusEl.style.cssText = "padding:8px 10px;margin-bottom:8px;border:1px solid rgba(255,255,255,.16);border-radius:6px;background:#0e161d;color:#f2f7fa;font-size:12px";
+      sec.appendChild(statusEl);
+    }
+    if (!gridEl) {
+      gridEl = document.createElement("div");
+      gridEl.id = "battle-grid";
+      sec.appendChild(gridEl);
+    }
+    if (!actEl) {
+      actEl = document.createElement("div");
+      actEl.id = "battle-actions";
+      actEl.style.cssText = "display:flex;flex-wrap:wrap;gap:6px;margin-top:10px";
+      sec.appendChild(actEl);
+    }
+    if (!logEl) {
+      logEl = document.createElement("div");
+      logEl.id = "battle-log";
+      logEl.style.cssText = "margin-top:8px;padding:8px 10px;border:1px solid rgba(255,255,255,.14);border-radius:6px;background:#091016;color:#cbd8e2;font-size:12px";
+      sec.appendChild(logEl);
+    }
+  }
+
+  if (gridEl) {
+    gridEl.style.display = "grid";
+    gridEl.style.gridTemplateColumns = "repeat(8, minmax(0, 1fr))";
+    gridEl.style.gap = "4px";
+    gridEl.style.background = "#091016";
+    gridEl.style.padding = "6px";
+    gridEl.style.borderRadius = "8px";
+  }
+
+  return { statusEl, gridEl, actEl, logEl };
+}
+
 function renderBattle() {
-  const gridEl = document.getElementById("battle-grid");
-  const statusEl = document.getElementById("battle-status");
+  const battleSec = resolveScreenElement("battle");
+  const { statusEl, gridEl } = ensureBattleElements(battleSec);
   if (!gridEl) return;
 
   battle.smokes = battle.smokes.filter(s => s.turns > 0);
@@ -1362,6 +1444,7 @@ function renderBattle() {
     for (let x = 0; x < GRID_W; x++) {
       const cell = document.createElement("div");
       cell.className = "cell";
+      cell.style.cssText = "min-height:42px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.14);border-radius:4px;background:#121d26;color:#f2f7fa;font-size:10px;padding:2px;text-align:center";
 
       const unitHere = getUnitAt(x, y);
       const enemyHere = getEnemyAt(x, y);
@@ -1375,23 +1458,30 @@ function renderBattle() {
         if (activeCombatMode === "move" && active.ap > 0 && canMoveTo(active, x, y)) {
           movable = true;
           cell.classList.add("move");
+          cell.style.background = "#153624";
+          cell.style.borderColor = "#42e88b";
         } else if (activeCombatMode === "shoot" && active.ap > 0 && enemyHere) {
           targetableEnemy = enemyHere;
           cell.classList.add("shoot");
+          cell.style.background = "#3b171b";
+          cell.style.borderColor = "#ff5c6c";
         } else if (activeCombatMode === "frag" && active.ap > 0 && active.frag > 0 && manhattanDist(active.x, active.y, x, y) <= 6) {
           cell.classList.add("shoot");
+          cell.style.borderColor = "#ff9d42";
         } else if (activeCombatMode === "smoke" && active.ap > 0 && active.smoke > 0 && manhattanDist(active.x, active.y, x, y) <= 6) {
           cell.classList.add("move");
+          cell.style.borderColor = "#9ad8ff";
         } else if (activeCombatMode === "medkit" && active.ap > 0 && active.medkit > 0 && unitHere && unitHere.hp < unitHere.maxHp && manhattanDist(active.x, active.y, x, y) <= 2) {
           cell.classList.add("move");
+          cell.style.borderColor = "#6ef7ff";
         }
       }
 
-      if (smokeHere) cell.style.boxShadow = "inset 0 0 0 2px rgba(200,220,235,.55)";
+      if (smokeHere) cell.style.boxShadow = "inset 0 0 0 2px rgba(200,220,235,.65)";
 
       if (covHere) {
         const covTag = document.createElement("span");
-        covTag.style.cssText = "font-size:9px;opacity:.75";
+        covTag.style.cssText = "font-size:8px;opacity:.8";
         covTag.textContent = covHere.type === "full" ? "COB-F" : "COB-M";
         cell.appendChild(covTag);
       }
@@ -1399,7 +1489,7 @@ function renderBattle() {
       if (unitHere) {
         const badge = document.createElement("div");
         badge.className = "unit player";
-        if (active && active.opIndex === unitHere.opIndex) badge.style.outline = "2px solid var(--lime)";
+        badge.style.cssText = `background:#1c4a6e;color:#fff;padding:1px 3px;border-radius:3px;font-weight:bold;${active && active.opIndex === unitHere.opIndex ? "outline:2px solid #b9ff3b;" : ""}`;
         badge.textContent = `${unitHere.name.split(" ")[0]} (${unitHere.hp})`;
         cell.appendChild(badge);
       }
@@ -1407,6 +1497,7 @@ function renderBattle() {
       if (enemyHere) {
         const eBadge = document.createElement("div");
         eBadge.className = "unit enemy";
+        eBadge.style.cssText = "background:#6b1d29;color:#fff;padding:1px 3px;border-radius:3px;font-weight:bold";
         eBadge.textContent = `${enemyHere.name.split(" ")[0]} (${enemyHere.hp})`;
         cell.appendChild(eBadge);
       }
