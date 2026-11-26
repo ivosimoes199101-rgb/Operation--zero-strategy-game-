@@ -1,6 +1,7 @@
 const SAVE_KEY = "oz_save";
-
 const STAT_NAMES = ["Pontaria", "Mobilidade", "Blindagem", "Disciplina"];
+const GRID_W = 8;
+const GRID_H = 6;
 
 const OPERATIVES = [
   ["Kaelen Vance", "Rifle de Assalto", "Assalto", [78, 74, 70, 72], 100],
@@ -33,15 +34,9 @@ const OUTFITS_SHOP = [
 ];
 
 const CONSUMABLES_SHOP = {
-  frag: [
-    { id: "frag_1", name: "Granada Fragmentação (x1)", qty: 1, credits: 120, materials: 3, desc: "Explosão 3x3 com 32 de dano." }
-  ],
-  smoke: [
-    { id: "smoke_1", name: "Granada de Fumo (x1)", qty: 1, credits: 110, materials: 3, desc: "Cobertura visual 3x3 por 2 turnos." }
-  ],
-  medkit: [
-    { id: "med_1", name: "Kit de Saúde (x1)", qty: 1, credits: 130, materials: 3, desc: "Recupera 40 HP (50 HP na classe Médico)." }
-  ]
+  frag: [{ id: "frag_1", name: "Granada Fragmentação (x1)", qty: 1, credits: 120, materials: 3, desc: "Explosão 3x3 com 32 de dano." }],
+  smoke: [{ id: "smoke_1", name: "Granada de Fumo (x1)", qty: 1, credits: 110, materials: 3, desc: "Cobertura visual 3x3 por 2 turnos." }],
+  medkit: [{ id: "med_1", name: "Kit de Saúde (x1)", qty: 1, credits: 130, materials: 3, desc: "Recupera 40 HP (50 HP na classe Médico)." }]
 };
 
 const MISSIONS = [
@@ -97,42 +92,15 @@ function createDefaultState() {
     completed: [],
     mission: 0,
     barracksLevel: 1,
-    commandCenter: {
-      built: false,
-      level: 0,
-      reconReady: false
-    },
-    lab: {
-      weaponTier: 0,
-      intelTier: 0,
-      armorTier: 0,
-      intelDecoded: 0,
-      piercingAmmo: false
-    },
+    commandCenter: { built: false, level: 0, reconReady: false },
+    lab: { weaponTier: 0, intelTier: 0, armorTier: 0, intelDecoded: 0, piercingAmmo: false },
     armoryTier: 0,
     opHp: OPERATIVES.map(op => op[4]),
-    opGear: OPERATIVES.map(() => ({
-      weaponId: "ar_mk1",
-      outfitId: "fat_std",
-      frag: 1,
-      smoke: 1,
-      medkit: 1
-    })),
-    opProgress: OPERATIVES.map(() => ({
-      xp: 0,
-      level: 1,
-      trainPoints: 0
-    })),
+    opGear: OPERATIVES.map(() => ({ weaponId: "ar_mk1", outfitId: "fat_std", frag: 1, smoke: 1, medkit: 1 })),
+    opProgress: OPERATIVES.map(() => ({ xp: 0, level: 1, trainPoints: 0 })),
     medProphylaxis: {}
   };
 }
-
-let state = loadState();
-let selectedOpIndex = 0;
-let selectedShopOpIndex = 0;
-let selectedShopCategory = "weapon";
-let selectedShopItemId = "ar_mk2";
-let activeCombatMode = null;
 
 function loadState() {
   const base = createDefaultState();
@@ -153,20 +121,17 @@ function loadState() {
         ...base.lab,
         ...(parsed.lab && typeof parsed.lab === "object" ? parsed.lab : {})
       },
-      medProphylaxis:
-        parsed.medProphylaxis && typeof parsed.medProphylaxis === "object"
-          ? { ...parsed.medProphylaxis }
-          : {}
+      medProphylaxis: parsed.medProphylaxis && typeof parsed.medProphylaxis === "object" ? { ...parsed.medProphylaxis } : {}
     };
 
     if (!Array.isArray(merged.built) || merged.built.length === 0) merged.built = [0];
     if (!merged.built.includes(0)) merged.built.unshift(0);
-    if (!Array.isArray(merged.selected)) merged.selected = [0, 1, 2];
+    if (!Array.isArray(merged.selected) || merged.selected.length === 0) merged.selected = [0, 1, 2];
     if (!Array.isArray(merged.completed)) merged.completed = [];
 
     merged.opHp = OPERATIVES.map((op, i) => {
-      const val = Array.isArray(parsed.opHp) ? Number(parsed.opHp[i]) : op[4];
-      return Number.isFinite(val) ? Math.max(0, val) : op[4];
+      const v = Array.isArray(parsed.opHp) ? Number(parsed.opHp[i]) : op[4];
+      return Number.isFinite(v) ? Math.max(0, v) : op[4];
     });
 
     merged.opGear = OPERATIVES.map((_, i) => {
@@ -195,40 +160,60 @@ function loadState() {
   }
 }
 
+let state = loadState();
+let selectedOpIndex = 0;
+let selectedShopOpIndex = 0;
+let selectedShopCategory = "weapon";
+let activeCombatMode = null;
+let expTrainOp = 0;
+let expTrainStat = 0;
+let expMedOp = 0;
+let expLabTarget = "flanker";
+let modalReturnScreen = null;
+
+let battle = {
+  missionIndex: 0,
+  turn: 1,
+  activeUnitIdx: 0,
+  units: [],
+  enemies: [],
+  smokes: [],
+  finished: false,
+  commandReconTurn1: false
+};
+
 function save() {
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify(state));
   } catch (_) {}
-                              }
+}
+
 function go(screenName) {
-  document.querySelectorAll(".screen").forEach(sec => {
-    sec.classList.remove("active");
-  });
+  document.querySelectorAll(".screen").forEach(sec => sec.classList.remove("active"));
   const target = document.getElementById(screenName);
-  if (target) {
-    target.classList.add("active");
-  }
+  if (target) target.classList.add("active");
   if (screenName === "roster") renderRoster();
   if (screenName === "base") renderBuildings();
   if (screenName === "missions") renderMissions();
   if (screenName === "battle") renderBattle();
 }
 
-document.querySelectorAll("[data-go]").forEach(btn => {
-  btn.addEventListener("click", () => {
-    const dest = btn.getAttribute("data-go");
-    if (dest) go(dest);
+function bindNavigation() {
+  document.querySelectorAll("[data-go]").forEach(btn => {
+    btn.onclick = () => {
+      const dest = btn.getAttribute("data-go");
+      if (dest) go(dest);
+    };
   });
-});
-
-let modalReturnScreen = null;
+  const closeModalBtn = document.getElementById("close-modal");
+  if (closeModalBtn) closeModalBtn.onclick = closeModal;
+}
 
 function logModal(title, htmlMessage, returnScreen = null) {
   const modal = document.getElementById("modal");
   const titleEl = document.getElementById("modal-title");
   const bodyEl = document.getElementById("modal-body");
   modalReturnScreen = returnScreen;
-
   if (titleEl) titleEl.textContent = title;
   if (bodyEl) bodyEl.innerHTML = htmlMessage;
   if (modal) modal.classList.remove("hidden");
@@ -244,11 +229,6 @@ function closeModal() {
   }
 }
 
-const closeModalBtn = document.getElementById("close-modal");
-if (closeModalBtn) {
-  closeModalBtn.addEventListener("click", closeModal);
-}
-
 function renderResources() {
   const cEl = document.getElementById("credits");
   const mEl = document.getElementById("materials");
@@ -258,11 +238,8 @@ function renderResources() {
   if (aEl) aEl.textContent = state.alien;
 }
 
-function getOpProgress(opIndex) {
-  if (!Array.isArray(state.opProgress) || !state.opProgress[opIndex]) {
-    return { xp: 0, level: 1, trainPoints: 0 };
-  }
-  return state.opProgress[opIndex];
+function getOpProgress(i) {
+  return (Array.isArray(state.opProgress) && state.opProgress[i]) || { xp: 0, level: 1, trainPoints: 0 };
 }
 
 function getXpNeededForLevel(level) {
@@ -272,12 +249,12 @@ function getXpNeededForLevel(level) {
 function grantOpXp(opIndex, amount) {
   const prog = getOpProgress(opIndex);
   prog.xp += Math.max(0, amount);
-  let leveledUp = 0;
+  let ups = 0;
   while (prog.xp >= getXpNeededForLevel(prog.level)) {
     prog.xp -= getXpNeededForLevel(prog.level);
     prog.level += 1;
     prog.trainPoints += 1;
-    leveledUp += 1;
+    ups += 1;
     const op = OPERATIVES[opIndex];
     if (op && Array.isArray(op[3])) {
       op[3][0] = Math.min(99, op[3][0] + 2);
@@ -286,44 +263,32 @@ function grantOpXp(opIndex, amount) {
       op[3][3] = Math.min(99, op[3][3] + 2);
     }
   }
-  return leveledUp;
+  return ups;
 }
 
-function getOpGear(opIndex) {
-  if (!Array.isArray(state.opGear) || !state.opGear[opIndex]) {
-    return { weaponId: "ar_mk1", outfitId: "fat_std", frag: 1, smoke: 1, medkit: 1 };
-  }
-  return state.opGear[opIndex];
+function getOpGear(i) {
+  return (Array.isArray(state.opGear) && state.opGear[i]) || { weaponId: "ar_mk1", outfitId: "fat_std", frag: 1, smoke: 1, medkit: 1 };
 }
 
-function getEquippedOutfitItem(opIndex) {
-  const gear = getOpGear(opIndex);
+function getEquippedOutfitItem(i) {
+  const gear = getOpGear(i);
   return OUTFITS_SHOP.find(o => o.id === gear.outfitId) || OUTFITS_SHOP[0];
 }
 
 function getLabWeaponBonus() {
-  const tier = Number(state.lab && state.lab.weaponTier) || 0;
-  return {
-    dmg: tier * 3,
-    hit: tier * 3
-  };
+  const t = Number(state.lab && state.lab.weaponTier) || 0;
+  return { dmg: t * 3, hit: t * 3 };
 }
 
 function getLabArmorBonus() {
-  const tier = Number(state.lab && state.lab.armorTier) || 0;
-  return {
-    hp: tier * 10,
-    dmgRed: tier * 1
-  };
+  const t = Number(state.lab && state.lab.armorTier) || 0;
+  return { hp: t * 10, dmgRed: t * 1 };
 }
 
 function getLabIntelDebuff() {
-  const tier = Number(state.lab && state.lab.intelTier) || 0;
-  const decoded = Number(state.lab && state.lab.intelDecoded) || 0;
-  return {
-    aimPen: tier * 4 + decoded * 5,
-    dmgRed: tier * 1 + decoded * 1
-  };
+  const t = Number(state.lab && state.lab.intelTier) || 0;
+  const d = Number(state.lab && state.lab.intelDecoded) || 0;
+  return { aimPen: t * 4 + d * 5, dmgRed: t * 1 + d * 1 };
 }
 
 function getWeapon(opIndex) {
@@ -332,32 +297,27 @@ function getWeapon(opIndex) {
   const labWpn = getLabWeaponBonus();
   const armTier = Number(state.armoryTier) || 0;
   const piercing = Boolean(state.lab && state.lab.piercingAmmo);
-
-  let dmg = baseWpn.dmg + labWpn.dmg + armTier * 4 + (piercing ? 4 : 0);
-  let hitBonus = (baseWpn.hitBonus || 0) + labWpn.hit + armTier * 4;
   let name = baseWpn.name;
   if (armTier > 0) name += ` [AR-NV${armTier}]`;
   if (piercing) name += ` [AP]`;
-
   return {
     ...baseWpn,
     name,
-    dmg,
-    hitBonus,
+    dmg: baseWpn.dmg + labWpn.dmg + armTier * 4 + (piercing ? 4 : 0),
+    hitBonus: (baseWpn.hitBonus || 0) + labWpn.hit + armTier * 4,
     piercing
   };
 }
 
 function getMaxHp(opIndex) {
-  const op = OPERATIVES[opIndex];
-  const baseHp = op ? op[4] : 90;
+  const op = OPERATIVES[opIndex] || OPERATIVES[0];
   const prog = getOpProgress(opIndex);
   const levelHp = (Math.max(1, prog.level) - 1) * 6;
   const outfitHp = getEquippedOutfitItem(opIndex).hpBonus || 0;
   const labHp = getLabArmorBonus().hp || 0;
-  const statArmorBonus = op ? Math.max(0, Math.round(((op[3][2] || 70) - 70) * 0.4)) : 0;
+  const statArmorBonus = Math.max(0, Math.round(((op[3][2] || 70) - 70) * 0.4));
   const prophBonus = state.medProphylaxis && state.medProphylaxis[opIndex] ? 8 : 0;
-  return baseHp + levelHp + outfitHp + labHp + statArmorBonus + prophBonus;
+  return op[4] + levelHp + outfitHp + labHp + statArmorBonus + prophBonus;
 }
 
 function getOpHp(opIndex) {
@@ -369,63 +329,50 @@ function getOpHp(opIndex) {
 
 function setOpHp(opIndex, value) {
   const maxHp = getMaxHp(opIndex);
-  if (!Array.isArray(state.opHp)) {
-    state.opHp = OPERATIVES.map(op => op[4]);
-  }
+  if (!Array.isArray(state.opHp)) state.opHp = OPERATIVES.map(op => op[4]);
   state.opHp[opIndex] = Math.max(0, Math.min(maxHp, Math.round(value)));
 }
 
 function getBarracksRestHeal() {
-  const lv = Number(state.barracksLevel) || 1;
-  return 15 + (lv - 1) * 10;
+  return 15 + ((Number(state.barracksLevel) || 1) - 1) * 10;
 }
 
 function getSquadSynergyBonus() {
   const count = Array.isArray(state.selected) ? state.selected.length : 0;
   const lv = Number(state.barracksLevel) || 1;
-  if (count <= 1) return 0;
-  return (count - 1) * 2 + (lv - 1) * 2;
+  return count <= 1 ? 0 : (count - 1) * 2 + (lv - 1) * 2;
 }
+
+function getHealCost(opIndex) {
+  const missing = Math.max(0, getMaxHp(opIndex) - getOpHp(opIndex));
+  return Math.max(40, missing * 4);
+}
+
 function renderRoster() {
   const listEl = document.getElementById("roster-list");
   if (!listEl) return;
 
   const cap = 5;
+  const opActive = OPERATIVES[selectedOpIndex] || OPERATIVES[0];
   const maxHpActive = getMaxHp(selectedOpIndex);
   const curHpActive = getOpHp(selectedOpIndex);
   const progActive = getOpProgress(selectedOpIndex);
   const gearActive = getOpGear(selectedOpIndex);
   const wpnActive = getWeapon(selectedOpIndex);
   const outfitActive = getEquippedOutfitItem(selectedOpIndex);
-  const opActive = OPERATIVES[selectedOpIndex] || OPERATIVES[0];
-
-  const statsHtml = opActive[3]
-    .map((val, idx) => `<span><b>${STAT_NAMES[idx]}:</b> ${val}</span>`)
-    .join(" · ");
+  const statsHtml = opActive[3].map((val, idx) => `<span><b>${STAT_NAMES[idx]}:</b> ${val}</span>`).join(" · ");
 
   listEl.innerHTML = `
     <div style="margin-bottom:10px;padding:10px;border:1px solid rgba(255,255,255,.14);border-radius:8px;background:rgba(14,22,29,.75)">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
-        <div>
-          <b style="color:var(--lime)">${opActive[0]}</b> · <span>${opActive[2]}</span> (${opActive[1]})
-        </div>
-        <div style="font-size:12px">
-          Nv.<b>${progActive.level}</b> · XP: <b>${progActive.xp}/${getXpNeededForLevel(progActive.level)}</b> · PT: <b>${progActive.trainPoints}</b>
-        </div>
+        <div><b style="color:var(--lime)">${opActive[0]}</b> · <span>${opActive[2]}</span> (${opActive[1]})</div>
+        <div style="font-size:12px">Nv.<b>${progActive.level}</b> · XP: <b>${progActive.xp}/${getXpNeededForLevel(progActive.level)}</b> · PT: <b>${progActive.trainPoints}</b></div>
       </div>
-      <div style="font-size:12px;margin-top:6px">
-        HP: <b>${curHpActive}/${maxHpActive}</b> · Arma: <b>${wpnActive.name}</b> (${wpnActive.dmg} DMG) · Farda: <b>${outfitActive.name}</b>
-      </div>
-      <div style="font-size:11px;color:var(--muted);margin-top:4px">
-        Mochila: Frag x${gearActive.frag} · Fumo x${gearActive.smoke} · Kit x${gearActive.medkit}
-      </div>
-      <div style="font-size:11px;color:var(--muted);margin-top:4px;display:flex;flex-wrap:wrap;gap:8px">
-        ${statsHtml}
-      </div>
+      <div style="font-size:12px;margin-top:6px">HP: <b>${curHpActive}/${maxHpActive}</b> · Arma: <b>${wpnActive.name}</b> (${wpnActive.dmg} DMG) · Farda: <b>${outfitActive.name}</b></div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">Mochila: Frag x${gearActive.frag} · Fumo x${gearActive.smoke} · Kit x${gearActive.medkit}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;display:flex;flex-wrap:wrap;gap:8px">${statsHtml}</div>
     </div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:8px">
-      Equipa ativa: <b>${state.selected.length}/${cap}</b> · Bónus de camaradagem: <b>+${getSquadSynergyBonus()}%</b> precisão
-    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Equipa ativa: <b>${state.selected.length}/${cap}</b> · Camaradagem: <b>+${getSquadSynergyBonus()}%</b> precisão</div>
   `;
 
   OPERATIVES.forEach((op, idx) => {
@@ -441,9 +388,7 @@ function renderRoster() {
     card.style.alignItems = "stretch";
     card.style.gap = "8px";
     card.style.marginBottom = "8px";
-    if (isFocused) {
-      card.style.borderColor = "var(--lime)";
-    }
+    if (isFocused) card.style.borderColor = "var(--lime)";
 
     card.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
@@ -491,26 +436,17 @@ function renderRoster() {
     listEl.appendChild(card);
   });
 }
-let expTrainOp = 0;
-let expTrainStat = 0;
-let expMedOp = 0;
-let expLabTarget = "flanker";
 
 function renderBuildings() {
   const el = document.getElementById("buildings");
   if (!el) return;
-
   el.innerHTML = "";
 
   BUILDINGS.forEach((b, i) => {
     const [name, desc, costCr, costMat] = b;
     const isCommandCenter = i === 4;
     const cc = state.commandCenter || { built: false, level: 0, reconReady: false };
-
-    let built = state.built.includes(i);
-    if (isCommandCenter) {
-      built = Boolean(cc.built);
-    }
+    const built = isCommandCenter ? Boolean(cc.built) : state.built.includes(i);
 
     const row = document.createElement("div");
     row.className = "building";
@@ -520,18 +456,10 @@ function renderBuildings() {
     row.style.marginBottom = "10px";
 
     let levelInfo = "";
-    if (i === 0) {
-      levelInfo = ` · Nível ${state.barracksLevel || 1}/3`;
-    } else if (isCommandCenter && built) {
-      levelInfo = ` · Nível ${cc.level || 1}/2`;
-    }
+    if (i === 0) levelInfo = ` · Nível ${state.barracksLevel || 1}/3`;
+    else if (isCommandCenter && built) levelInfo = ` · Nível ${cc.level || 1}/2`;
 
-    row.innerHTML = `
-      <div>
-        <b>${name}${levelInfo}</b><br>
-        <small style="color:var(--muted)">${desc}</small>
-      </div>
-    `;
+    row.innerHTML = `<div><b>${name}${levelInfo}</b><br><small style="color:var(--muted)">${desc}</small></div>`;
 
     const actionWrap = document.createElement("div");
     actionWrap.style.display = "flex";
@@ -651,9 +579,7 @@ function renderBuildings() {
   resetBtn.style.marginTop = "14px";
   resetBtn.textContent = "RESET PROGRESSO (TESTE)";
   resetBtn.onclick = () => {
-    try {
-      localStorage.removeItem(SAVE_KEY);
-    } catch (_) {}
+    try { localStorage.removeItem(SAVE_KEY); } catch (_) {}
     state = createDefaultState();
     selectedOpIndex = 0;
     selectedShopOpIndex = 0;
@@ -666,12 +592,6 @@ function renderBuildings() {
     logModal("PROGRESSO REINICIADO", "Estado inicial restaurado com o Quartel no Nível 1.", "base");
   };
   el.appendChild(resetBtn);
-        }
-function getHealCost(opIndex) {
-  const maxHp = getMaxHp(opIndex);
-  const curHp = getOpHp(opIndex);
-  const missing = Math.max(0, maxHp - curHp);
-  return Math.max(40, missing * 4);
 }
 
 function renderFacilityExtras(container) {
@@ -684,9 +604,7 @@ function renderFacilityExtras(container) {
     return `<option value="${i}" ${i === expTrainOp ? "selected" : ""}>${op[0]} (Nv.${p.level} · PT:${p.trainPoints})</option>`;
   }).join("");
 
-  const statOpts = STAT_NAMES.map((s, i) => {
-    return `<option value="${i}" ${i === expTrainStat ? "selected" : ""}>${s} (${OPERATIVES[expTrainOp][3][i]})</option>`;
-  }).join("");
+  const statOpts = STAT_NAMES.map((s, i) => `<option value="${i}" ${i === expTrainStat ? "selected" : ""}>${s} (${OPERATIVES[expTrainOp][3][i]})</option>`).join("");
 
   const medOpts = OPERATIVES.map((op, i) => {
     const hp = getOpHp(i);
@@ -702,10 +620,7 @@ function renderFacilityExtras(container) {
   barracksBox.style.gap = "8px";
   barracksBox.style.marginBottom = "10px";
   barracksBox.innerHTML = `
-    <div>
-      <b>QUARTEL — TREINO DE ATRIBUTOS E DESCANSO RÁPIDO</b><br>
-      <small style="color:var(--muted)">Usa 1 Ponto de Treino (gratuito) ou 260 CR · 7 MAT para subir +2 num atributo.</small>
-    </div>
+    <div><b>QUARTEL — TREINO DE ATRIBUTOS E DESCANSO RÁPIDO</b><br><small style="color:var(--muted)">Usa 1 Ponto de Treino (gratuito) ou 260 CR · 7 MAT para subir +2 num atributo.</small></div>
     <select id="oz-train-op" style="width:100%;padding:8px;background:#0e161d;color:#f2f7fa;border:1px solid rgba(255,255,255,.22);border-radius:6px;font-size:12px">${opOpts}</select>
     <select id="oz-train-stat" style="width:100%;padding:8px;background:#0e161d;color:#f2f7fa;border:1px solid rgba(255,255,255,.22);border-radius:6px;font-size:12px">${statOpts}</select>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -722,10 +637,7 @@ function renderFacilityExtras(container) {
   medBox.style.gap = "8px";
   medBox.style.marginBottom = "10px";
   medBox.innerHTML = `
-    <div>
-      <b>ENFERMARIA — TRATAMENTO, URGÊNCIA E PROFILAXIA</b><br>
-      <small style="color:var(--muted)">${infBuilt ? "Cura padrão, recuperação de urgência (HP completo) e reforço +8 HP para a próxima saída." : "Constrói a Enfermaria para usar estas opções."}</small>
-    </div>
+    <div><b>ENFERMARIA — TRATAMENTO, URGÊNCIA E PROFILAXIA</b><br><small style="color:var(--muted)">${infBuilt ? "Cura padrão, recuperação de urgência (HP completo) e reforço +8 HP para a próxima saída." : "Constrói a Enfermaria para usar estas opções."}</small></div>
     <select id="oz-med-op" ${!infBuilt ? "disabled" : ""} style="width:100%;padding:8px;background:#0e161d;color:#f2f7fa;border:1px solid rgba(255,255,255,.22);border-radius:6px;font-size:12px">${medOpts}</select>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button type="button" class="btn" id="oz-btn-heal" ${!infBuilt ? "disabled" : ""} style="flex:1">CURAR FERIDO</button>
@@ -742,18 +654,12 @@ function renderFacilityExtras(container) {
   armoryBox.style.gap = "8px";
   armoryBox.style.marginBottom = "10px";
 
-  const shopOpOpts = OPERATIVES.map((op, i) => {
-    return `<option value="${i}" ${i === selectedShopOpIndex ? "selected" : ""}>${op[0]} (${op[2]})</option>`;
-  }).join("");
-
+  const shopOpOpts = OPERATIVES.map((op, i) => `<option value="${i}" ${i === selectedShopOpIndex ? "selected" : ""}>${op[0]} (${op[2]})</option>`).join("");
   const armTier = Number(state.armoryTier) || 0;
   const squadCount = state.selected.length;
 
   armoryBox.innerHTML = `
-    <div>
-      <b>ARSENAL — EQUIPAMENTO, REABASTECIMENTO E NÍVEL (${armTier}/2)</b><br>
-      <small style="color:var(--muted)">${armBuilt ? "Equipa armas, fardas e consumíveis ou melhora o nível de armamento da base." : "Constrói o Arsenal para equipar e melhorar armamento."}</small>
-    </div>
+    <div><b>ARSENAL — EQUIPAMENTO, REABASTECIMENTO E NÍVEL (${armTier}/2)</b><br><small style="color:var(--muted)">${armBuilt ? "Equipa armas, fardas e consumíveis ou melhora o nível de armamento da base." : "Constrói o Arsenal para equipar e melhorar armamento."}</small></div>
     <select id="oz-shop-op" ${!armBuilt ? "disabled" : ""} style="width:100%;padding:8px;background:#0e161d;color:#f2f7fa;border:1px solid rgba(255,255,255,.22);border-radius:6px;font-size:12px">${shopOpOpts}</select>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button type="button" class="btn" data-shop-cat="weapon" ${!armBuilt ? "disabled" : ""}>ARMAS</button>
@@ -763,12 +669,8 @@ function renderFacilityExtras(container) {
       <button type="button" class="btn" data-shop-cat="medkit" ${!armBuilt ? "disabled" : ""}>KIT</button>
     </div>
     <div id="oz-shop-items" style="display:flex;flex-direction:column;gap:6px"></div>
-    <button type="button" class="btn" id="oz-btn-resupply" ${!armBuilt ? "disabled" : ""} style="width:100%">
-      REABASTECER EQUIPA ATIVA (${squadCount * 150} CR · ${squadCount * 3} MAT)
-    </button>
-    <button type="button" class="btn" id="oz-btn-arm-tier" ${!armBuilt || armTier >= 2 ? "disabled" : ""} style="width:100%">
-      ${armTier >= 2 ? "ARMAMENTO NO NÍVEL MÁXIMO (2/2)" : `MELHORAR ARMAMENTO (${armTier === 0 ? "550 CR · 14 MAT" : "900 CR · 22 MAT"})`}
-    </button>
+    <button type="button" class="btn" id="oz-btn-resupply" ${!armBuilt ? "disabled" : ""} style="width:100%">REABASTECER EQUIPA ATIVA (${squadCount * 150} CR · ${squadCount * 3} MAT)</button>
+    <button type="button" class="btn" id="oz-btn-arm-tier" ${!armBuilt || armTier >= 2 ? "disabled" : ""} style="width:100%">${armTier >= 2 ? "ARMAMENTO NO NÍVEL MÁXIMO (2/2)" : `MELHORAR ARMAMENTO (${armTier === 0 ? "550 CR · 14 MAT" : "900 CR · 22 MAT"})`}</button>
   `;
   container.appendChild(armoryBox);
 
@@ -786,39 +688,26 @@ function renderFacilityExtras(container) {
   const piercing = Boolean(state.lab.piercingAmmo);
 
   labBox.innerHTML = `
-    <div>
-      <b>LABORATÓRIO — PESQUISA XENO, ANÁLISE E PERFURANTE</b><br>
-      <small style="color:var(--muted)">${labBuilt ? `Armas: ${wTier}/2 · Info: ${iTier}/2 · Blindagem: ${aTier}/2 · Amostras: ${decoded}/2` : "Constrói o Laboratório para pesquisar tecnologia alienígena."}</small>
-    </div>
-    <button type="button" class="btn" id="oz-lab-wpn" ${!labBuilt || wTier >= 2 ? "disabled" : ""} style="width:100%">
-      ${wTier >= 2 ? "PESQUISA ARMAS XENO COMPLETA (2/2)" : `PESQUISA ARMAS XENO (${wTier === 0 ? "1 XENO · 300 CR" : "2 XENO · 550 CR"})`}
-    </button>
-    <button type="button" class="btn" id="oz-lab-int" ${!labBuilt || iTier >= 2 ? "disabled" : ""} style="width:100%">
-      ${iTier >= 2 ? "PESQUISA INFO XENO COMPLETA (2/2)" : `PESQUISA INFO XENO (${iTier === 0 ? "1 XENO · 300 CR" : "2 XENO · 550 CR"})`}
-    </button>
-    <button type="button" class="btn" id="oz-lab-arm" ${!labBuilt || aTier >= 2 ? "disabled" : ""} style="width:100%">
-      ${aTier >= 2 ? "PESQUISA BLINDAGEM XENO COMPLETA (2/2)" : `PESQUISA BLINDAGEM XENO (${aTier === 0 ? "1 XENO · 350 CR" : "2 XENO · 600 CR"})`}
-    </button>
+    <div><b>LABORATÓRIO — PESQUISA XENO, ANÁLISE E PERFURANTE</b><br><small style="color:var(--muted)">${labBuilt ? `Armas: ${wTier}/2 · Info: ${iTier}/2 · Blindagem: ${aTier}/2 · Amostras: ${decoded}/2` : "Constrói o Laboratório para pesquisar tecnologia alienígena."}</small></div>
+    <button type="button" class="btn" id="oz-lab-wpn" ${!labBuilt || wTier >= 2 ? "disabled" : ""} style="width:100%">${wTier >= 2 ? "PESQUISA ARMAS XENO COMPLETA (2/2)" : `PESQUISA ARMAS XENO (${wTier === 0 ? "1 XENO · 300 CR" : "2 XENO · 550 CR"})`}</button>
+    <button type="button" class="btn" id="oz-lab-int" ${!labBuilt || iTier >= 2 ? "disabled" : ""} style="width:100%">${iTier >= 2 ? "PESQUISA INFO XENO COMPLETA (2/2)" : `PESQUISA INFO XENO (${iTier === 0 ? "1 XENO · 300 CR" : "2 XENO · 550 CR"})`}</button>
+    <button type="button" class="btn" id="oz-lab-arm" ${!labBuilt || aTier >= 2 ? "disabled" : ""} style="width:100%">${aTier >= 2 ? "PESQUISA BLINDAGEM XENO COMPLETA (2/2)" : `PESQUISA BLINDAGEM XENO (${aTier === 0 ? "1 XENO · 350 CR" : "2 XENO · 600 CR"})`}</button>
     <select id="oz-lab-target" ${!labBuilt ? "disabled" : ""} style="width:100%;padding:8px;background:#0e161d;color:#f2f7fa;border:1px solid rgba(255,255,255,.22);border-radius:6px;font-size:12px">
       <option value="flanker" ${expLabTarget === "flanker" ? "selected" : ""}>Foco de Análise: Flanqueadores / Sentinela</option>
       <option value="skirmisher" ${expLabTarget === "skirmisher" ? "selected" : ""}>Foco de Análise: Pesados / Caçadores</option>
     </select>
-    <button type="button" class="btn" id="oz-lab-decode" ${!labBuilt || decoded >= 2 ? "disabled" : ""} style="width:100%">
-      ${decoded >= 2 ? "DESCODIFICAÇÃO DE AMOSTRAS COMPLETA (2/2)" : "DESCODIFICAR AMOSTRA XENO (1 XENO · 220 CR)"}
-    </button>
-    <button type="button" class="btn" id="oz-lab-piercing" ${!labBuilt || piercing ? "disabled" : ""} style="width:100%">
-      ${piercing ? "MUNIÇÃO PERFURANTE XENO ATIVA ✓" : "PESQUISAR MUNIÇÃO PERFURANTE (2 XENO · 650 CR · 16 MAT)"}
-    </button>
+    <button type="button" class="btn" id="oz-lab-decode" ${!labBuilt || decoded >= 2 ? "disabled" : ""} style="width:100%">${decoded >= 2 ? "DESCODIFICAÇÃO DE AMOSTRAS COMPLETA (2/2)" : "DESCODIFICAR AMOSTRA XENO (1 XENO · 220 CR)"}</button>
+    <button type="button" class="btn" id="oz-lab-piercing" ${!labBuilt || piercing ? "disabled" : ""} style="width:100%">${piercing ? "MUNIÇÃO PERFURANTE XENO ATIVA ✓" : "PESQUISAR MUNIÇÃO PERFURANTE (2 XENO · 650 CR · 16 MAT)"}</button>
   `;
   container.appendChild(labBox);
 
   bindFacilityExtraEvents(container, armBuilt);
 }
+
 function renderArsenalShopItems(armBuilt) {
   const box = document.getElementById("oz-shop-items");
   if (!box) return;
   box.innerHTML = "";
-
   const gear = getOpGear(selectedShopOpIndex);
   const opName = OPERATIVES[selectedShopOpIndex][0];
 
@@ -826,21 +715,8 @@ function renderArsenalShopItems(armBuilt) {
     WEAPONS_SHOP.forEach(w => {
       const equipped = gear.weaponId === w.id;
       const itemRow = document.createElement("div");
-      itemRow.style.display = "flex";
-      itemRow.style.justifyContent = "space-between";
-      itemRow.style.alignItems = "center";
-      itemRow.style.gap = "8px";
-      itemRow.style.padding = "6px 8px";
-      itemRow.style.border = "1px solid rgba(255,255,255,.12)";
-      itemRow.style.borderRadius = "6px";
-
-      itemRow.innerHTML = `
-        <div style="font-size:12px">
-          <b>${w.name}</b> (${w.dmg} DMG · Alcance ${w.optRange})<br>
-          <small style="color:var(--muted)">${w.desc}</small>
-        </div>
-      `;
-
+      itemRow.style.cssText = "display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border:1px solid rgba(255,255,255,.12);border-radius:6px";
+      itemRow.innerHTML = `<div style="font-size:12px"><b>${w.name}</b> (${w.dmg} DMG · Alcance ${w.optRange})<br><small style="color:var(--muted)">${w.desc}</small></div>`;
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "btn";
@@ -870,21 +746,8 @@ function renderArsenalShopItems(armBuilt) {
     OUTFITS_SHOP.forEach(o => {
       const equipped = gear.outfitId === o.id;
       const itemRow = document.createElement("div");
-      itemRow.style.display = "flex";
-      itemRow.style.justifyContent = "space-between";
-      itemRow.style.alignItems = "center";
-      itemRow.style.gap = "8px";
-      itemRow.style.padding = "6px 8px";
-      itemRow.style.border = "1px solid rgba(255,255,255,.12)";
-      itemRow.style.borderRadius = "6px";
-
-      itemRow.innerHTML = `
-        <div style="font-size:12px">
-          <b>${o.name}</b> (+${o.hpBonus} HP · -${o.dmgRed} Dano)<br>
-          <small style="color:var(--muted)">${o.desc}</small>
-        </div>
-      `;
-
+      itemRow.style.cssText = "display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border:1px solid rgba(255,255,255,.12);border-radius:6px";
+      itemRow.innerHTML = `<div style="font-size:12px"><b>${o.name}</b> (+${o.hpBonus} HP · -${o.dmgRed} Dano)<br><small style="color:var(--muted)">${o.desc}</small></div>`;
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "btn";
@@ -915,21 +778,8 @@ function renderArsenalShopItems(armBuilt) {
   const currentCount = gear[selectedShopCategory] || 0;
   catList.forEach(c => {
     const itemRow = document.createElement("div");
-    itemRow.style.display = "flex";
-    itemRow.style.justifyContent = "space-between";
-    itemRow.style.alignItems = "center";
-    itemRow.style.gap = "8px";
-    itemRow.style.padding = "6px 8px";
-    itemRow.style.border = "1px solid rgba(255,255,255,.12)";
-    itemRow.style.borderRadius = "6px";
-
-    itemRow.innerHTML = `
-      <div style="font-size:12px">
-        <b>${c.name}</b> · Atual: <b>${currentCount}</b><br>
-        <small style="color:var(--muted)">${c.desc}</small>
-      </div>
-    `;
-
+    itemRow.style.cssText = "display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border:1px solid rgba(255,255,255,.12);border-radius:6px";
+    itemRow.innerHTML = `<div style="font-size:12px"><b>${c.name}</b> · Atual: <b>${currentCount}</b><br><small style="color:var(--muted)">${c.desc}</small></div>`;
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "btn";
@@ -956,19 +806,10 @@ function renderArsenalShopItems(armBuilt) {
 
 function bindFacilityExtraEvents(container, armBuilt) {
   const trainOpSel = container.querySelector("#oz-train-op");
-  if (trainOpSel) {
-    trainOpSel.onchange = e => {
-      expTrainOp = Number(e.target.value);
-      renderBuildings();
-    };
-  }
+  if (trainOpSel) trainOpSel.onchange = e => { expTrainOp = Number(e.target.value); renderBuildings(); };
 
   const trainStatSel = container.querySelector("#oz-train-stat");
-  if (trainStatSel) {
-    trainStatSel.onchange = e => {
-      expTrainStat = Number(e.target.value);
-    };
-  }
+  if (trainStatSel) trainStatSel.onchange = e => { expTrainStat = Number(e.target.value); };
 
   const trainBtn = container.querySelector("#oz-btn-train");
   if (trainBtn) {
@@ -1009,7 +850,7 @@ function bindFacilityExtraEvents(container, armBuilt) {
   if (restBtn) {
     restBtn.onclick = () => {
       if (state.selected.includes(expTrainOp)) {
-        logModal("EM EQUIPA ATIVA", `${OPERATIVES[expTrainOp][0]} está na equipa ativa. Retira da equipa ou usa a Enfermaria.`);
+        logModal("EM EQUIPA ATIVA", `${OPERATIVES[expTrainOp][0]} está na equipa ativa.`);
         return;
       }
       const maxHp = getMaxHp(expTrainOp);
@@ -1034,11 +875,7 @@ function bindFacilityExtraEvents(container, armBuilt) {
   }
 
   const medOpSel = container.querySelector("#oz-med-op");
-  if (medOpSel) {
-    medOpSel.onchange = e => {
-      expMedOp = Number(e.target.value);
-    };
-  }
+  if (medOpSel) medOpSel.onchange = e => { expMedOp = Number(e.target.value); };
 
   const healBtn = container.querySelector("#oz-btn-heal");
   if (healBtn) {
@@ -1134,10 +971,6 @@ function bindFacilityExtraEvents(container, armBuilt) {
       const squad = state.selected;
       const needCr = squad.length * 150;
       const needMat = squad.length * 3;
-      if (squad.length === 0) {
-        logModal("SEM EQUIPA", "Seleciona operacionais antes de reabastecer.");
-        return;
-      }
       if (state.credits < needCr || state.materials < needMat) {
         logModal("RECURSOS INSUFICIENTES", `Reabastecer custa <b>${needCr} CR</b> e <b>${needMat} MAT</b>.`);
         return;
@@ -1246,11 +1079,7 @@ function bindFacilityExtraEvents(container, armBuilt) {
   }
 
   const labTargetSel = container.querySelector("#oz-lab-target");
-  if (labTargetSel) {
-    labTargetSel.onchange = e => {
-      expLabTarget = e.target.value;
-    };
-  }
+  if (labTargetSel) labTargetSel.onchange = e => { expLabTarget = e.target.value; };
 
   const labDecodeBtn = container.querySelector("#oz-lab-decode");
   if (labDecodeBtn) {
@@ -1295,20 +1124,7 @@ function bindFacilityExtraEvents(container, armBuilt) {
     opt.style.backgroundColor = "#0e161d";
     opt.style.color = "#f2f7fa";
   });
-    }
-const GRID_W = 8;
-const GRID_H = 6;
-
-let battle = {
-  missionIndex: 0,
-  turn: 1,
-  activeUnitIdx: 0,
-  units: [],
-  enemies: [],
-  smokes: [],
-  finished: false,
-  commandReconTurn1: false
-};
+}
 
 function renderMissions() {
   const list = document.getElementById("mission-list");
@@ -1316,11 +1132,12 @@ function renderMissions() {
   list.innerHTML = "";
 
   const cc = state.commandCenter || { built: false, level: 0, reconReady: false };
-  const reconNote = cc.built && cc.reconReady
-    ? `<div style="margin-bottom:10px;padding:8px 10px;border:1px solid var(--lime);border-radius:6px;font-size:12px;color:var(--lime)">Reconhecimento do Centro de Comando pronto: +15% de precisão no Turno 1.</div>`
-    : "";
-
-  list.innerHTML = reconNote;
+  if (cc.built && cc.reconReady) {
+    const reconBanner = document.createElement("div");
+    reconBanner.style.cssText = "margin-bottom:10px;padding:8px 10px;border:1px solid var(--lime);border-radius:6px;font-size:12px;color:var(--lime)";
+    reconBanner.textContent = "Reconhecimento do Centro de Comando pronto: +15% de precisão no Turno 1.";
+    list.appendChild(reconBanner);
+  }
 
   MISSIONS.forEach((m, idx) => {
     const done = state.completed.includes(idx);
@@ -1355,35 +1172,15 @@ function buildEnemiesForMission(missionIndex) {
     { name: "Assaltante Xeno", role: "flanker", hp: 54, maxHp: 54, dmg: 17, aim: 66, move: 4, x: 6, y: 3 },
     { name: "Caçador de Cobertura", role: "skirmisher", hp: 62, maxHp: 62, dmg: 19, aim: 64, move: 3, x: 7, y: 4 }
   ];
-
-  const extra = missionIndex >= 1
-    ? [{ name: "Guardião Blindado", role: "skirmisher", hp: 78, maxHp: 78, dmg: 22, aim: 68, move: 2, x: 7, y: 2 }]
-    : [];
-
-  const extra2 = missionIndex >= 2
-    ? [{ name: "Ceifador de Assalto", role: "flanker", hp: 70, maxHp: 70, dmg: 24, aim: 72, move: 4, x: 5, y: 5 }]
-    : [];
-
-  return [...baseTemplates, ...extra, ...extra2].map((e, i) => ({
-    ...e,
-    id: `en_${i}`,
-    hunker: false
-  }));
+  const extra = missionIndex >= 1 ? [{ name: "Guardião Blindado", role: "skirmisher", hp: 78, maxHp: 78, dmg: 22, aim: 68, move: 2, x: 7, y: 2 }] : [];
+  const extra2 = missionIndex >= 2 ? [{ name: "Ceifador de Assalto", role: "flanker", hp: 70, maxHp: 70, dmg: 24, aim: 72, move: 4, x: 5, y: 5 }] : [];
+  return [...baseTemplates, ...extra, ...extra2].map((e, i) => ({ ...e, id: `en_${i}`, hunker: false }));
 }
 
 function startMission(missionIndex) {
   const idx = Number(missionIndex) || 0;
-  const squadIndices = Array.isArray(state.selected) && state.selected.length > 0
-    ? state.selected.slice(0, 5)
-    : [0];
-
-  const startPositions = [
-    [1, 1],
-    [0, 2],
-    [1, 3],
-    [0, 4],
-    [1, 5]
-  ];
+  const squadIndices = Array.isArray(state.selected) && state.selected.length > 0 ? state.selected.slice(0, 5) : [0];
+  const startPositions = [[1, 1], [0, 2], [1, 3], [0, 4], [1, 5]];
 
   const units = squadIndices.map((opIdx, i) => {
     const op = OPERATIVES[opIdx] || OPERATIVES[0];
@@ -1469,20 +1266,14 @@ function getTargetCoverBonus(attackerX, attackerY, targetX, targetY) {
   let bonus = 0;
   const dx = Math.sign(attackerX - targetX);
   const dy = Math.sign(attackerY - targetY);
-  const checkCoords = [
-    [targetX + dx, targetY],
-    [targetX, targetY + dy],
-    [targetX + dx, targetY + dy]
-  ];
-
+  const checkCoords = [[targetX + dx, targetY], [targetX, targetY + dy], [targetX + dx, targetY + dy]];
   for (const [cx, cy] of checkCoords) {
     const cov = getCoverAt(cx, cy);
-    if (cov) {
-      bonus = Math.max(bonus, cov.type === "full" ? 30 : 15);
-    }
+    if (cov) bonus = Math.max(bonus, cov.type === "full" ? 30 : 15);
   }
   return bonus;
-      }
+}
+
 function getActiveUnit() {
   if (!battle || !Array.isArray(battle.units) || battle.units.length === 0) return null;
   const alive = battle.units.filter(u => u.hp > 0);
@@ -1515,34 +1306,22 @@ function calcHitChance(unit, enemy, isOverwatch = false) {
   const piercingFactor = wpn.piercing ? 0.5 : 1;
   chance -= Math.round(covBonus * piercingFactor);
 
-  if (isSmokeAt(enemy.x, enemy.y)) {
-    chance -= 25;
-  }
-
-  if (isOverwatch) {
-    chance -= 12;
-  }
+  if (isSmokeAt(enemy.x, enemy.y)) chance -= 25;
+  if (isOverwatch) chance -= 12;
 
   const decoded = Number(state.lab && state.lab.intelDecoded) || 0;
-  if (decoded > 0) {
-    chance += expLabTarget === enemy.role ? decoded * 6 : decoded * 2;
-  }
-
-  if (battle.commandReconTurn1 && battle.turn === 1) {
-    chance += 15;
-  }
+  if (decoded > 0) chance += expLabTarget === enemy.role ? decoded * 6 : decoded * 2;
+  if (battle.commandReconTurn1 && battle.turn === 1) chance += 15;
 
   return Math.max(5, Math.min(98, Math.round(chance)));
 }
 
-function calcDamage(unit, enemy) {
+function calcDamage(unit) {
   const wpn = getWeapon(unit.opIndex);
   const outfit = getEquippedOutfitItem(unit.opIndex);
   const intel = getLabIntelDebuff();
-  const baseDmg = wpn.dmg || 20;
-  const enemyDmgRed = intel.dmgRed || 0;
   const selfOutfitBonus = outfit.id === "exo_heavy" ? 2 : 0;
-  return Math.max(6, baseDmg + selfOutfitBonus - enemyDmgRed);
+  return Math.max(6, (wpn.dmg || 20) + selfOutfitBonus - (intel.dmgRed || 0));
 }
 
 function canMoveTo(unit, tx, ty) {
@@ -1550,11 +1329,15 @@ function canMoveTo(unit, tx, ty) {
   if (getUnitAt(tx, ty) || getEnemyAt(tx, ty)) return false;
   const cov = getCoverAt(tx, ty);
   if (cov && cov.blocksSight) return false;
-
   const mobStat = unit.stats && unit.stats[1] ? unit.stats[1] : 72;
   const maxStep = unit.ap >= 2 ? 4 + Math.floor((mobStat - 70) / 10) : 3;
   const dist = manhattanDist(unit.x, unit.y, tx, ty);
   return dist >= 1 && dist <= Math.max(2, maxStep);
+}
+
+function selectNextUnitWithAp() {
+  const nextIdx = battle.units.findIndex(u => u.hp > 0 && u.ap > 0);
+  if (nextIdx !== -1) battle.activeUnitIdx = nextIdx;
 }
 
 function renderBattle() {
@@ -1604,14 +1387,11 @@ function renderBattle() {
         }
       }
 
-      if (smokeHere) {
-        cell.style.boxShadow = "inset 0 0 0 2px rgba(200,220,235,.55)";
-      }
+      if (smokeHere) cell.style.boxShadow = "inset 0 0 0 2px rgba(200,220,235,.55)";
 
       if (covHere) {
         const covTag = document.createElement("span");
-        covTag.style.fontSize = "9px";
-        covTag.style.opacity = "0.75";
+        covTag.style.cssText = "font-size:9px;opacity:.75";
         covTag.textContent = covHere.type === "full" ? "COB-F" : "COB-M";
         cell.appendChild(covTag);
       }
@@ -1619,9 +1399,7 @@ function renderBattle() {
       if (unitHere) {
         const badge = document.createElement("div");
         badge.className = "unit player";
-        if (active && active.opIndex === unitHere.opIndex) {
-          badge.style.outline = "2px solid var(--lime)";
-        }
+        if (active && active.opIndex === unitHere.opIndex) badge.style.outline = "2px solid var(--lime)";
         badge.textContent = `${unitHere.name.split(" ")[0]} (${unitHere.hp})`;
         cell.appendChild(badge);
       }
@@ -1645,7 +1423,6 @@ function renderBattle() {
           battleLog(`${active.name} deslocou-se para (${x + 1}, ${y + 1}).`);
           if (active.ap <= 0) selectNextUnitWithAp();
           renderBattle();
-          renderBattleActions();
           return;
         }
 
@@ -1676,7 +1453,6 @@ function renderBattle() {
             activeCombatMode = null;
             battleLog(`${unitHere.name} selecionado.`);
             renderBattle();
-            renderBattleActions();
           }
         }
       };
@@ -1688,42 +1464,6 @@ function renderBattle() {
   renderBattleActions();
 }
 
-function selectNextUnitWithAp() {
-  const nextIdx = battle.units.findIndex(u => u.hp > 0 && u.ap > 0);
-  if (nextIdx !== -1) {
-    battle.activeUnitIdx = nextIdx;
-  }
-}
-
-function performShot(unit, enemy) {
-  if (unit.ammo <= 0) {
-    battleLog(`${unit.name} está sem munição — usa RECARREGAR.`);
-    activeCombatMode = null;
-    renderBattleActions();
-    return;
-  }
-
-  const hitChance = calcHitChance(unit, enemy, false);
-  unit.ammo = Math.max(0, unit.ammo - 1);
-  unit.ap = 0;
-  unit.hunker = false;
-  activeCombatMode = null;
-
-  const roll = Math.random() * 100;
-  if (roll <= hitChance) {
-    const dmg = calcDamage(unit, enemy);
-    enemy.hp = Math.max(0, enemy.hp - dmg);
-    battleLog(`${unit.name} acertou em ${enemy.name} (${hitChance}%) por ${dmg} de dano${enemy.hp <= 0 ? " — ALVO ELIMINADO" : ""}.`);
-  } else {
-    battleLog(`${unit.name} falhou o disparo contra ${enemy.name} (${hitChance}%).`);
-  }
-
-  checkWin();
-  if (!battle.finished) {
-    selectNextUnitWithAp();
-    renderBattle();
-  }
-    }
 function renderBattleActions() {
   const actEl = document.getElementById("battle-actions");
   if (!actEl) return;
@@ -1822,7 +1562,7 @@ function renderBattleActions() {
       disabled: active.ap <= 0 || active.medkit <= 0,
       onClick: () => {
         activeCombatMode = activeCombatMode === "medkit" ? null : "medkit";
-        battleLog(activeCombatMode === "medkit" ? "Seleciona um aliado adjacente (ou o próprio) para curar." : "Kit cancelado.");
+        battleLog(activeCombatMode === "medkit" ? "Seleciona um aliado ferido próximo para curar." : "Kit cancelado.");
         renderBattle();
       }
     },
@@ -1863,6 +1603,35 @@ function renderBattleActions() {
     b.onclick = cfg.onClick;
     actEl.appendChild(b);
   });
+}
+
+function performShot(unit, enemy) {
+  if (unit.ammo <= 0) {
+    battleLog(`${unit.name} está sem munição — usa RECARREGAR.`);
+    activeCombatMode = null;
+    renderBattleActions();
+    return;
+  }
+
+  const hitChance = calcHitChance(unit, enemy, false);
+  unit.ammo = Math.max(0, unit.ammo - 1);
+  unit.ap = 0;
+  unit.hunker = false;
+  activeCombatMode = null;
+
+  if (Math.random() * 100 <= hitChance) {
+    const dmg = calcDamage(unit);
+    enemy.hp = Math.max(0, enemy.hp - dmg);
+    battleLog(`${unit.name} acertou em ${enemy.name} (${hitChance}%) por ${dmg} de dano${enemy.hp <= 0 ? " — ALVO ELIMINADO" : ""}.`);
+  } else {
+    battleLog(`${unit.name} falhou o disparo contra ${enemy.name} (${hitChance}%).`);
+  }
+
+  checkWin();
+  if (!battle.finished) {
+    selectNextUnitWithAp();
+    renderBattle();
+  }
 }
 
 function throwFragGrenade(unit, tx, ty) {
@@ -1910,15 +1679,15 @@ function useMedkit(unit, targetUnit) {
   unit.ap = Math.max(0, unit.ap - 1);
   activeCombatMode = null;
 
-  const isMedic = unit.role === "Médico";
-  const healAmt = isMedic ? 50 : 40;
+  const healAmt = unit.role === "Médico" ? 50 : 40;
   const before = targetUnit.hp;
   targetUnit.hp = Math.min(targetUnit.maxHp, targetUnit.hp + healAmt);
   save();
   battleLog(`${unit.name} tratou ${targetUnit.name} (+${targetUnit.hp - before} HP).`);
   if (unit.ap <= 0) selectNextUnitWithAp();
   renderBattle();
-      }
+}
+
 function triggerOverwatchReactions(enemy) {
   for (const unit of battle.units) {
     if (enemy.hp <= 0) break;
@@ -1927,7 +1696,7 @@ function triggerOverwatchReactions(enemy) {
       unit.ammo = Math.max(0, unit.ammo - 1);
       const hitChance = calcHitChance(unit, enemy, true);
       if (Math.random() * 100 <= hitChance) {
-        const dmg = calcDamage(unit, enemy);
+        const dmg = calcDamage(unit);
         enemy.hp = Math.max(0, enemy.hp - dmg);
         battleLog(`VIGILÂNCIA: ${unit.name} atingiu ${enemy.name} (${hitChance}%) por ${dmg} de dano.`);
       } else {
@@ -1939,13 +1708,11 @@ function triggerOverwatchReactions(enemy) {
 
 function runEnemyTurn() {
   if (battle.finished) return;
-
   const intelDebuff = getLabIntelDebuff();
   const events = [];
 
   for (const enemy of battle.enemies) {
     if (enemy.hp <= 0) continue;
-
     const livingUnits = battle.units.filter(u => u.hp > 0);
     if (livingUnits.length === 0) break;
 
@@ -1964,10 +1731,7 @@ function runEnemyTurn() {
       for (let s = 0; s < steps; s++) {
         const dx = Math.sign(target.x - enemy.x);
         const dy = Math.sign(target.y - enemy.y);
-        const candidates = [
-          [enemy.x + dx, enemy.y],
-          [enemy.x, enemy.y + dy]
-        ];
+        const candidates = [[enemy.x + dx, enemy.y], [enemy.x, enemy.y + dy]];
         let moved = false;
         for (const [nx, ny] of candidates) {
           if (nx < 0 || nx >= GRID_W || ny < 0 || ny >= GRID_H) continue;
@@ -2012,11 +1776,8 @@ function runEnemyTurn() {
   }
 
   battle.turn += 1;
-  battle.smokes.forEach(s => {
-    s.turns = Math.max(0, s.turns - 1);
-  });
+  battle.smokes.forEach(s => { s.turns = Math.max(0, s.turns - 1); });
   battle.smokes = battle.smokes.filter(s => s.turns > 0);
-
   battle.units.forEach(u => {
     if (u.hp > 0) {
       u.ap = 2;
@@ -2032,21 +1793,15 @@ function runEnemyTurn() {
 
 function checkWin() {
   if (battle.finished) return;
-
   const allEnemiesDead = battle.enemies.every(e => e.hp <= 0);
   const allUnitsDead = battle.units.every(u => u.hp <= 0);
-
   if (!allEnemiesDead && !allUnitsDead) return;
 
   battle.finished = true;
   activeCombatMode = null;
 
   const mission = MISSIONS[battle.missionIndex] || MISSIONS[0];
-
-  battle.units.forEach(u => {
-    setOpHp(u.opIndex, u.hp);
-  });
-
+  battle.units.forEach(u => setOpHp(u.opIndex, u.hp));
   state.medProphylaxis = {};
 
   const restHeal = getBarracksRestHeal();
@@ -2058,18 +1813,12 @@ function checkWin() {
   });
 
   if (allEnemiesDead) {
-    if (!state.completed.includes(battle.missionIndex)) {
-      state.completed.push(battle.missionIndex);
-    }
+    if (!state.completed.includes(battle.missionIndex)) state.completed.push(battle.missionIndex);
 
     let secondaryMet = false;
-    if (mission.secondaryType === "clear_all") {
-      secondaryMet = true;
-    } else if (mission.secondaryType === "no_casualties") {
-      secondaryMet = battle.units.every(u => u.hp > 0);
-    } else if (mission.secondaryType === "fast_clear") {
-      secondaryMet = battle.turn <= 6;
-    }
+    if (mission.secondaryType === "clear_all") secondaryMet = true;
+    else if (mission.secondaryType === "no_casualties") secondaryMet = battle.units.every(u => u.hp > 0);
+    else if (mission.secondaryType === "fast_clear") secondaryMet = battle.turn <= 6;
 
     let totalCr = mission.rewardCredits + (secondaryMet ? mission.bonusCredits : 0);
     let totalMat = mission.rewardMaterials + (secondaryMet ? mission.bonusMaterials : 0);
@@ -2099,9 +1848,7 @@ function checkWin() {
     battle.units.forEach(u => {
       const xpGain = u.hp > 0 ? mission.xpBase : Math.round(mission.xpBase * 0.5);
       const ups = grantOpXp(u.opIndex, xpGain);
-      if (ups > 0) {
-        levelNotes.push(`${u.name} subiu para Nv.${getOpProgress(u.opIndex).level}`);
-      }
+      if (ups > 0) levelNotes.push(`${u.name} subiu para Nv.${getOpProgress(u.opIndex).level}`);
     });
 
     save();
@@ -2138,6 +1885,7 @@ function checkWin() {
 }
 
 function initOperationZero() {
+  bindNavigation();
   renderResources();
   renderRoster();
   renderBuildings();
@@ -2148,4 +1896,4 @@ if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", initOperationZero);
 } else {
   initOperationZero();
-        }
+}
