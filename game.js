@@ -27,7 +27,7 @@ const CLASS_TRAINING_PROFILES = [
 
 const BUILDINGS = [
   ["Quartel", "Aumenta a capacidade de alojamento.", 500, 10],
-  ["Enfermaria", "Permite tratar ferimentos após operações.", 700, 15],
+  ["Enfermaria", "Reduz o custo de créditos e materiais para curar ferimentos.", 700, 15],
   ["Arsenal", "Melhora a preparação e equipamento.", 900, 20],
   ["Laboratório", "Investiga tecnologia recuperada.", 1200, 25],
   ["Hangar", "Desbloqueia operações de transporte.", 1500, 35],
@@ -113,21 +113,51 @@ const defaults = {
   turn: 1,
   hp: {},
   pos: 0,
-  opProgress: {}
+  opProgress: {},
+  opHp: {}
 };
 
 let state = load();
 let pendingReturnScreen = null;
 let selectedTrainOpIndex = 0;
+let selectedHealOpIndex = 0;
 
 function load() {
   try {
     const parsed = { ...defaults, ...JSON.parse(localStorage.getItem("oz_save") || "{}") };
     if (!parsed.opProgress || typeof parsed.opProgress !== "object") parsed.opProgress = {};
+    if (!parsed.opHp || typeof parsed.opHp !== "object") parsed.opHp = {};
     return parsed;
   } catch (e) {
-    return { ...defaults, opProgress: {} };
+    return { ...defaults, opProgress: {}, opHp: {} };
   }
+}
+
+function getOpHp(opIndex) {
+  const raw = state.opHp[opIndex];
+  if (typeof raw !== "number" || Number.isNaN(raw)) {
+    state.opHp[opIndex] = 100;
+    return 100;
+  }
+  return Math.max(1, Math.min(100, Math.round(raw)));
+}
+
+function setOpHp(opIndex, value) {
+  state.opHp[opIndex] = Math.max(1, Math.min(100, Math.round(value)));
+}
+
+function getHealCost(opIndex) {
+  const hp = getOpHp(opIndex);
+  const missing = Math.max(0, 100 - hp);
+  if (missing === 0) return { missing: 0, credits: 0, materials: 0 };
+  const infirmaryBuilt = state.built.includes(1);
+  const crPerHp = infirmaryBuilt ? 2 : 4;
+  const matPerHp = infirmaryBuilt ? 0.08 : 0.15;
+  return {
+    missing,
+    credits: Math.max(10, Math.ceil(missing * crPerHp)),
+    materials: Math.max(1, Math.ceil(missing * matPerHp))
+  };
 }
 
 function getOpProgress(opIndex) {
@@ -194,10 +224,12 @@ function renderRoster() {
   OPERATIVES.forEach((o, i) => {
     const selected = state.selected.includes(i);
     const prog = getOpProgress(i);
+    const hp = getOpHp(i);
     const ptsBadge = prog.trainPts > 0 ? ` · +${prog.trainPts} PT` : "";
+    const hpBadge = hp < 100 ? ` · <span style="color:#ff9b6a">${hp} HP</span>` : ` · 100 HP`;
     const d = document.createElement("div");
     d.className = "operator" + (selected ? " selected" : "");
-    d.innerHTML = `<span class="portrait">${o[0].split(" ").map(x => x[0]).slice(0, 2).join("")}</span><span style="min-width:0;flex:1;text-align:left"><b>${o[0]}</b><small>NV.${prog.level} · ${o[2]} · ${prog.xp}/100 XP${ptsBadge}</small></span><button type="button" class="op-info-btn">INFO</button><span class="pick">${selected ? "✓" : "＋"}</span>`;
+    d.innerHTML = `<span class="portrait">${o[0].split(" ").map(x => x[0]).slice(0, 2).join("")}</span><span style="min-width:0;flex:1;text-align:left"><b>${o[0]}</b><small>NV.${prog.level} · ${o[2]}${hpBadge} · ${prog.xp}/100 XP${ptsBadge}</small></span><button type="button" class="op-info-btn">INFO</button><span class="pick">${selected ? "✓" : "＋"}</span>`;
     d.onclick = ev => {
       if (ev.target.closest(".op-info-btn")) return;
       if (state.selected.includes(i)) {
@@ -282,9 +314,35 @@ function trainSelectedOperative(opIndex, statIdx) {
   logModal("TREINO CONCLUÍDO", `${op[0]} (${op[2]}) ganhou +1 em <b>${STAT_NAMES[statIdx]}</b> (${getEffectiveStats(idx)[statIdx]}).`);
 }
 
+function healOperativeOnBase(opIndex) {
+  const idx = Number(opIndex);
+  if (Number.isNaN(idx) || !OPERATIVES[idx]) return;
+  const op = OPERATIVES[idx];
+  const cost = getHealCost(idx);
+
+  if (cost.missing <= 0) {
+    logModal("SEM FERIMENTOS", `${op[0]} já está com 100 HP.`);
+    return;
+  }
+
+  if (state.credits < cost.credits || state.materials < cost.materials) {
+    logModal("RECURSOS INSUFICIENTES", `Curar ${op[0]} custa ${cost.credits} créditos e ${cost.materials} materiais.`);
+    return;
+  }
+
+  state.credits -= cost.credits;
+  state.materials -= cost.materials;
+  setOpHp(idx, 100);
+  save();
+  renderBuildings();
+  renderRoster();
+  logModal("FERIMENTOS TRATADOS", `${op[0]} recuperou até 100 HP (${cost.credits} cr e ${cost.materials} mat gastos).`);
+}
+
 function showOperator(i) {
   const o = OPERATIVES[i];
   const prog = getOpProgress(i);
+  const hp = getOpHp(i);
   const stats = getEffectiveStats(i);
   const perk = ROLE_PERKS[o[2]] || "";
   const academyBuilt = state.built.includes(6);
@@ -302,8 +360,8 @@ function showOperator(i) {
   }).join("");
 
   const headerInfo = prog.trainPts > 0
-    ? `NV.${prog.level} · ${prog.xp}/100 XP · <span style="color:var(--lime)">${prog.trainPts} PONTO(S) DE TREINO LIVRE</span>`
-    : `NV.${prog.level} · ${prog.xp}/100 XP · Treino direto: ${drillCost} cr/ponto${academyBuilt ? " (Academia ativa)" : ""}`;
+    ? `NV.${prog.level} · ${hp}/100 HP · ${prog.xp}/100 XP · <span style="color:var(--lime)">${prog.trainPts} PONTO(S) DE TREINO LIVRE</span>`
+    : `NV.${prog.level} · ${hp}/100 HP · ${prog.xp}/100 XP · Treino direto: ${drillCost} cr/ponto${academyBuilt ? " (Academia ativa)" : ""}`;
 
   document.getElementById("modal-content").innerHTML = `<div class="eyebrow">${o[1]} // ${o[2]}</div><h2 style="font:800 32px var(--display);margin:0">${o[0]}</h2><p class="muted">${o[4]}<br><span style="color:var(--lime)">${perk}</span><br><small style="color:var(--muted)">${headerInfo}</small></p><div class="stats">${statsHtml}</div>`;
 
@@ -358,6 +416,52 @@ function renderBuildings() {
     };
     el.appendChild(d);
   });
+
+  const infirmaryBuilt = state.built.includes(1);
+  if (!OPERATIVES[selectedHealOpIndex]) selectedHealOpIndex = 0;
+  const healOp = OPERATIVES[selectedHealOpIndex];
+  const healHp = getOpHp(selectedHealOpIndex);
+  const healCost = getHealCost(selectedHealOpIndex);
+
+  const healOptionsHtml = OPERATIVES.map((o, idx) => {
+    const h = getOpHp(idx);
+    const status = h < 100 ? ` (${h}/100 HP)` : " (100/100 HP)";
+    return `<option value="${idx}" ${idx === selectedHealOpIndex ? "selected" : ""}>${o[0]} · ${o[2]}${status}</option>`;
+  }).join("");
+
+  const healBox = document.createElement("div");
+  healBox.className = "building";
+  healBox.style.flexDirection = "column";
+  healBox.style.alignItems = "stretch";
+  healBox.style.gap = "10px";
+
+  healBox.innerHTML = `
+    <div>
+      <b>ENFERMARIA E CURA — BASE MILITAR</b><br>
+      <small>${infirmaryBuilt ? "Enfermaria construída: custo reduzido de créditos e materiais." : "Constrói a Enfermaria para reduzir os custos de cura."}</small>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.07)">
+      <label style="font-size:11px;color:var(--muted)">Seleciona o operacional ferido:</label>
+      <select id="heal-op-select" style="width:100%;padding:9px;background:#0e161d;color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:6px;font-size:12px">
+        ${healOptionsHtml}
+      </select>
+      <small style="color:var(--muted)">
+        ${healOp[0]}: <b>${healHp}/100 HP</b> · ${healCost.missing > 0 ? `Custo: <b>${healCost.credits} créditos</b> e <b>${healCost.materials} materiais</b>` : "Sem ferimentos para tratar"}
+      </small>
+      <button type="button" id="heal-op-btn" ${healCost.missing <= 0 ? "disabled" : ""} style="padding:8px 10px;font-size:10px">
+        ${healCost.missing > 0 ? `CURAR ATÉ 100 HP (${healCost.credits} CR / ${healCost.materials} MAT)` : "TOTALMENTE RECUPERADO"}
+      </button>
+    </div>
+  `;
+
+  healBox.querySelector("#heal-op-select").onchange = ev => {
+    selectedHealOpIndex = Number(ev.target.value);
+    renderBuildings();
+  };
+  healBox.querySelector("#heal-op-btn").onclick = () => {
+    healOperativeOnBase(selectedHealOpIndex);
+  };
+  el.appendChild(healBox);
 
   const academyBuilt = state.built.includes(6);
   const trainCost = academyBuilt ? 160 : 250;
@@ -435,7 +539,7 @@ function renderMissions() {
     d.querySelector("button").onclick = () => startMission(i);
     el.appendChild(d);
   });
-   }
+}
 let battle = {
   units: [],
   enemies: [],
@@ -606,7 +710,7 @@ function startMission(i) {
         id,
         x: 1,
         y: Math.min(5, n + 1),
-        hp: 100,
+        hp: getOpHp(id),
         ap: 2,
         ammo: wpn.mag,
         maxAmmo: wpn.mag,
@@ -629,7 +733,7 @@ function startMission(i) {
   document.getElementById("battle-log").textContent = `Turno 1 · Secundário: ${m.secondaryLabel}. Escolhe mover, disparar, vigiar ou Hunker Down (-1 PA).`;
   go("tactical");
   renderBattle();
-  }
+      }
 function renderBattle() {
   const grid = document.getElementById("battle-grid");
   grid.innerHTML = "";
@@ -904,15 +1008,25 @@ function runEnemyTurn() {
   return logs;
 }
 
+function persistBattleInjuries(minDownHp = 25) {
+  battle.units.forEach(u => {
+    const savedHp = u.hp > 0 ? u.hp : minDownHp;
+    setOpHp(u.id, savedHp);
+  });
+}
+
 document.getElementById("end-turn").onclick = () => {
   if (battle.finished) return;
   const enemyLogs = runEnemyTurn();
 
   if (battle.units.every(u => u.hp <= 0)) {
     battle.finished = true;
+    persistBattleInjuries(25);
+    save();
+    renderRoster();
     battleLog(enemyLogs.join(" ") + " Toda a equipa ficou inconsciente. Operação falhada.");
     renderBattle();
-    logModal("OPERAÇÃO FALHADA", "Os operacionais ficaram sem condições de combate. A regressar à base.", "command");
+    logModal("OPERAÇÃO FALHADA", "Os operacionais ficaram sem condições de combate (25 HP de recuperação). A regressar à base.", "command");
     return;
   }
 
@@ -950,6 +1064,7 @@ function checkWin() {
   const allEnemiesDown = battle.enemies.every(e => e.hp <= 0);
   if (reachedExit || allEnemiesDown) {
     battle.finished = true;
+    persistBattleInjuries(25);
     const m = MISSIONS[state.mission];
     const secDone = isSecondaryCompleted(m);
     const totalCredits = m.rewardCredits + (secDone ? m.bonusCredits : 0);
@@ -962,8 +1077,10 @@ function checkWin() {
       const gained = m.xpBase + survivedBonus + secBonus;
       const lvUps = grantOpXp(u.id, gained);
       const prog = getOpProgress(u.id);
+      const finalHp = getOpHp(u.id);
       totalLevelsGained += lvUps;
-      return `<div><b>${OPERATIVES[u.id][0]}</b>: +${gained} XP → NV.${prog.level} (${prog.xp}/100 XP)${lvUps ? ` · <span style="color:var(--lime)">+${lvUps * 2} PT</span>` : ""}</div>`;
+      const hpNote = finalHp < 100 ? ` · <span style="color:#ff9b6a">${finalHp} HP</span>` : ` · 100 HP`;
+      return `<div><b>${OPERATIVES[u.id][0]}</b>: +${gained} XP → NV.${prog.level} (${prog.xp}/100 XP)${hpNote}${lvUps ? ` · <span style="color:var(--lime)">+${lvUps * 2} PT</span>` : ""}</div>`;
     });
 
     battleLog(`OBJETIVO CUMPRIDO${secDone ? " + SECUNDÁRIO!" : "."} A regressar à base.`);
