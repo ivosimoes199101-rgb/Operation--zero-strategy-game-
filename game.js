@@ -102,10 +102,11 @@ function renderRoster() {
   el.innerHTML = "";
   OPERATIVES.forEach((o, i) => {
     const selected = state.selected.includes(i);
-    const d = document.createElement("button");
+    const d = document.createElement("div");
     d.className = "operator" + (selected ? " selected" : "");
-    d.innerHTML = `<span class="portrait">${o[0].split(" ").map(x => x[0]).slice(0, 2).join("")}</span><span style="min-width:0;text-align:left"><b>${o[0]}</b><small>${o[2]} · ${o[1]}</small></span><span class="pick">${selected ? "✓" : "＋"}</span>`;
-    d.onclick = () => {
+    d.innerHTML = `<span class="portrait">${o[0].split(" ").map(x => x[0]).slice(0, 2).join("")}</span><span style="min-width:0;flex:1;text-align:left"><b>${o[0]}</b><small>${o[2]} · ${o[1]}</small></span><button type="button" class="op-info-btn">INFO</button><span class="pick">${selected ? "✓" : "＋"}</span>`;
+    d.onclick = ev => {
+      if (ev.target.closest(".op-info-btn")) return;
       if (state.selected.includes(i)) {
         state.selected = state.selected.filter(x => x !== i);
       } else if (state.selected.length < 5) {
@@ -117,8 +118,8 @@ function renderRoster() {
       save();
       renderRoster();
     };
-    d.oncontextmenu = ev => {
-      ev.preventDefault();
+    d.querySelector(".op-info-btn").onclick = ev => {
+      ev.stopPropagation();
       showOperator(i);
     };
     d.ondblclick = () => showOperator(i);
@@ -131,7 +132,7 @@ function renderRoster() {
 function showOperator(i) {
   const o = OPERATIVES[i];
   const names = ["Precisão", "Pontaria", "Mobilidade", "Resistência", "Perceção", "Técnica", "Furtividade", "Disciplina"];
-  document.getElementById("modal-content").innerHTML = `<div class="eyebrow">${o[1]} // ${o[2]}</div><h2 style="font:800 32px var(--display);margin:0">${o[0]}</h2><p class="muted">${o[4]}</p><div class="stats">${o[3].map((v, j) => `<div class="stat">${names[j]} <b>${v}</b></div>`).join("")}</div><p class="muted">Toque prolongado ou duplo toque num operacional para consultar a ficha.</p>`;
+  document.getElementById("modal-content").innerHTML = `<div class="eyebrow">${o[1]} // ${o[2]}</div><h2 style="font:800 32px var(--display);margin:0">${o[0]}</h2><p class="muted">${o[4]}</p><div class="stats">${o[3].map((v, j) => `<div class="stat">${names[j]} <b>${v}</b></div>`).join("")}</div><p class="muted">Toca em INFO ou faz duplo toque num operacional para consultar a ficha.</p>`;
   document.getElementById("modal").classList.remove("hidden");
 }
 
@@ -181,7 +182,8 @@ function renderMissions() {
     d.querySelector("button").onclick = () => startMission(i);
     el.appendChild(d);
   });
-    let battle = {
+}
+let battle = {
   units: [],
   enemies: [],
   selected: 0,
@@ -635,4 +637,3 @@ document.getElementById("retreat").onclick = () => {
 renderResources();
 renderRoster();
 document.getElementById("clock").textContent = "2089";
-}
