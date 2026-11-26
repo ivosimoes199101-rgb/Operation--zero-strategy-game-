@@ -18,7 +18,7 @@ const STAT_NAMES = ["Precisão", "Pontaria", "Mobilidade", "Resistência", "Perc
 const BUILDINGS = [
   ["Quartel", "Aumenta a capacidade de alojamento.", 500, 10],
   ["Enfermaria", "Desbloqueia o tratamento de ferimentos (Leve, Grave e Muito Grave).", 700, 15],
-  ["Arsenal", "Desbloqueia a loja de armas e fardas para os operacionais.", 900, 20],
+  ["Arsenal", "Desbloqueia a loja de armas, fardas, granadas e kits de saúde.", 900, 20],
   ["Laboratório", "Investiga tecnologia recuperada.", 1200, 25],
   ["Hangar", "Desbloqueia operações de transporte.", 1500, 35],
   ["Centro de inteligência", "Melhora a informação de missão.", 1000, 20],
@@ -39,6 +39,20 @@ const OUTFITS_SHOP = [
   { id: "out_tactical", name: "COLETE TÁTICO AEGIS", credits: 650, materials: 16, dmgRed: 5, hpBonus: 20, dodgeBonus: 4, desc: "+20 HP máx., -5 dano recebido, +4% evasão." },
   { id: "out_exo", name: "EXOFARDA SENTINELA", credits: 950, materials: 24, dmgRed: 8, hpBonus: 35, dodgeBonus: 6, desc: "+35 HP máx., -8 dano recebido, +6% evasão." }
 ];
+const CONSUMABLES_SHOP = {
+  frag: [
+    { id: "frag_1", name: "GRANADA FRAGMENTAÇÃO x1", count: 1, credits: 180, materials: 4, dmg: 32, desc: "Explosão 3x3 (32 dano direto, ignora cobertura)." },
+    { id: "frag_2", name: "GRANADA FRAGMENTAÇÃO x2", count: 2, credits: 320, materials: 7, dmg: 32, desc: "2 granadas de fragmentação (32 dano em área)." }
+  ],
+  smoke: [
+    { id: "smoke_1", name: "GRANADA DE FUMO x1", count: 1, credits: 150, materials: 3, turns: 2, pen: 30, desc: "Nuvem de fumo 3x3 por 2 turnos (-30% precisão inimiga)." },
+    { id: "smoke_2", name: "GRANADA DE FUMO x2", count: 2, credits: 270, materials: 6, turns: 2, pen: 30, desc: "2 granadas de fumo (-30% precisão inimiga por 2 turnos)." }
+  ],
+  medkit: [
+    { id: "med_1", name: "KIT DE SAÚDE x1", count: 1, credits: 160, materials: 4, heal: 40, desc: "Recupera +40 HP em combate (+50 HP na classe Médico)." },
+    { id: "med_2", name: "KIT DE SAÚDE x2", count: 2, credits: 290, materials: 7, heal: 40, desc: "2 kits de saúde (+40 HP cada, +50 HP na classe Médico)." }
+  ]
+};
 
 const MISSIONS = [
   {
@@ -92,7 +106,7 @@ const WEAPONS_BY_ROLE = {
 const ROLE_PERKS = {
   "Assalto": "Bónus discreto: +5% precisão a curta/média distância (≤ 4 casas).",
   "Sniper": "Bónus discreto: +6% precisão e +5% crítico à distância (≥ 5 casas).",
-  "Médico": "Bónus discreto: kit médico recupera +35 HP em vez de +25 HP.",
+  "Médico": "Bónus discreto: kit médico recupera +35 HP base (+50 com kit de saúde).",
   "Engenheira": "Bónus discreto: reduz em 5% a proteção de cobertura dos inimigos.",
   "Armas pesadas": "Bónus discreto: reduz em 2 pontos o dano recebido em combate.",
   "Batedora": "Bónus discreto: +6% precisão em flancos e +5% em vigilância.",
@@ -130,6 +144,7 @@ let selectedHealOpIndex = 0;
 let selectedShopOpIndex = 0;
 let selectedShopCategory = "weapon";
 let selectedShopItemId = "wpn_vanguard";
+let activeCombatMode = null;
 
 function load() {
   try {
@@ -157,9 +172,13 @@ function isAcademyBuilt() {
 
 function getOpGear(opIndex) {
   if (!state.opGear[opIndex]) {
-    state.opGear[opIndex] = { weaponId: "wpn_std", outfitId: "out_std" };
+    state.opGear[opIndex] = { weaponId: "wpn_std", outfitId: "out_std", frag: 0, smoke: 0, medkit: 0 };
   }
-  return state.opGear[opIndex];
+  const g = state.opGear[opIndex];
+  if (typeof g.frag !== "number") g.frag = 0;
+  if (typeof g.smoke !== "number") g.smoke = 0;
+  if (typeof g.medkit !== "number") g.medkit = 0;
+  return g;
 }
 
 function getEquippedWeaponItem(opIndex) {
@@ -181,7 +200,7 @@ function getShopItemCost(item) {
     credits: item.credits,
     materials: item.materials
   };
-   }
+}
 function getOpHp(opIndex) {
   const maxHp = getMaxHp(opIndex);
   const raw = state.opHp[opIndex];
@@ -265,6 +284,7 @@ function save() {
 }
 
 function go(id) {
+  activeCombatMode = null;
   document.querySelectorAll(".screen").forEach(s => s.classList.toggle("active", s.id === id));
   window.scrollTo(0, 0);
   if (id === "squad") renderRoster();
@@ -328,7 +348,7 @@ function renderRoster() {
 
 function buyOrEquipGear(opIndex, type, itemId) {
   if (!isArmoryBuilt()) {
-    logModal("ARSENAL EM FALTA", "Constrói primeiro o edifício <b>Arsenal</b> na base para aceder à loja de armas e fardas.");
+    logModal("ARSENAL EM FALTA", "Constrói primeiro o edifício <b>Arsenal</b> na base para aceder à loja.");
     return;
   }
 
@@ -336,6 +356,29 @@ function buyOrEquipGear(opIndex, type, itemId) {
   if (Number.isNaN(idx) || !OPERATIVES[idx]) return;
   const op = OPERATIVES[idx];
   const gear = getOpGear(idx);
+
+  if (type === "frag" || type === "smoke" || type === "medkit") {
+    const list = CONSUMABLES_SHOP[type] || [];
+    const item = list.find(x => x.id === itemId);
+    if (!item) return;
+    const cost = getShopItemCost(item);
+    if (state.credits < cost.credits || state.materials < cost.materials) {
+      logModal("RECURSOS INSUFICIENTES", `Comprar <b>${item.name}</b> custa <b>${cost.credits} créditos</b> e <b>${cost.materials} materiais</b>.`);
+      return;
+    }
+    state.credits -= cost.credits;
+    state.materials -= cost.materials;
+    gear[type] = (gear[type] || 0) + item.count;
+    save();
+    renderBuildings();
+    renderRoster();
+    logModal(
+      "CONSUMÍVEL ADICIONADO",
+      `${op[0]} recebeu <b>${item.name}</b> (total: ${gear[type]} na mochila) por ${cost.credits} cr e ${cost.materials} mat.`
+    );
+    return;
+  }
+
   const catalog = type === "weapon" ? WEAPONS_SHOP : OUTFITS_SHOP;
   const item = catalog.find(x => x.id === itemId);
   if (!item) return;
@@ -382,7 +425,7 @@ function buyOrEquipGear(opIndex, type, itemId) {
     needsPayment ? "COMPRA CONCLUÍDA" : "EQUIPAMENTO ATUALIZADO",
     `${op[0]} equipou <b>${item.name}</b>${needsPayment ? ` (${cost.credits} cr e ${cost.materials} mat gastos)` : ""}.`
   );
-    }
+}
 function trainOpStat(opIndex, statIdx, fromAcademy = false) {
   const prog = getOpProgress(opIndex);
   const currentStats = getEffectiveStats(opIndex);
@@ -493,6 +536,7 @@ function showOperator(i) {
   const sev = getInjurySeverity(hp, maxHp);
   const wpnItem = getEquippedWeaponItem(i);
   const outItem = getEquippedOutfitItem(i);
+  const gear = getOpGear(i);
   const stats = getEffectiveStats(i);
   const perk = ROLE_PERKS[o[2]] || "";
   const academyBuilt = isAcademyBuilt();
@@ -520,8 +564,9 @@ function showOperator(i) {
     : `<span style="color:var(--muted)">Treino bloqueado · Constrói a Academia militar na base</span>`;
 
   const headerInfo = `NV.${prog.level} · ${hpLine} · ${prog.xp}/100 XP · ${trainStatusText}`;
+  const packInfo = `Frag: <b>${gear.frag}</b> · Fumo: <b>${gear.smoke}</b> · Kits Saúde: <b>${gear.medkit}</b>`;
 
-  document.getElementById("modal-content").innerHTML = `<div class="eyebrow">${o[1]} // ${o[2]}</div><h2 style="font:800 32px var(--display);margin:0">${o[0]}</h2><p class="muted">${o[4]}<br><span style="color:var(--lime)">${perk}</span><br><small style="color:#9ec5d8">Arma: <b>${wpnItem.name}</b> · Farda: <b>${outItem.name}</b></small><br><small style="color:var(--muted)">${headerInfo}</small></p><div class="stats">${statsHtml}</div>`;
+  document.getElementById("modal-content").innerHTML = `<div class="eyebrow">${o[1]} // ${o[2]}</div><h2 style="font:800 32px var(--display);margin:0">${o[0]}</h2><p class="muted">${o[4]}<br><span style="color:var(--lime)">${perk}</span><br><small style="color:#9ec5d8">Arma: <b>${wpnItem.name}</b> · Farda: <b>${outItem.name}</b><br>Mochila: ${packInfo}</small><br><small style="color:var(--muted)">${headerInfo}</small></p><div class="stats">${statsHtml}</div>`;
 
   document.querySelectorAll("#modal-content [data-train-stat]").forEach(btn => {
     btn.onclick = () => {
@@ -630,15 +675,26 @@ function renderBuildings() {
   const eqWpn = getEquippedWeaponItem(selectedShopOpIndex);
   const eqOut = getEquippedOutfitItem(selectedShopOpIndex);
 
-  const shopCatalog = selectedShopCategory === "outfit" ? OUTFITS_SHOP : WEAPONS_SHOP;
+  const validCats = ["weapon", "outfit", "frag", "smoke", "medkit"];
+  if (!validCats.includes(selectedShopCategory)) selectedShopCategory = "weapon";
+
+  let shopCatalog = WEAPONS_SHOP;
+  if (selectedShopCategory === "outfit") shopCatalog = OUTFITS_SHOP;
+  else if (selectedShopCategory === "frag" || selectedShopCategory === "smoke" || selectedShopCategory === "medkit") {
+    shopCatalog = CONSUMABLES_SHOP[selectedShopCategory];
+  }
+
   if (!shopCatalog.some(x => x.id === selectedShopItemId)) {
     selectedShopItemId = shopCatalog[1] ? shopCatalog[1].id : shopCatalog[0].id;
   }
   const chosenShopItem = shopCatalog.find(x => x.id === selectedShopItemId) || shopCatalog[0];
-  const chosenEquipped = selectedShopCategory === "outfit"
-    ? shopGear.outfitId === chosenShopItem.id
-    : shopGear.weaponId === chosenShopItem.id;
-  const chosenNeedsPay = !(chosenShopItem.credits === 0 && chosenShopItem.materials === 0);
+  const isConsumable = selectedShopCategory === "frag" || selectedShopCategory === "smoke" || selectedShopCategory === "medkit";
+  const chosenEquipped = !isConsumable && (
+    selectedShopCategory === "outfit"
+      ? shopGear.outfitId === chosenShopItem.id
+      : shopGear.weaponId === chosenShopItem.id
+  );
+  const chosenNeedsPay = isConsumable || !(chosenShopItem.credits === 0 && chosenShopItem.materials === 0);
   const chosenCost = getShopItemCost(chosenShopItem);
 
   const shopOpOptions = OPERATIVES.map((o, idx) => {
@@ -646,8 +702,13 @@ function renderBuildings() {
   }).join("");
 
   const shopItemOptions = shopCatalog.map(item => {
-    const isEq = selectedShopCategory === "outfit" ? shopGear.outfitId === item.id : shopGear.weaponId === item.id;
-    const tag = isEq ? " [EQUIPADO]" : (item.credits > 0 || item.materials > 0 ? ` (${item.credits} CR / ${item.materials} MAT)` : " [BASE]");
+    let tag = "";
+    if (!isConsumable) {
+      const isEq = selectedShopCategory === "outfit" ? shopGear.outfitId === item.id : shopGear.weaponId === item.id;
+      tag = isEq ? " [EQUIPADO]" : (item.credits > 0 || item.materials > 0 ? ` (${item.credits} CR / ${item.materials} MAT)` : " [BASE]");
+    } else {
+      tag = ` (${item.credits} CR / ${item.materials} MAT)`;
+    }
     return `<option value="${item.id}" ${item.id === chosenShopItem.id ? "selected" : ""}>${item.name}${tag}</option>`;
   }).join("");
 
@@ -659,8 +720,8 @@ function renderBuildings() {
 
   shopBox.innerHTML = `
     <div>
-      <b>LOJA DE OBJETOS — BASE MILITAR</b><br>
-      <small>${armoryBuilt ? "<span style='color:var(--lime)'>Arsenal construído · Escolhe personagem, tipo e objeto sem restrição de classe</span>" : "<span style='color:#ff9e5e'>Bloqueada · Constrói o Arsenal para comprar e equipar armas ou fardas</span>"}</small>
+      <b>LOJA DE OBJETOS E TÁTICA — BASE MILITAR</b><br>
+      <small>${armoryBuilt ? "<span style='color:var(--lime)'>Arsenal construído · Escolhe personagem, tipo e objeto</span>" : "<span style='color:#ff9e5e'>Bloqueada · Constrói o Arsenal para comprar armas, fardas, granadas e kits</span>"}</small>
     </div>
     <div style="display:flex;flex-direction:column;gap:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.07)">
       <label style="font-size:11px;color:var(--muted)">1. Personagem:</label>
@@ -671,6 +732,9 @@ function renderBuildings() {
       <select id="shop-cat-select" ${!armoryBuilt ? "disabled" : ""} style="width:100%;padding:9px;background:#0e161d;color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:6px;font-size:12px">
         <option value="weapon" ${selectedShopCategory === "weapon" ? "selected" : ""}>Arma</option>
         <option value="outfit" ${selectedShopCategory === "outfit" ? "selected" : ""}>Farda / Roupa</option>
+        <option value="frag" ${selectedShopCategory === "frag" ? "selected" : ""}>Granadas de Fragmentação</option>
+        <option value="smoke" ${selectedShopCategory === "smoke" ? "selected" : ""}>Granadas de Fumo</option>
+        <option value="medkit" ${selectedShopCategory === "medkit" ? "selected" : ""}>Kits de Saúde</option>
       </select>
       <label style="font-size:11px;color:var(--muted)">3. Objeto:</label>
       <select id="shop-item-select" ${!armoryBuilt ? "disabled" : ""} style="width:100%;padding:9px;background:#0e161d;color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:6px;font-size:12px">
@@ -678,10 +742,11 @@ function renderBuildings() {
       </select>
       <small style="color:var(--muted)">
         ${shopOp[0]} (atual: <b>${eqWpn.name}</b> · <b>${eqOut.name}</b>)<br>
+        Mochila de ${shopOp[0]}: Frag <b>${shopGear.frag}</b> · Fumo <b>${shopGear.smoke}</b> · Kits Saúde <b>${shopGear.medkit}</b><br>
         Selecionado: <b>${chosenShopItem.name}</b> — ${chosenShopItem.desc}${chosenNeedsPay ? ` (${chosenCost.credits} cr / ${chosenCost.materials} mat)` : ""}
       </small>
       <button type="button" id="shop-confirm-btn" ${(!armoryBuilt || chosenEquipped) ? "disabled" : ""} style="padding:8px 10px;font-size:10px">
-        ${!armoryBuilt ? "REQUER ARSENAL" : (chosenEquipped ? "JÁ EQUIPADO" : (chosenNeedsPay ? `COMPRAR E EQUIPAR (${chosenCost.credits} CR / ${chosenCost.materials} MAT)` : "EQUIPAR OBJETO BASE"))}
+        ${!armoryBuilt ? "REQUER ARSENAL" : (chosenEquipped ? "JÁ EQUIPADO" : (chosenNeedsPay ? `COMPRAR (${chosenCost.credits} CR / ${chosenCost.materials} MAT)` : "EQUIPAR OBJETO BASE"))}
       </button>
     </div>
   `;
@@ -691,8 +756,12 @@ function renderBuildings() {
     renderBuildings();
   };
   shopBox.querySelector("#shop-cat-select").onchange = ev => {
-    selectedShopCategory = ev.target.value === "outfit" ? "outfit" : "weapon";
-    const nextCat = selectedShopCategory === "outfit" ? OUTFITS_SHOP : WEAPONS_SHOP;
+    selectedShopCategory = ev.target.value;
+    let nextCat = WEAPONS_SHOP;
+    if (selectedShopCategory === "outfit") nextCat = OUTFITS_SHOP;
+    else if (selectedShopCategory === "frag" || selectedShopCategory === "smoke" || selectedShopCategory === "medkit") {
+      nextCat = CONSUMABLES_SHOP[selectedShopCategory];
+    }
     selectedShopItemId = nextCat[1] ? nextCat[1].id : nextCat[0].id;
     renderBuildings();
   };
@@ -792,6 +861,7 @@ function renderMissions() {
 let battle = {
   units: [],
   enemies: [],
+  smokes: [],
   selected: 0,
   targetEnemy: 0,
   turn: 1,
@@ -813,6 +883,10 @@ function getWeapon(opIndex) {
 
 function getCoverAt(x, y) {
   return COVERS.find(c => c.x === x && c.y === y) || null;
+}
+
+function isSmokeAt(x, y) {
+  return (battle.smokes || []).some(s => s.turnsLeft > 0 && Math.abs(s.x - x) <= 1 && Math.abs(s.y - y) <= 1);
 }
 
 function isTileBlocked(x, y, ignoreUnit = null, ignoreEnemy = null) {
@@ -901,8 +975,9 @@ function calcHitChance(unit, enemy, isOverwatch = false) {
   if (role === "Sniper" && dist >= 5) roleBonus += 6;
   if ((role === "Batedora" || role === "Batedor") && isOverwatch) roleBonus += 5;
 
+  const smokeLoss = isSmokeAt(enemy.x, enemy.y) ? 20 : 0;
   const reactionLoss = isOverwatch ? 10 : 0;
-  return Math.max(5, Math.min(98, Math.round(base - rangeLoss - coverLoss + flankBonus + roleBonus - reactionLoss)));
+  return Math.max(5, Math.min(98, Math.round(base - rangeLoss - coverLoss + flankBonus + roleBonus - smokeLoss - reactionLoss)));
 }
 
 function calcCritChance(unit, enemy, isOverwatch = false) {
@@ -959,11 +1034,13 @@ function startMission(i) {
     logModal("EQUIPA NÃO SELECIONADA", "Vai a Operacionais e escolhe até cinco elementos antes de iniciar.");
     return;
   }
+  activeCombatMode = null;
   const m = MISSIONS[i];
   battle = {
     units: state.selected.map((id, n) => {
       const wpn = getWeapon(id);
       const maxHp = getMaxHp(id);
+      const gear = getOpGear(id);
       return {
         id,
         x: 1,
@@ -973,6 +1050,9 @@ function startMission(i) {
         ap: 2,
         ammo: wpn.mag,
         maxAmmo: wpn.mag,
+        frag: gear.frag || 0,
+        smoke: gear.smoke || 0,
+        medkit: gear.medkit || 0,
         overwatch: false,
         hunker: false
       };
@@ -981,6 +1061,7 @@ function startMission(i) {
       { name: "SENTINELA XENO", x: 5, y: 1, hp: 65, dmg: 14, role: "flanker" },
       { name: "CAÇADOR XENO", x: 6, y: 4, hp: 75, dmg: 18, role: "skirmisher" }
     ],
+    smokes: [],
     selected: 0,
     targetEnemy: 0,
     turn: 1,
@@ -989,7 +1070,7 @@ function startMission(i) {
   state.mission = i;
   document.getElementById("battle-title").textContent = m.title;
   document.getElementById("turn-label").textContent = "TURNO 1";
-  document.getElementById("battle-log").textContent = `Turno 1 · Secundário: ${m.secondaryLabel}. Escolhe mover, disparar, vigiar ou Hunker Down (-1 PA).`;
+  document.getElementById("battle-log").textContent = `Turno 1 · Secundário: ${m.secondaryLabel}. Usa mover, disparar, granadas ou kits de saúde.`;
   go("tactical");
   renderBattle();
     }
@@ -1002,8 +1083,113 @@ function positionBattleLogBelowGrid() {
   }
 }
 
+function ensureTacticalConsumableButtons() {
+  const medBtn = document.getElementById("medkit");
+  if (!medBtn || !medBtn.parentNode) return;
+
+  if (!document.getElementById("frag-btn")) {
+    const fragBtn = document.createElement("button");
+    fragBtn.type = "button";
+    fragBtn.id = "frag-btn";
+    fragBtn.style.marginLeft = "6px";
+    fragBtn.textContent = "FRAG (0)";
+    medBtn.insertAdjacentElement("afterend", fragBtn);
+  }
+
+  if (!document.getElementById("smoke-btn")) {
+    const smokeBtn = document.createElement("button");
+    smokeBtn.type = "button";
+    smokeBtn.id = "smoke-btn";
+    smokeBtn.style.marginLeft = "6px";
+    smokeBtn.textContent = "FUMO (0)";
+    document.getElementById("frag-btn").insertAdjacentElement("afterend", smokeBtn);
+  }
+
+  const fragBtnEl = document.getElementById("frag-btn");
+  if (fragBtnEl && !fragBtnEl.dataset.bound) {
+    fragBtnEl.dataset.bound = "1";
+    fragBtnEl.onclick = () => {
+      if (battle.finished) return;
+      const unit = battle.units[battle.selected];
+      if (!unit || unit.hp <= 0 || unit.ap < 1 || (unit.frag || 0) <= 0) return;
+      activeCombatMode = activeCombatMode === "frag" ? null : "frag";
+      battleLog(
+        activeCombatMode === "frag"
+          ? "Modo FRAG ativo: clica num inimigo ou casa no mapa para lançar (área 3x3, 32 dano)."
+          : "Modo FRAG cancelado."
+      );
+      renderBattle();
+    };
+  }
+
+  const smokeBtnEl = document.getElementById("smoke-btn");
+  if (smokeBtnEl && !smokeBtnEl.dataset.bound) {
+    smokeBtnEl.dataset.bound = "1";
+    smokeBtnEl.onclick = () => {
+      if (battle.finished) return;
+      const unit = battle.units[battle.selected];
+      if (!unit || unit.hp <= 0 || unit.ap < 1 || (unit.smoke || 0) <= 0) return;
+      activeCombatMode = activeCombatMode === "smoke" ? null : "smoke";
+      battleLog(
+        activeCombatMode === "smoke"
+          ? "Modo FUMO ativo: clica numa casa do mapa para lançar cortina de fumo (3x3, 2 turnos)."
+          : "Modo FUMO cancelado."
+      );
+      renderBattle();
+    };
+  }
+}
+
+function throwFragAt(x, y) {
+  const unit = battle.units[battle.selected];
+  if (!unit || unit.hp <= 0 || unit.ap < 1 || (unit.frag || 0) <= 0) return;
+  if (x < 0 || y < 0 || x >= 8 || y >= 6) return;
+
+  unit.ap = Math.max(0, unit.ap - 1);
+  unit.frag = Math.max(0, unit.frag - 1);
+  unit.hunker = false;
+  activeCombatMode = null;
+
+  const hitEnemies = battle.enemies.filter(
+    e => e.hp > 0 && Math.abs(e.x - x) <= 1 && Math.abs(e.y - y) <= 1
+  );
+
+  if (hitEnemies.length === 0) {
+    battleLog(`${OPERATIVES[unit.id][0]} lançou Granada de Fragmentação em (${x + 1},${y + 1}) sem atingir inimigos (-1 PA).`);
+  } else {
+    const names = [];
+    hitEnemies.forEach(e => {
+      e.hp = Math.max(0, e.hp - 32);
+      names.push(`${e.name} (-32 HP)`);
+    });
+    const nextAlive = battle.enemies.findIndex(e => e.hp > 0);
+    if (nextAlive >= 0) battle.targetEnemy = nextAlive;
+    battleLog(`${OPERATIVES[unit.id][0]} detonou Granada de Fragmentação em (${x + 1},${y + 1}): ${names.join(", ")} (-1 PA).`);
+  }
+
+  renderBattle();
+  checkWin();
+}
+
+function throwSmokeAt(x, y) {
+  const unit = battle.units[battle.selected];
+  if (!unit || unit.hp <= 0 || unit.ap < 1 || (unit.smoke || 0) <= 0) return;
+  if (x < 0 || y < 0 || x >= 8 || y >= 6) return;
+
+  unit.ap = Math.max(0, unit.ap - 1);
+  unit.smoke = Math.max(0, unit.smoke - 1);
+  unit.hunker = false;
+  activeCombatMode = null;
+
+  battle.smokes.push({ x, y, turnsLeft: 2 });
+  battleLog(`${OPERATIVES[unit.id][0]} lançou Granada de Fumo em (${x + 1},${y + 1}) por 2 turnos (-1 PA).`);
+  renderBattle();
+}
+
 function renderBattle() {
   positionBattleLogBelowGrid();
+  ensureTacticalConsumableButtons();
+
   const grid = document.getElementById("battle-grid");
   grid.innerHTML = "";
   const unit = battle.units[battle.selected];
@@ -1015,10 +1201,14 @@ function renderBattle() {
       const uIdx = battle.units.findIndex(a => a.hp > 0 && a.x === x && a.y === y);
       const eIdx = battle.enemies.findIndex(a => a.hp > 0 && a.x === x && a.y === y);
       const cov = getCoverAt(x, y);
+      const smoky = isSmokeAt(x, y);
 
       if (cov) {
         tile.classList.add("cover");
         tile.classList.add(cov.blocksSight ? "wall" : "half");
+      }
+      if (smoky) {
+        tile.style.boxShadow = "inset 0 0 0 2px rgba(180,225,255,.55)";
       }
       if (x === 7 && y === 5) {
         tile.classList.add("exit");
@@ -1032,7 +1222,7 @@ function renderBattle() {
         tile.textContent = "◆";
         tile.classList.add("enemy");
         if (eIdx === battle.targetEnemy) tile.classList.add("target");
-      } else if (canMoveTo(unit, x, y)) {
+      } else if (!activeCombatMode && canMoveTo(unit, x, y)) {
         tile.classList.add("move");
       }
 
@@ -1045,11 +1235,13 @@ function renderBattle() {
     const flags = [];
     if (unit.overwatch) flags.push("VIGILÂNCIA");
     if (unit.hunker) flags.push("HUNKER");
+    if (activeCombatMode === "frag") flags.push("MODO FRAG");
+    if (activeCombatMode === "smoke") flags.push("MODO FUMO");
     const statusSuffix = flags.length ? " · " + flags.join(" + ") : "";
     document.getElementById("selected-unit").textContent = OPERATIVES[unit.id][0].toUpperCase();
     document.getElementById("unit-hp").textContent = `${unit.hp}/${unit.maxHp} HP`;
     document.getElementById("unit-ap").textContent = unit.ap + " PA";
-    document.getElementById("unit-ammo").textContent = unit.ammo + "/" + unit.maxAmmo + " MUN" + statusSuffix;
+    document.getElementById("unit-ammo").textContent = `${unit.ammo}/${unit.maxAmmo} MUN · KIT:${unit.medkit || 0}${statusSuffix}`;
   }
 
   const enemy = battle.enemies[battle.targetEnemy];
@@ -1058,14 +1250,17 @@ function renderBattle() {
   const overwatchBtn = document.getElementById("overwatch-btn");
   const hunkerBtn = document.getElementById("hunker-btn");
   const medBtn = document.getElementById("medkit");
+  const fragBtn = document.getElementById("frag-btn");
+  const smokeBtn = document.getElementById("smoke-btn");
 
   if (enemy && enemy.hp > 0 && unit && unit.hp > 0) {
     const chance = calcHitChance(unit, enemy, false);
     const covPen = getCoverPenalty(enemy.x, enemy.y, unit.x, unit.y);
     const flanked = isFlanked(enemy.x, enemy.y, unit.x, unit.y);
+    const smoky = isSmokeAt(enemy.x, enemy.y);
     document.getElementById("target-info").textContent = `${enemy.name} (${enemy.hp} HP)`;
     document.getElementById("hit-chance").textContent = chance > 0
-      ? `CHANCE: ${chance}%${covPen ? ` (-${covPen}% COB)` : flanked ? " [FLANCO]" : ""}`
+      ? `CHANCE: ${chance}%${covPen ? ` (-${covPen}% COB)` : flanked ? " [FLANCO]" : ""}${smoky ? " [FUMO]" : ""}`
       : "SEM LINHA DE VISÃO";
     fireBtn.disabled = battle.finished || unit.ap < 1 || unit.ammo <= 0 || chance <= 0;
   } else {
@@ -1081,11 +1276,36 @@ function renderBattle() {
   if (hunkerBtn) {
     hunkerBtn.disabled = battle.finished || !unit || unit.hp <= 0 || unit.ap < 1 || unit.hunker;
   }
-  medBtn.disabled = battle.finished || !unit || unit.hp <= 0 || unit.ap < 1 || unit.hp >= unit.maxHp;
+  if (medBtn) {
+    const hasPack = (unit && (unit.medkit || 0) > 0);
+    const role = unit ? OPERATIVES[unit.id][2] : "";
+    medBtn.textContent = hasPack ? `KIT SAÚDE (${unit.medkit})` : (role === "Médico" ? "CURA CAMPO (35)" : "CURA CAMPO (25)");
+    medBtn.disabled = battle.finished || !unit || unit.hp <= 0 || unit.ap < 1 || unit.hp >= unit.maxHp;
+  }
+  if (fragBtn) {
+    const fCount = unit ? (unit.frag || 0) : 0;
+    fragBtn.textContent = `FRAG (${fCount})`;
+    fragBtn.disabled = battle.finished || !unit || unit.hp <= 0 || unit.ap < 1 || fCount <= 0;
+  }
+  if (smokeBtn) {
+    const sCount = unit ? (unit.smoke || 0) : 0;
+    smokeBtn.textContent = `FUMO (${sCount})`;
+    smokeBtn.disabled = battle.finished || !unit || unit.hp <= 0 || unit.ap < 1 || sCount <= 0;
+  }
 }
 
 function tileAction(x, y, uIdx, eIdx) {
   if (battle.finished) return;
+
+  if (activeCombatMode === "frag") {
+    throwFragAt(x, y);
+    return;
+  }
+  if (activeCombatMode === "smoke") {
+    throwSmokeAt(x, y);
+    return;
+  }
+
   if (uIdx >= 0) {
     battle.selected = uIdx;
     battleLog(`${OPERATIVES[battle.units[uIdx].id][0]} selecionado.`);
@@ -1120,6 +1340,7 @@ function battleLog(t) {
 
 document.getElementById("fire-btn").onclick = () => {
   if (battle.finished) return;
+  activeCombatMode = null;
   const unit = battle.units[battle.selected];
   const enemy = battle.enemies[battle.targetEnemy];
   if (!unit || !enemy || enemy.hp <= 0 || unit.ap < 1 || unit.ammo <= 0) return;
@@ -1140,6 +1361,7 @@ document.getElementById("fire-btn").onclick = () => {
 
 document.getElementById("reload-btn").onclick = () => {
   if (battle.finished) return;
+  activeCombatMode = null;
   const unit = battle.units[battle.selected];
   if (!unit || unit.ap < 1 || unit.ammo >= unit.maxAmmo) return;
   unit.ap = Math.max(0, unit.ap - 1);
@@ -1152,6 +1374,7 @@ const overwatchBtnEl = document.getElementById("overwatch-btn");
 if (overwatchBtnEl) {
   overwatchBtnEl.onclick = () => {
     if (battle.finished) return;
+    activeCombatMode = null;
     const unit = battle.units[battle.selected];
     if (!unit || unit.hp <= 0 || unit.ap < 1 || unit.ammo <= 0 || unit.overwatch) return;
     unit.ap = Math.max(0, unit.ap - 1);
@@ -1165,6 +1388,7 @@ const hunkerBtnEl = document.getElementById("hunker-btn");
 if (hunkerBtnEl) {
   hunkerBtnEl.onclick = () => {
     if (battle.finished) return;
+    activeCombatMode = null;
     const unit = battle.units[battle.selected];
     if (!unit || unit.hp <= 0 || unit.ap < 1 || unit.hunker) return;
     unit.ap = Math.max(0, unit.ap - 1);
@@ -1176,13 +1400,26 @@ if (hunkerBtnEl) {
 
 document.getElementById("medkit").onclick = () => {
   if (battle.finished) return;
+  activeCombatMode = null;
   const unit = battle.units[battle.selected];
   if (!unit || unit.ap < 1 || unit.hp >= unit.maxHp) return;
   const role = OPERATIVES[unit.id][2];
-  const healAmount = role === "Médico" ? 35 : 25;
+  const hasPack = (unit.medkit || 0) > 0;
+  let healAmount = role === "Médico" ? 35 : 25;
+  let sourceLabel = "Cura de campo";
+
+  if (hasPack) {
+    unit.medkit -= 1;
+    const gear = getOpGear(unit.id);
+    gear.medkit = Math.max(0, (gear.medkit || 0) - 1);
+    healAmount = role === "Médico" ? 50 : 40;
+    sourceLabel = "Kit de Saúde";
+    save();
+  }
+
   unit.ap = Math.max(0, unit.ap - 1);
   unit.hp = Math.min(unit.maxHp, unit.hp + healAmount);
-  battleLog(`Kit médico aplicado a ${OPERATIVES[unit.id][0]}: +${healAmount} HP (-1 PA).`);
+  battleLog(`${sourceLabel} aplicado a ${OPERATIVES[unit.id][0]}: +${healAmount} HP (-1 PA).`);
   renderBattle();
 };
 
@@ -1263,13 +1500,14 @@ function runEnemyTurn() {
       const targetCovPen = getCoverPenalty(target.x, target.y, e.x, e.y);
       const hunkerExtra = target.hunker ? (targetCovPen > 0 ? 35 : 25) : 0;
       const dodgeExtra = outfit.dodgeBonus || 0;
-      const hitProb = Math.max(10, Math.min(85, 72 - Math.max(0, dist - 4) * 6 - targetCovPen - hunkerExtra - dodgeExtra));
+      const smokeLoss = (isSmokeAt(target.x, target.y) || isSmokeAt(e.x, e.y)) ? 30 : 0;
+      const hitProb = Math.max(10, Math.min(85, 72 - Math.max(0, dist - 4) * 6 - targetCovPen - hunkerExtra - dodgeExtra - smokeLoss));
       if (Math.random() * 100 <= hitProb) {
         const roleMitigation = targetRole === "Armas pesadas" ? 2 : 0;
         const outfitMitigation = outfit.dmgRed || 0;
         const dmgTaken = Math.max(1, e.dmg - roleMitigation - outfitMitigation);
         target.hp = Math.max(0, target.hp - dmgTaken);
-        logs.push(`${e.name} acertou em ${OPERATIVES[target.id][0]} (${hitProb}%): -${dmgTaken} HP${targetCovPen ? " [cobertura]" : ""}${target.hunker ? " [hunker]" : ""}.`);
+        logs.push(`${e.name} acertou em ${OPERATIVES[target.id][0]} (${hitProb}%): -${dmgTaken} HP${targetCovPen ? " [cobertura]" : ""}${smokeLoss ? " [fumo]" : ""}${target.hunker ? " [hunker]" : ""}.`);
       } else {
         logs.push(`${e.name} falhou contra ${OPERATIVES[target.id][0]} (${hitProb}%).`);
       }
@@ -1278,6 +1516,13 @@ function runEnemyTurn() {
     }
   });
 
+  if (Array.isArray(battle.smokes)) {
+    battle.smokes.forEach(s => {
+      s.turnsLeft -= 1;
+    });
+    battle.smokes = battle.smokes.filter(s => s.turnsLeft > 0);
+  }
+
   return logs;
 }
 
@@ -1285,11 +1530,16 @@ function persistBattleInjuries(minDownHp = 25) {
   battle.units.forEach(u => {
     const savedHp = u.hp > 0 ? u.hp : Math.min(u.maxHp, minDownHp);
     setOpHp(u.id, savedHp);
+    const gear = getOpGear(u.id);
+    gear.frag = u.frag || 0;
+    gear.smoke = u.smoke || 0;
+    gear.medkit = u.medkit || 0;
   });
 }
 
 document.getElementById("end-turn").onclick = () => {
   if (battle.finished) return;
+  activeCombatMode = null;
   const enemyLogs = runEnemyTurn();
 
   if (battle.units.every(u => u.hp <= 0)) {
