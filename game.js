@@ -1838,3 +1838,288 @@ renderBuildings = function() {
 
 ensureBarracksInitialized();
 renderBuildings();
+(function initLabUiAndResetExtension() {
+  if (!state.lab || typeof state.lab !== "object") {
+    state.lab = {
+      weaponTier: 0,
+      intelTier: 0,
+      armorTier: 0
+    };
+  }
+  if (!Array.isArray(state.lootCollected)) {
+    state.lootCollected = [];
+  }
+
+  const LAB_COSTS = {
+    weapon: [
+      { alien: 1, credits: 350, materials: 10, dmgBonus: 5, hitBonus: 3, label: "Balística Xeno I (+5 dano, +3% precisão)" },
+      { alien: 2, credits: 650, materials: 18, dmgBonus: 10, hitBonus: 6, label: "Balística Xeno II (+10 dano, +6% precisão)" }
+    ],
+    intel: [
+      { alien: 1, credits: 300, materials: 8, enemyAimPen: 8, enemyDmgRed: 2, label: "Análise Tática I (-8% precisão e -2 dano inimigo)" },
+      { alien: 2, credits: 600, materials: 16, enemyAimPen: 15, enemyDmgRed: 4, label: "Análise Tática II (-15% precisão e -4 dano inimigo)" }
+    ],
+    armor: [
+      { alien: 1, credits: 350, materials: 12, hpBonus: 10, dmgRed: 2, label: "Blindagem Reativa I (+10 HP máx., -2 dano)" },
+      { alien: 2, credits: 700, materials: 20, hpBonus: 20, dmgRed: 4, label: "Blindagem Reativa II (+20 HP máx., -4 dano)" }
+    ]
+  };
+
+  const MISSION_ENEMY_SETS = [
+    [
+      { name: "SENTINELA XENO", x: 5, y: 1, hp: 65, dmg: 14, role: "flanker" },
+      { name: "CAÇADOR XENO", x: 6, y: 4, hp: 75, dmg: 18, role: "skirmisher" }
+    ],
+    [
+      { name: "FLANQUEADOR XENO", x: 4, y: 1, hp: 70, dmg: 16, role: "flanker" },
+      { name: "SUPRESSOR XENO", x: 6, y: 3, hp: 85, dmg: 19, role: "skirmisher" },
+      { name: "SENTINELA XENO", x: 6, y: 5, hp: 65, dmg: 15, role: "flanker" }
+    ],
+    [
+      { name: "COLOSSO XENO", x: 5, y: 2, hp: 105, dmg: 22, role: "skirmisher" },
+      { name: "ASSALTANTE XENO", x: 4, y: 4, hp: 75, dmg: 18, role: "flanker" },
+      { name: "INTERCETOR XENO", x: 7, y: 1, hp: 80, dmg: 19, role: "flanker" }
+    ]
+  ];
+
+  const MISSION_SAMPLES = [
+    [{ x: 3, y: 4, id: "m0_s1" }],
+    [{ x: 4, y: 2, id: "m1_s1" }, { x: 5, y: 4, id: "m1_s2" }],
+    [{ x: 3, y: 1, id: "m2_s1" }, { x: 6, y: 2, id: "m2_s2" }]
+  ];
+
+  function isLabBuilt() {
+    return Array.isArray(state.built) && state.built.includes(3);
+  }
+
+  function getLabWeaponBonus() {
+    const t = state.lab.weaponTier || 0;
+    if (t === 1) return { dmg: 5, hit: 3 };
+    if (t === 2) return { dmg: 10, hit: 6 };
+    return { dmg: 0, hit: 0 };
+  }
+
+  function getLabIntelDebuff() {
+    const t = state.lab.intelTier || 0;
+    if (t === 1) return { aimPen: 8, dmgRed: 2 };
+    if (t === 2) return { aimPen: 15, dmgRed: 4 };
+    return { aimPen: 0, dmgRed: 0 };
+  }
+
+  function getLabArmorBonus() {
+    const t = state.lab.armorTier || 0;
+    if (t === 1) return { hp: 10, dmgRed: 2 };
+    if (t === 2) return { hp: 20, dmgRed: 4 };
+    return { hp: 0, dmgRed: 0 };
+  }
+
+  function researchLabProject(kind) {
+    if (!isLabBuilt()) {
+      logModal("LABORATÓRIO EM FALTA", "Constrói primeiro o edifício <b>Laboratório</b> na base para estudar material alienígena.");
+      return;
+    }
+    const currentTier = state.lab[kind + "Tier"] || 0;
+    const project = LAB_COSTS[kind][currentTier];
+    if (!project) {
+      logModal("PESQUISA CONCLUÍDA", "Este projeto já atingiu o nível máximo no Laboratório.");
+      return;
+    }
+    if (state.alien < project.alien || state.credits < project.credits || state.materials < project.materials) {
+      logModal(
+        "RECURSOS INSUFICIENTES",
+        `Precisas de <b>${project.alien} tecnologia alienígena</b>, <b>${project.credits} créditos</b> e <b>${project.materials} materiais</b>.`
+      );
+      return;
+    }
+    state.alien -= project.alien;
+    state.credits -= project.credits;
+    state.materials -= project.materials;
+    state.lab[kind + "Tier"] = currentTier + 1;
+    if (kind === "armor") {
+      OPERATIVES.forEach((_, idx) => {
+        setOpHp(idx, Math.min(getMaxHp(idx), getOpHp(idx) + 10));
+      });
+    }
+    save();
+    renderRoster();
+    renderBuildings();
+    logModal("INVESTIGAÇÃO CONCLUÍDA", `Novo avanço ativo: <b>${project.label}</b>.`);
+  }
+
+  function resetGameProgress() {
+    if (!confirm("Apagar todo o progresso guardado e recomeçar do zero?")) return;
+    localStorage.removeItem("oz_save");
+    location.reload();
+  }
+
+  function ensureResetButtonOnBase() {
+    const baseScreen = document.getElementById("base");
+    if (!baseScreen) return;
+    if (document.getElementById("reset-save-btn")) return;
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.id = "reset-save-btn";
+    btn.textContent = "RESET SAVE (TESTE)";
+    btn.style.marginTop = "14px";
+    btn.style.width = "100%";
+    btn.style.padding = "9px 12px";
+    btn.style.fontSize = "10px";
+    btn.style.background = "#261215";
+    btn.style.border = "1px solid #ff6b6b";
+    btn.style.color = "#ffb3b3";
+    btn.style.borderRadius = "6px";
+    btn.onclick = resetGameProgress;
+
+    const container = document.getElementById("buildings") || baseScreen;
+    container.insertAdjacentElement("afterend", btn);
+  }
+
+  const origGetMaxHp = getMaxHp;
+  getMaxHp = function(opIndex) {
+    return origGetMaxHp(opIndex) + getLabArmorBonus().hp;
+  };
+
+  const origGetWeapon = getWeapon;
+  getWeapon = function(opIndex) {
+    const w = origGetWeapon(opIndex);
+    const labBonus = getLabWeaponBonus();
+    return {
+      ...w,
+      dmg: w.dmg + labBonus.dmg,
+      hitBonus: (w.hitBonus || 0) + labBonus.hit
+    };
+  };
+
+  const origStartMission = startMission;
+  startMission = function(i) {
+    origStartMission(i);
+    const set = MISSION_ENEMY_SETS[i] || MISSION_ENEMY_SETS[0];
+    battle.enemies = set.map(e => ({ ...e }));
+    const samples = (MISSION_SAMPLES[i] || []).map(s => ({ ...s, collected: false }));
+    battle.samples = samples;
+    const intel = getLabIntelDebuff();
+    const intelNote = intel.aimPen > 0
+      ? ` · Info Lab: inimigos -${intel.aimPen}% precisão / -${intel.dmgRed} dano`
+      : "";
+    const sampleNote = samples.length > 0 ? ` · Amostras xeno no mapa: ${samples.length}` : "";
+    battleLog(`${document.getElementById("battle-log").textContent}${intelNote}${sampleNote}`);
+    renderBattle();
+  };
+
+  const origTileAction = tileAction;
+  tileAction = function(x, y, uIdx, eIdx) {
+    origTileAction(x, y, uIdx, eIdx);
+    if (!Array.isArray(battle.samples) || battle.finished) return;
+    for (const s of battle.samples) {
+      if (!s.collected && s.x === x && s.y === y) {
+        const hasUnit = battle.units.some(u => u.hp > 0 && u.x === x && u.y === y);
+        if (hasUnit) {
+          s.collected = true;
+          state.alien = (state.alien || 0) + 1;
+          save();
+          battleLog(`${document.getElementById("battle-log").textContent} Amostra alienígena recolhida (+1 Tec. Alienígena)!`.trim());
+          renderBattle();
+        }
+      }
+    }
+  };
+
+  const origRenderBattle = renderBattle;
+  renderBattle = function() {
+    origRenderBattle();
+    const grid = document.getElementById("battle-grid");
+    if (!grid || !Array.isArray(battle.samples)) return;
+    const tiles = grid.querySelectorAll(".tile");
+    battle.samples.forEach(s => {
+      if (s.collected) return;
+      const idx = s.y * 8 + s.x;
+      const tile = tiles[idx];
+      if (!tile) return;
+      const occupied = battle.units.some(u => u.hp > 0 && u.x === s.x && u.y === s.y) ||
+        battle.enemies.some(e => e.hp > 0 && e.x === s.x && e.y === s.y);
+      if (!occupied && !(s.x === 7 && s.y === 5)) {
+        tile.textContent = "✦";
+        tile.style.color = "#6ef7ff";
+      }
+    });
+  };
+
+  const origRunEnemyTurn = runEnemyTurn;
+  runEnemyTurn = function() {
+    const intel = getLabIntelDebuff();
+    const prevDmg = battle.enemies.map(e => e.dmg);
+    if (intel.dmgRed > 0) {
+      battle.enemies.forEach(e => {
+        e.dmg = Math.max(4, e.dmg - intel.dmgRed);
+      });
+    }
+    const logs = origRunEnemyTurn();
+    battle.enemies.forEach((e, idx) => {
+      e.dmg = prevDmg[idx];
+    });
+    return logs;
+  };
+
+  const origRenderBuildings = renderBuildings;
+  renderBuildings = function() {
+    origRenderBuildings();
+    ensureResetButtonOnBase();
+
+    const el = document.getElementById("buildings");
+    if (!el) return;
+
+    const labBuilt = isLabBuilt();
+    const wTier = state.lab.weaponTier || 0;
+    const iTier = state.lab.intelTier || 0;
+    const aTier = state.lab.armorTier || 0;
+
+    const wNext = LAB_COSTS.weapon[wTier];
+    const iNext = LAB_COSTS.intel[iTier];
+    const aNext = LAB_COSTS.armor[aTier];
+
+    const labCard = document.createElement("div");
+    labCard.className = "building";
+    labCard.style.flexDirection = "column";
+    labCard.style.alignItems = "stretch";
+    labCard.style.gap = "10px";
+
+    labCard.innerHTML = `
+      <div>
+        <b>LABORATÓRIO XENO — PESQUISA E INFORMAÇÃO</b><br>
+        <small style="color:var(--muted)">
+          ${labBuilt ? "<span style='color:var(--lime)'>Laboratório ativo · Estuda amostras recolhidas em missão</span>" : "<span style='color:#ff9e5e'>Bloqueado · Constrói o Laboratório para investigar</span>"}
+          · Tec. Alienígena: <b>${state.alien || 0}</b>
+        </small>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.07)">
+        <div>
+          <small style="color:#d6e9f5"><b>Armamento (Nv.${wTier}/2):</b> ${wNext ? wNext.label : "Máximo atingido"}</small><br>
+          <button type="button" id="lab-btn-weapon" ${(!labBuilt || !wNext) ? "disabled" : ""} style="margin-top:4px;padding:7px 9px;font-size:10px;width:100%">
+            ${!labBuilt ? "REQUER LABORATÓRIO" : (wNext ? `PESQUISAR ARMAMENTO (${wNext.alien} XENO · ${wNext.credits} CR · ${wNext.materials} MAT)` : "ARMAMENTO NO MÁXIMO")}
+          </button>
+        </div>
+        <div>
+          <small style="color:#d6e9f5"><b>Informação Inimiga (Nv.${iTier}/2):</b> ${iNext ? iNext.label : "Máximo atingido"}</small><br>
+          <button type="button" id="lab-btn-intel" ${(!labBuilt || !iNext) ? "disabled" : ""} style="margin-top:4px;padding:7px 9px;font-size:10px;width:100%">
+            ${!labBuilt ? "REQUER LABORATÓRIO" : (iNext ? `DECIFRAR INIMIGOS (${iNext.alien} XENO · ${iNext.credits} CR · ${iNext.materials} MAT)` : "INFORMAÇÃO NO MÁXIMO")}
+          </button>
+        </div>
+        <div>
+          <small style="color:#d6e9f5"><b>Blindagem Adaptativa (Nv.${aTier}/2):</b> ${aNext ? aNext.label : "Máximo atingido"}</small><br>
+          <button type="button" id="lab-btn-armor" ${(!labBuilt || !aNext) ? "disabled" : ""} style="margin-top:4px;padding:7px 9px;font-size:10px;width:100%">
+            ${!labBuilt ? "REQUER LABORATÓRIO" : (aNext ? `DESENVOLVER BLINDAGEM (${aNext.alien} XENO · ${aNext.credits} CR · ${aNext.materials} MAT)` : "BLINDAGEM NO MÁXIMO")}
+          </button>
+        </div>
+      </div>
+    `;
+
+    labCard.querySelector("#lab-btn-weapon").onclick = () => researchLabProject("weapon");
+    labCard.querySelector("#lab-btn-intel").onclick = () => researchLabProject("intel");
+    labCard.querySelector("#lab-btn-armor").onclick = () => researchLabProject("armor");
+
+    el.appendChild(labCard);
+  };
+
+  renderBuildings();
+})();
