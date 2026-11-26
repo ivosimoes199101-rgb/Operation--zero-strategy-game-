@@ -27,7 +27,7 @@ const CLASS_TRAINING_PROFILES = [
 
 const BUILDINGS = [
   ["Quartel", "Aumenta a capacidade de alojamento.", 500, 10],
-  ["Enfermaria", "Reduz o custo de créditos e materiais para curar ferimentos.", 700, 15],
+  ["Enfermaria", "Reduz significativamente o custo de tratar ferimentos leves, graves e muito graves.", 700, 15],
   ["Arsenal", "Melhora a preparação e equipamento.", 900, 20],
   ["Laboratório", "Investiga tecnologia recuperada.", 1200, 25],
   ["Hangar", "Desbloqueia operações de transporte.", 1500, 35],
@@ -146,17 +146,33 @@ function setOpHp(opIndex, value) {
   state.opHp[opIndex] = Math.max(1, Math.min(100, Math.round(value)));
 }
 
+function getInjurySeverity(hp) {
+  if (hp >= 100) return { label: "Íntegro", color: "var(--lime)", mult: 1, baseCr: 0, baseMat: 0 };
+  if (hp >= 70) return { label: "Ferimento Leve", color: "#9be564", mult: 1, baseCr: 10, baseMat: 1 };
+  if (hp >= 40) return { label: "Ferimento Grave", color: "#ffb84d", mult: 1.6, baseCr: 35, baseMat: 3 };
+  return { label: "Ferimento Muito Grave", color: "#ff6b6b", mult: 2.4, baseCr: 75, baseMat: 6 };
+}
+
 function getHealCost(opIndex) {
   const hp = getOpHp(opIndex);
   const missing = Math.max(0, 100 - hp);
-  if (missing === 0) return { missing: 0, credits: 0, materials: 0 };
+  const sev = getInjurySeverity(hp);
+  if (missing === 0) {
+    return { missing: 0, credits: 0, materials: 0, severity: sev };
+  }
   const infirmaryBuilt = state.built.includes(1);
-  const crPerHp = infirmaryBuilt ? 2 : 4;
-  const matPerHp = infirmaryBuilt ? 0.08 : 0.15;
+  const discount = infirmaryBuilt ? 0.55 : 1;
+  const crPerHp = 3.2 * sev.mult;
+  const matPerHp = 0.14 * sev.mult;
+
+  const credits = Math.max(15, Math.ceil((sev.baseCr + missing * crPerHp) * discount));
+  const materials = Math.max(2, Math.ceil((sev.baseMat + missing * matPerHp) * discount));
+
   return {
     missing,
-    credits: Math.max(10, Math.ceil(missing * crPerHp)),
-    materials: Math.max(1, Math.ceil(missing * matPerHp))
+    credits,
+    materials,
+    severity: sev
   };
 }
 
@@ -225,8 +241,11 @@ function renderRoster() {
     const selected = state.selected.includes(i);
     const prog = getOpProgress(i);
     const hp = getOpHp(i);
+    const sev = getInjurySeverity(hp);
     const ptsBadge = prog.trainPts > 0 ? ` · +${prog.trainPts} PT` : "";
-    const hpBadge = hp < 100 ? ` · <span style="color:#ff9b6a">${hp} HP</span>` : ` · 100 HP`;
+    const hpBadge = hp < 100
+      ? ` · <span style="color:${sev.color}">${hp} HP (${sev.label})</span>`
+      : ` · 100 HP`;
     const d = document.createElement("div");
     d.className = "operator" + (selected ? " selected" : "");
     d.innerHTML = `<span class="portrait">${o[0].split(" ").map(x => x[0]).slice(0, 2).join("")}</span><span style="min-width:0;flex:1;text-align:left"><b>${o[0]}</b><small>NV.${prog.level} · ${o[2]}${hpBadge} · ${prog.xp}/100 XP${ptsBadge}</small></span><button type="button" class="op-info-btn">INFO</button><span class="pick">${selected ? "✓" : "＋"}</span>`;
@@ -252,8 +271,7 @@ function renderRoster() {
   });
   const countEl = document.getElementById("team-count");
   if (countEl) countEl.textContent = `EQUIPA ${state.selected.length}/5`;
-}
-
+  }
 function trainOpStat(opIndex, statIdx, fromAcademy = false) {
   const prog = getOpProgress(opIndex);
   const currentStats = getEffectiveStats(opIndex);
@@ -326,7 +344,10 @@ function healOperativeOnBase(opIndex) {
   }
 
   if (state.credits < cost.credits || state.materials < cost.materials) {
-    logModal("RECURSOS INSUFICIENTES", `Curar ${op[0]} custa ${cost.credits} créditos e ${cost.materials} materiais.`);
+    logModal(
+      "RECURSOS INSUFICIENTES",
+      `Tratar <b>${cost.severity.label}</b> de ${op[0]} custa <b>${cost.credits} créditos</b> e <b>${cost.materials} materiais</b>.`
+    );
     return;
   }
 
@@ -336,13 +357,17 @@ function healOperativeOnBase(opIndex) {
   save();
   renderBuildings();
   renderRoster();
-  logModal("FERIMENTOS TRATADOS", `${op[0]} recuperou até 100 HP (${cost.credits} cr e ${cost.materials} mat gastos).`);
+  logModal(
+    "FERIMENTOS TRATADOS",
+    `${op[0]} (${cost.severity.label}) recuperou até 100 HP (${cost.credits} cr e ${cost.materials} mat gastos).`
+  );
 }
 
 function showOperator(i) {
   const o = OPERATIVES[i];
   const prog = getOpProgress(i);
   const hp = getOpHp(i);
+  const sev = getInjurySeverity(hp);
   const stats = getEffectiveStats(i);
   const perk = ROLE_PERKS[o[2]] || "";
   const academyBuilt = state.built.includes(6);
@@ -359,9 +384,13 @@ function showOperator(i) {
     return `<div class="stat"><span>${STAT_NAMES[j]}</span><span><b>${v}</b>${btnHtml}</span></div>`;
   }).join("");
 
+  const hpLine = hp < 100
+    ? `<span style="color:${sev.color}">${hp}/100 HP · ${sev.label}</span>`
+    : `100/100 HP · Íntegro`;
+
   const headerInfo = prog.trainPts > 0
-    ? `NV.${prog.level} · ${hp}/100 HP · ${prog.xp}/100 XP · <span style="color:var(--lime)">${prog.trainPts} PONTO(S) DE TREINO LIVRE</span>`
-    : `NV.${prog.level} · ${hp}/100 HP · ${prog.xp}/100 XP · Treino direto: ${drillCost} cr/ponto${academyBuilt ? " (Academia ativa)" : ""}`;
+    ? `NV.${prog.level} · ${hpLine} · ${prog.xp}/100 XP · <span style="color:var(--lime)">${prog.trainPts} PONTO(S) DE TREINO LIVRE</span>`
+    : `NV.${prog.level} · ${hpLine} · ${prog.xp}/100 XP · Treino direto: ${drillCost} cr/ponto${academyBuilt ? " (Academia ativa)" : ""}`;
 
   document.getElementById("modal-content").innerHTML = `<div class="eyebrow">${o[1]} // ${o[2]}</div><h2 style="font:800 32px var(--display);margin:0">${o[0]}</h2><p class="muted">${o[4]}<br><span style="color:var(--lime)">${perk}</span><br><small style="color:var(--muted)">${headerInfo}</small></p><div class="stats">${statsHtml}</div>`;
 
@@ -425,7 +454,8 @@ function renderBuildings() {
 
   const healOptionsHtml = OPERATIVES.map((o, idx) => {
     const h = getOpHp(idx);
-    const status = h < 100 ? ` (${h}/100 HP)` : " (100/100 HP)";
+    const s = getInjurySeverity(h);
+    const status = h < 100 ? ` (${h} HP · ${s.label})` : " (100 HP · Íntegro)";
     return `<option value="${idx}" ${idx === selectedHealOpIndex ? "selected" : ""}>${o[0]} · ${o[2]}${status}</option>`;
   }).join("");
 
@@ -438,15 +468,15 @@ function renderBuildings() {
   healBox.innerHTML = `
     <div>
       <b>ENFERMARIA E CURA — BASE MILITAR</b><br>
-      <small>${infirmaryBuilt ? "Enfermaria construída: custo reduzido de créditos e materiais." : "Constrói a Enfermaria para reduzir os custos de cura."}</small>
+      <small>Leve (70–99 HP) · Grave (40–69 HP) · Muito Grave (1–39 HP)${infirmaryBuilt ? " · <span style='color:var(--lime)'>Enfermaria ativa (-45% custo)</span>" : " · Constrói a Enfermaria para reduzir custos"}</small>
     </div>
     <div style="display:flex;flex-direction:column;gap:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.07)">
-      <label style="font-size:11px;color:var(--muted)">Seleciona o operacional ferido:</label>
+      <label style="font-size:11px;color:var(--muted)">Seleciona o operacional:</label>
       <select id="heal-op-select" style="width:100%;padding:9px;background:#0e161d;color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:6px;font-size:12px">
         ${healOptionsHtml}
       </select>
       <small style="color:var(--muted)">
-        ${healOp[0]}: <b>${healHp}/100 HP</b> · ${healCost.missing > 0 ? `Custo: <b>${healCost.credits} créditos</b> e <b>${healCost.materials} materiais</b>` : "Sem ferimentos para tratar"}
+        ${healOp[0]}: <b style="color:${healCost.severity.color}">${healHp}/100 HP (${healCost.severity.label})</b> · ${healCost.missing > 0 ? `Custo: <b>${healCost.credits} créditos</b> e <b>${healCost.materials} materiais</b>` : "Sem ferimentos para tratar"}
       </small>
       <button type="button" id="heal-op-btn" ${healCost.missing <= 0 ? "disabled" : ""} style="padding:8px 10px;font-size:10px">
         ${healCost.missing > 0 ? `CURAR ATÉ 100 HP (${healCost.credits} CR / ${healCost.materials} MAT)` : "TOTALMENTE RECUPERADO"}
@@ -539,7 +569,7 @@ function renderMissions() {
     d.querySelector("button").onclick = () => startMission(i);
     el.appendChild(d);
   });
-}
+                                                                           }
 let battle = {
   units: [],
   enemies: [],
@@ -733,8 +763,18 @@ function startMission(i) {
   document.getElementById("battle-log").textContent = `Turno 1 · Secundário: ${m.secondaryLabel}. Escolhe mover, disparar, vigiar ou Hunker Down (-1 PA).`;
   go("tactical");
   renderBattle();
-      }
+}
+function positionBattleLogBelowGrid() {
+  const grid = document.getElementById("battle-grid");
+  const logEl = document.getElementById("battle-log");
+  if (!grid || !logEl || !grid.parentNode) return;
+  if (grid.nextElementSibling !== logEl) {
+    grid.insertAdjacentElement("afterend", logEl);
+  }
+}
+
 function renderBattle() {
+  positionBattleLogBelowGrid();
   const grid = document.getElementById("battle-grid");
   grid.innerHTML = "";
   const unit = battle.units[battle.selected];
@@ -845,6 +885,7 @@ function tileAction(x, y, uIdx, eIdx) {
 }
 
 function battleLog(t) {
+  positionBattleLogBelowGrid();
   document.getElementById("battle-log").textContent = t;
 }
 
@@ -1026,7 +1067,7 @@ document.getElementById("end-turn").onclick = () => {
     renderRoster();
     battleLog(enemyLogs.join(" ") + " Toda a equipa ficou inconsciente. Operação falhada.");
     renderBattle();
-    logModal("OPERAÇÃO FALHADA", "Os operacionais ficaram sem condições de combate (25 HP de recuperação). A regressar à base.", "command");
+    logModal("OPERAÇÃO FALHADA", "Os operacionais ficaram sem condições de combate (25 HP · Ferimento Muito Grave). A regressar à base.", "command");
     return;
   }
 
@@ -1078,8 +1119,11 @@ function checkWin() {
       const lvUps = grantOpXp(u.id, gained);
       const prog = getOpProgress(u.id);
       const finalHp = getOpHp(u.id);
+      const sev = getInjurySeverity(finalHp);
       totalLevelsGained += lvUps;
-      const hpNote = finalHp < 100 ? ` · <span style="color:#ff9b6a">${finalHp} HP</span>` : ` · 100 HP`;
+      const hpNote = finalHp < 100
+        ? ` · <span style="color:${sev.color}">${finalHp} HP (${sev.label})</span>`
+        : ` · 100 HP`;
       return `<div><b>${OPERATIVES[u.id][0]}</b>: +${gained} XP → NV.${prog.level} (${prog.xp}/100 XP)${hpNote}${lvUps ? ` · <span style="color:var(--lime)">+${lvUps * 2} PT</span>` : ""}</div>`;
     });
 
