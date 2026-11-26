@@ -15,36 +15,26 @@ const OPERATIVES = [
 
 const STAT_NAMES = ["Precisão", "Pontaria", "Mobilidade", "Resistência", "Perceção", "Técnica", "Furtividade", "Disciplina"];
 
-const CLASS_TRAINING_PROFILES = [
-  { role: "Assalto", focusStat: 0, altStat: 2, label: "Linha de frente e mobilidade" },
-  { role: "Sniper", focusStat: 1, altStat: 4, label: "Precisão de tiro e perceção" },
-  { role: "Médico", focusStat: 7, altStat: 5, label: "Disciplina e suporte técnico" },
-  { role: "Engenheira", focusStat: 5, altStat: 3, label: "Técnica e resistência tática" },
-  { role: "Armas pesadas", focusStat: 3, altStat: 7, label: "Resistência e sangue-frio" },
-  { role: "Batedora", focusStat: 6, altStat: 2, label: "Furtividade e flanqueamento" },
-  { role: "Batedor", focusStat: 6, altStat: 2, label: "Furtividade e flanqueamento" }
-];
-
 const BUILDINGS = [
   ["Quartel", "Aumenta a capacidade de alojamento.", 500, 10],
-  ["Enfermaria", "Reduz significativamente o custo de tratar ferimentos leves, graves e muito graves.", 700, 15],
-  ["Arsenal", "Desconta 20% nas armas e fardas da loja da base.", 900, 20],
+  ["Enfermaria", "Desbloqueia o tratamento de ferimentos (Leve, Grave e Muito Grave).", 700, 15],
+  ["Arsenal", "Desbloqueia a loja de armas e fardas para os operacionais.", 900, 20],
   ["Laboratório", "Investiga tecnologia recuperada.", 1200, 25],
   ["Hangar", "Desbloqueia operações de transporte.", 1500, 35],
   ["Centro de inteligência", "Melhora a informação de missão.", 1000, 20],
-  ["Academia militar", "Reduz o custo de treino e melhora a preparação das classes.", 1100, 25],
+  ["Academia militar", "Desbloqueia o treino de atributos na base.", 1100, 25],
   ["Central de energia", "Aumenta a capacidade energética.", 1300, 30]
 ];
 
 const WEAPONS_SHOP = [
-  { id: "wpn_std", name: "ARMA PADRÃO", credits: 0, materials: 0, dmgBonus: 0, magBonus: 0, hitBonus: 0, desc: "Equipamento base da classe." },
+  { id: "wpn_std", name: "ARMA PADRÃO", credits: 0, materials: 0, dmgBonus: 0, magBonus: 0, hitBonus: 0, desc: "Equipamento base." },
   { id: "wpn_vanguard", name: "CARABINA VANGUARDA MK.II", credits: 450, materials: 12, dmgBonus: 8, magBonus: 4, hitBonus: 4, desc: "+8 dano, +4 munição, +4% precisão." },
   { id: "wpn_marksman", name: "PRECISÃO ZERO-X", credits: 700, materials: 18, dmgBonus: 16, magBonus: 2, hitBonus: 8, desc: "+16 dano, +2 munição, +8% precisão." },
   { id: "wpn_heavy", name: "ASSALTO PESADO TITAN", credits: 950, materials: 25, dmgBonus: 22, magBonus: 10, hitBonus: 5, desc: "+22 dano, +10 munição, +5% precisão." }
 ];
 
 const OUTFITS_SHOP = [
-  { id: "out_std", name: "FARDA OPERACIONAL", credits: 0, materials: 0, dmgRed: 0, hpBonus: 0, dodgeBonus: 0, desc: "Farda padrão sem blindagem extra." },
+  { id: "out_std", name: "FARDA OPERACIONAL", credits: 0, materials: 0, dmgRed: 0, hpBonus: 0, dodgeBonus: 0, desc: "Farda base sem blindagem extra." },
   { id: "out_recon", name: "FATO FURTIVO SHADOW", credits: 400, materials: 10, dmgRed: 2, hpBonus: 10, dodgeBonus: 8, desc: "+10 HP máx., -2 dano recebido, +8% evasão." },
   { id: "out_tactical", name: "COLETE TÁTICO AEGIS", credits: 650, materials: 16, dmgRed: 5, hpBonus: 20, dodgeBonus: 4, desc: "+20 HP máx., -5 dano recebido, +4% evasão." },
   { id: "out_exo", name: "EXOFARDA SENTINELA", credits: 950, materials: 24, dmgRed: 8, hpBonus: 35, dodgeBonus: 6, desc: "+35 HP máx., -8 dano recebido, +6% evasão." }
@@ -135,8 +125,11 @@ const defaults = {
 let state = load();
 let pendingReturnScreen = null;
 let selectedTrainOpIndex = 0;
+let selectedTrainStatIndex = 0;
 let selectedHealOpIndex = 0;
 let selectedShopOpIndex = 0;
+let selectedShopCategory = "weapon";
+let selectedShopItemId = "wpn_vanguard";
 
 function load() {
   try {
@@ -148,6 +141,18 @@ function load() {
   } catch (e) {
     return { ...defaults, opProgress: {}, opHp: {}, opGear: {} };
   }
+}
+
+function isInfirmaryBuilt() {
+  return state.built.includes(1);
+}
+
+function isArmoryBuilt() {
+  return state.built.includes(2);
+}
+
+function isAcademyBuilt() {
+  return state.built.includes(6);
 }
 
 function getOpGear(opIndex) {
@@ -172,13 +177,11 @@ function getMaxHp(opIndex) {
 }
 
 function getShopItemCost(item) {
-  const armoryBuilt = state.built.includes(2);
-  const mult = armoryBuilt ? 0.8 : 1;
   return {
-    credits: Math.ceil(item.credits * mult),
-    materials: Math.ceil(item.materials * mult)
+    credits: item.credits,
+    materials: item.materials
   };
-}
+   }
 function getOpHp(opIndex) {
   const maxHp = getMaxHp(opIndex);
   const raw = state.opHp[opIndex];
@@ -210,13 +213,11 @@ function getHealCost(opIndex) {
   if (missing === 0) {
     return { missing: 0, credits: 0, materials: 0, severity: sev, maxHp };
   }
-  const infirmaryBuilt = state.built.includes(1);
-  const discount = infirmaryBuilt ? 0.55 : 1;
   const crPerHp = 3.2 * sev.mult;
   const matPerHp = 0.14 * sev.mult;
 
-  const credits = Math.max(15, Math.ceil((sev.baseCr + missing * crPerHp) * discount));
-  const materials = Math.max(2, Math.ceil((sev.baseMat + missing * matPerHp) * discount));
+  const credits = Math.max(15, Math.ceil(sev.baseCr + missing * crPerHp));
+  const materials = Math.max(2, Math.ceil(sev.baseMat + missing * matPerHp));
 
   return {
     missing,
@@ -326,6 +327,11 @@ function renderRoster() {
 }
 
 function buyOrEquipGear(opIndex, type, itemId) {
+  if (!isArmoryBuilt()) {
+    logModal("ARSENAL EM FALTA", "Constrói primeiro o edifício <b>Arsenal</b> na base para aceder à loja de armas e fardas.");
+    return;
+  }
+
   const idx = Number(opIndex);
   if (Number.isNaN(idx) || !OPERATIVES[idx]) return;
   const op = OPERATIVES[idx];
@@ -333,10 +339,6 @@ function buyOrEquipGear(opIndex, type, itemId) {
   const catalog = type === "weapon" ? WEAPONS_SHOP : OUTFITS_SHOP;
   const item = catalog.find(x => x.id === itemId);
   if (!item) return;
-
-  const isOwned = (item.credits === 0 && item.materials === 0) || (
-    type === "weapon" ? gear.weaponId === item.id : gear.outfitId === item.id
-  );
 
   if (type === "weapon" && gear.weaponId === item.id) {
     logModal("JÁ EQUIPADO", `${op[0]} já tem <b>${item.name}</b> equipada.`);
@@ -377,24 +379,25 @@ function buyOrEquipGear(opIndex, type, itemId) {
   renderBuildings();
   renderRoster();
   logModal(
-    isOwned ? "EQUIPAMENTO ATUALIZADO" : "COMPRA CONCLUÍDA",
+    needsPayment ? "COMPRA CONCLUÍDA" : "EQUIPAMENTO ATUALIZADO",
     `${op[0]} equipou <b>${item.name}</b>${needsPayment ? ` (${cost.credits} cr e ${cost.materials} mat gastos)` : ""}.`
   );
-      }
+    }
 function trainOpStat(opIndex, statIdx, fromAcademy = false) {
   const prog = getOpProgress(opIndex);
   const currentStats = getEffectiveStats(opIndex);
   if (currentStats[statIdx] >= 99) return false;
 
   if (prog.trainPts > 0) {
+    if (!isAcademyBuilt()) return false;
     prog.trainPts -= 1;
     prog.bonusStats[statIdx] = (prog.bonusStats[statIdx] || 0) + 1;
     save();
     return true;
   }
 
-  const academyBuilt = state.built.includes(6);
-  const cost = academyBuilt ? 140 : 220;
+  if (!isAcademyBuilt()) return false;
+  const cost = 200;
   if (fromAcademy && state.credits >= cost) {
     state.credits -= cost;
     prog.bonusStats[statIdx] = (prog.bonusStats[statIdx] || 0) + 1;
@@ -405,6 +408,11 @@ function trainOpStat(opIndex, statIdx, fromAcademy = false) {
 }
 
 function trainSelectedOperative(opIndex, statIdx) {
+  if (!isAcademyBuilt()) {
+    logModal("ACADEMIA EM FALTA", "Constrói primeiro o edifício <b>Academia militar</b> na base para treinar atributos.");
+    return;
+  }
+
   const idx = Number(opIndex);
   if (Number.isNaN(idx) || !OPERATIVES[idx]) return;
   const op = OPERATIVES[idx];
@@ -426,8 +434,7 @@ function trainSelectedOperative(opIndex, statIdx) {
     return;
   }
 
-  const academyBuilt = state.built.includes(6);
-  const cost = academyBuilt ? 160 : 250;
+  const cost = 220;
   if (state.credits < cost) {
     logModal("CRÉDITOS INSUFICIENTES", `Precisas de ${cost} créditos para treinar ${op[0]}.`);
     return;
@@ -438,10 +445,15 @@ function trainSelectedOperative(opIndex, statIdx) {
   save();
   renderBuildings();
   renderRoster();
-  logModal("TREINO CONCLUÍDO", `${op[0]} (${op[2]}) ganhou +1 em <b>${STAT_NAMES[statIdx]}</b> (${getEffectiveStats(idx)[statIdx]}).`);
+  logModal("TREINO CONCLUÍDO", `${op[0]} ganhou +1 em <b>${STAT_NAMES[statIdx]}</b> (${getEffectiveStats(idx)[statIdx]}).`);
 }
 
 function healOperativeOnBase(opIndex) {
+  if (!isInfirmaryBuilt()) {
+    logModal("ENFERMARIA EM FALTA", "Constrói primeiro o edifício <b>Enfermaria</b> na base para tratar ferimentos.");
+    return;
+  }
+
   const idx = Number(opIndex);
   if (Number.isNaN(idx) || !OPERATIVES[idx]) return;
   const op = OPERATIVES[idx];
@@ -483,12 +495,12 @@ function showOperator(i) {
   const outItem = getEquippedOutfitItem(i);
   const stats = getEffectiveStats(i);
   const perk = ROLE_PERKS[o[2]] || "";
-  const academyBuilt = state.built.includes(6);
-  const drillCost = academyBuilt ? 140 : 220;
-  const canUseDrill = prog.trainPts <= 0 && state.credits >= drillCost;
+  const academyBuilt = isAcademyBuilt();
+  const drillCost = 200;
+  const canUseDrill = academyBuilt && prog.trainPts <= 0 && state.credits >= drillCost;
 
   const statsHtml = stats.map((v, j) => {
-    const canSpendPt = prog.trainPts > 0 && v < 99;
+    const canSpendPt = academyBuilt && prog.trainPts > 0 && v < 99;
     const canBuyDrill = !canSpendPt && canUseDrill && v < 99;
     const btnLabel = canSpendPt ? "+1 PT" : canBuyDrill ? `+1 (${drillCost}cr)` : "";
     const btnHtml = btnLabel
@@ -501,9 +513,13 @@ function showOperator(i) {
     ? `<span style="color:${sev.color}">${hp}/${maxHp} HP · ${sev.label}</span>`
     : `${maxHp}/${maxHp} HP · Íntegro`;
 
-  const headerInfo = prog.trainPts > 0
-    ? `NV.${prog.level} · ${hpLine} · ${prog.xp}/100 XP · <span style="color:var(--lime)">${prog.trainPts} PONTO(S) DE TREINO LIVRE</span>`
-    : `NV.${prog.level} · ${hpLine} · ${prog.xp}/100 XP · Treino direto: ${drillCost} cr/ponto${academyBuilt ? " (Academia ativa)" : ""}`;
+  const trainStatusText = academyBuilt
+    ? (prog.trainPts > 0
+      ? `<span style="color:var(--lime)">${prog.trainPts} PONTO(S) DE TREINO LIVRE</span>`
+      : `Treino direto: ${drillCost} cr/ponto (Academia ativa)`)
+    : `<span style="color:var(--muted)">Treino bloqueado · Constrói a Academia militar na base</span>`;
+
+  const headerInfo = `NV.${prog.level} · ${hpLine} · ${prog.xp}/100 XP · ${trainStatusText}`;
 
   document.getElementById("modal-content").innerHTML = `<div class="eyebrow">${o[1]} // ${o[2]}</div><h2 style="font:800 32px var(--display);margin:0">${o[0]}</h2><p class="muted">${o[4]}<br><span style="color:var(--lime)">${perk}</span><br><small style="color:#9ec5d8">Arma: <b>${wpnItem.name}</b> · Farda: <b>${outItem.name}</b></small><br><small style="color:var(--muted)">${headerInfo}</small></p><div class="stats">${statsHtml}</div>`;
 
@@ -559,7 +575,7 @@ function renderBuildings() {
     el.appendChild(d);
   });
 
-  const infirmaryBuilt = state.built.includes(1);
+  const infirmaryBuilt = isInfirmaryBuilt();
   if (!OPERATIVES[selectedHealOpIndex]) selectedHealOpIndex = 0;
   const healOp = OPERATIVES[selectedHealOpIndex];
   const healMaxHp = getMaxHp(selectedHealOpIndex);
@@ -583,18 +599,18 @@ function renderBuildings() {
   healBox.innerHTML = `
     <div>
       <b>ENFERMARIA E CURA — BASE MILITAR</b><br>
-      <small>Leve (≥70% HP) · Grave (≥40% HP) · Muito Grave (<40% HP)${infirmaryBuilt ? " · <span style='color:var(--lime)'>Enfermaria ativa (-45% custo)</span>" : " · Constrói a Enfermaria para reduzir custos"}</small>
+      <small>${infirmaryBuilt ? "<span style='color:var(--lime)'>Enfermaria construída · Trata ferimentos Leves, Graves e Muito Graves</span>" : "<span style='color:#ff9e5e'>Bloqueada · Constrói a Enfermaria para curar operacionais</span>"}</small>
     </div>
     <div style="display:flex;flex-direction:column;gap:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.07)">
       <label style="font-size:11px;color:var(--muted)">Seleciona o operacional:</label>
-      <select id="heal-op-select" style="width:100%;padding:9px;background:#0e161d;color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:6px;font-size:12px">
+      <select id="heal-op-select" ${!infirmaryBuilt ? "disabled" : ""} style="width:100%;padding:9px;background:#0e161d;color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:6px;font-size:12px">
         ${healOptionsHtml}
       </select>
       <small style="color:var(--muted)">
         ${healOp[0]}: <b style="color:${healCost.severity.color}">${healHp}/${healMaxHp} HP (${healCost.severity.label})</b> · ${healCost.missing > 0 ? `Custo: <b>${healCost.credits} créditos</b> e <b>${healCost.materials} materiais</b>` : "Sem ferimentos para tratar"}
       </small>
-      <button type="button" id="heal-op-btn" ${healCost.missing <= 0 ? "disabled" : ""} style="padding:8px 10px;font-size:10px">
-        ${healCost.missing > 0 ? `CURAR ATÉ ${healMaxHp} HP (${healCost.credits} CR / ${healCost.materials} MAT)` : "TOTALMENTE RECUPERADO"}
+      <button type="button" id="heal-op-btn" ${(!infirmaryBuilt || healCost.missing <= 0) ? "disabled" : ""} style="padding:8px 10px;font-size:10px">
+        ${!infirmaryBuilt ? "REQUER ENFERMARIA" : (healCost.missing > 0 ? `CURAR ATÉ ${healMaxHp} HP (${healCost.credits} CR / ${healCost.materials} MAT)` : "TOTALMENTE RECUPERADO")}
       </button>
     </div>
   `;
@@ -607,39 +623,32 @@ function renderBuildings() {
     healOperativeOnBase(selectedHealOpIndex);
   };
   el.appendChild(healBox);
-  const armoryBuilt = state.built.includes(2);
+  const armoryBuilt = isArmoryBuilt();
   if (!OPERATIVES[selectedShopOpIndex]) selectedShopOpIndex = 0;
   const shopOp = OPERATIVES[selectedShopOpIndex];
   const shopGear = getOpGear(selectedShopOpIndex);
   const eqWpn = getEquippedWeaponItem(selectedShopOpIndex);
   const eqOut = getEquippedOutfitItem(selectedShopOpIndex);
 
+  const shopCatalog = selectedShopCategory === "outfit" ? OUTFITS_SHOP : WEAPONS_SHOP;
+  if (!shopCatalog.some(x => x.id === selectedShopItemId)) {
+    selectedShopItemId = shopCatalog[1] ? shopCatalog[1].id : shopCatalog[0].id;
+  }
+  const chosenShopItem = shopCatalog.find(x => x.id === selectedShopItemId) || shopCatalog[0];
+  const chosenEquipped = selectedShopCategory === "outfit"
+    ? shopGear.outfitId === chosenShopItem.id
+    : shopGear.weaponId === chosenShopItem.id;
+  const chosenNeedsPay = !(chosenShopItem.credits === 0 && chosenShopItem.materials === 0);
+  const chosenCost = getShopItemCost(chosenShopItem);
+
   const shopOpOptions = OPERATIVES.map((o, idx) => {
     return `<option value="${idx}" ${idx === selectedShopOpIndex ? "selected" : ""}>${o[0]} · ${o[2]}</option>`;
   }).join("");
 
-  const weaponsHtml = WEAPONS_SHOP.map(w => {
-    const equipped = shopGear.weaponId === w.id;
-    const cost = getShopItemCost(w);
-    const label = equipped
-      ? "EQUIPADA"
-      : (w.credits === 0 && w.materials === 0 ? "EQUIPAR" : `COMPRAR (${cost.credits} CR / ${cost.materials} MAT)`);
-    return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-top:1px solid rgba(255,255,255,.06)">
-      <div style="min-width:0;flex:1"><b>${w.name}</b><br><small>${w.desc}</small></div>
-      <button type="button" data-buy-weapon="${w.id}" ${equipped ? "disabled" : ""} style="padding:6px 8px;font-size:9px">${label}</button>
-    </div>`;
-  }).join("");
-
-  const outfitsHtml = OUTFITS_SHOP.map(oItem => {
-    const equipped = shopGear.outfitId === oItem.id;
-    const cost = getShopItemCost(oItem);
-    const label = equipped
-      ? "EQUIPADA"
-      : (oItem.credits === 0 && oItem.materials === 0 ? "EQUIPAR" : `COMPRAR (${cost.credits} CR / ${cost.materials} MAT)`);
-    return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-top:1px solid rgba(255,255,255,.06)">
-      <div style="min-width:0;flex:1"><b>${oItem.name}</b><br><small>${oItem.desc}</small></div>
-      <button type="button" data-buy-outfit="${oItem.id}" ${equipped ? "disabled" : ""} style="padding:6px 8px;font-size:9px">${label}</button>
-    </div>`;
+  const shopItemOptions = shopCatalog.map(item => {
+    const isEq = selectedShopCategory === "outfit" ? shopGear.outfitId === item.id : shopGear.weaponId === item.id;
+    const tag = isEq ? " [EQUIPADO]" : (item.credits > 0 || item.materials > 0 ? ` (${item.credits} CR / ${item.materials} MAT)` : " [BASE]");
+    return `<option value="${item.id}" ${item.id === chosenShopItem.id ? "selected" : ""}>${item.name}${tag}</option>`;
   }).join("");
 
   const shopBox = document.createElement("div");
@@ -650,19 +659,30 @@ function renderBuildings() {
 
   shopBox.innerHTML = `
     <div>
-      <b>LOJA DE ARMAS E FARDAS — BASE MILITAR</b><br>
-      <small>${armoryBuilt ? "<span style='color:var(--lime)'>Arsenal construído: -20% nos custos de armas e fardas</span>" : "Constrói o Arsenal para 20% de desconto em armas e fardas"}</small>
+      <b>LOJA DE OBJETOS — BASE MILITAR</b><br>
+      <small>${armoryBuilt ? "<span style='color:var(--lime)'>Arsenal construído · Escolhe personagem, tipo e objeto sem restrição de classe</span>" : "<span style='color:#ff9e5e'>Bloqueada · Constrói o Arsenal para comprar e equipar armas ou fardas</span>"}</small>
     </div>
     <div style="display:flex;flex-direction:column;gap:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.07)">
-      <label style="font-size:11px;color:var(--muted)">Equipar para:</label>
-      <select id="shop-op-select" style="width:100%;padding:9px;background:#0e161d;color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:6px;font-size:12px">
+      <label style="font-size:11px;color:var(--muted)">1. Personagem:</label>
+      <select id="shop-op-select" ${!armoryBuilt ? "disabled" : ""} style="width:100%;padding:9px;background:#0e161d;color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:6px;font-size:12px">
         ${shopOpOptions}
       </select>
-      <small style="color:var(--muted)">${shopOp[0]} · Atual: <b>${eqWpn.name}</b> + <b>${eqOut.name}</b></small>
-      <div style="font-size:11px;color:var(--lime);margin-top:2px">ARMAS</div>
-      ${weaponsHtml}
-      <div style="font-size:11px;color:var(--lime);margin-top:6px">FARDAS / ROUPAS</div>
-      ${outfitsHtml}
+      <label style="font-size:11px;color:var(--muted)">2. Tipo de objeto:</label>
+      <select id="shop-cat-select" ${!armoryBuilt ? "disabled" : ""} style="width:100%;padding:9px;background:#0e161d;color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:6px;font-size:12px">
+        <option value="weapon" ${selectedShopCategory === "weapon" ? "selected" : ""}>Arma</option>
+        <option value="outfit" ${selectedShopCategory === "outfit" ? "selected" : ""}>Farda / Roupa</option>
+      </select>
+      <label style="font-size:11px;color:var(--muted)">3. Objeto:</label>
+      <select id="shop-item-select" ${!armoryBuilt ? "disabled" : ""} style="width:100%;padding:9px;background:#0e161d;color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:6px;font-size:12px">
+        ${shopItemOptions}
+      </select>
+      <small style="color:var(--muted)">
+        ${shopOp[0]} (atual: <b>${eqWpn.name}</b> · <b>${eqOut.name}</b>)<br>
+        Selecionado: <b>${chosenShopItem.name}</b> — ${chosenShopItem.desc}${chosenNeedsPay ? ` (${chosenCost.credits} cr / ${chosenCost.materials} mat)` : ""}
+      </small>
+      <button type="button" id="shop-confirm-btn" ${(!armoryBuilt || chosenEquipped) ? "disabled" : ""} style="padding:8px 10px;font-size:10px">
+        ${!armoryBuilt ? "REQUER ARSENAL" : (chosenEquipped ? "JÁ EQUIPADO" : (chosenNeedsPay ? `COMPRAR E EQUIPAR (${chosenCost.credits} CR / ${chosenCost.materials} MAT)` : "EQUIPAR OBJETO BASE"))}
+      </button>
     </div>
   `;
 
@@ -670,35 +690,44 @@ function renderBuildings() {
     selectedShopOpIndex = Number(ev.target.value);
     renderBuildings();
   };
-  shopBox.querySelectorAll("[data-buy-weapon]").forEach(btn => {
-    btn.onclick = () => buyOrEquipGear(selectedShopOpIndex, "weapon", btn.dataset.buyWeapon);
-  });
-  shopBox.querySelectorAll("[data-buy-outfit]").forEach(btn => {
-    btn.onclick = () => buyOrEquipGear(selectedShopOpIndex, "outfit", btn.dataset.buyOutfit);
-  });
+  shopBox.querySelector("#shop-cat-select").onchange = ev => {
+    selectedShopCategory = ev.target.value === "outfit" ? "outfit" : "weapon";
+    const nextCat = selectedShopCategory === "outfit" ? OUTFITS_SHOP : WEAPONS_SHOP;
+    selectedShopItemId = nextCat[1] ? nextCat[1].id : nextCat[0].id;
+    renderBuildings();
+  };
+  shopBox.querySelector("#shop-item-select").onchange = ev => {
+    selectedShopItemId = ev.target.value;
+    renderBuildings();
+  };
+  shopBox.querySelector("#shop-confirm-btn").onclick = () => {
+    buyOrEquipGear(selectedShopOpIndex, selectedShopCategory, selectedShopItemId);
+  };
   el.appendChild(shopBox);
 
-  const academyBuilt = state.built.includes(6);
-  const trainCost = academyBuilt ? 160 : 250;
+  const academyBuilt = isAcademyBuilt();
+  const trainCost = 220;
   if (!OPERATIVES[selectedTrainOpIndex]) selectedTrainOpIndex = 0;
+  if (!STAT_NAMES[selectedTrainStatIndex]) selectedTrainStatIndex = 0;
 
   const currentOp = OPERATIVES[selectedTrainOpIndex];
   const currentProg = getOpProgress(selectedTrainOpIndex);
   const currentStats = getEffectiveStats(selectedTrainOpIndex);
-  const profile = CLASS_TRAINING_PROFILES.find(
-    p => p.role === currentOp[2] || (currentOp[2] === "Batedor" && p.role === "Batedora")
-  ) || CLASS_TRAINING_PROFILES[0];
-
-  const focusName = STAT_NAMES[profile.focusStat];
-  const altName = STAT_NAMES[profile.altStat];
-  const ptHint = currentProg.trainPts > 0
-    ? `<span style="color:var(--lime)">${currentProg.trainPts} PT livre disponível (custo 0 cr)</span>`
-    : `Custo: ${trainCost} cr${academyBuilt ? " · desconto da Academia militar ativo" : ""}`;
+  const chosenStatVal = currentStats[selectedTrainStatIndex];
+  const ptHint = academyBuilt
+    ? (currentProg.trainPts > 0
+      ? `<span style="color:var(--lime)">${currentProg.trainPts} PT livre disponível (custo 0 cr)</span>`
+      : `Custo: ${trainCost} cr por +1 ponto em qualquer atributo (Academia militar ativa)`)
+    : `<span style="color:#ff9e5e">Bloqueado · Constrói a Academia militar para treinar atributos na base</span>`;
 
   const opOptionsHtml = OPERATIVES.map((o, idx) => {
     const p = getOpProgress(idx);
     const ptTag = p.trainPts > 0 ? ` [+${p.trainPts} PT]` : "";
     return `<option value="${idx}" ${idx === selectedTrainOpIndex ? "selected" : ""}>${o[0]} · ${o[2]} (NV.${p.level})${ptTag}</option>`;
+  }).join("");
+
+  const statOptionsHtml = STAT_NAMES.map((sName, sIdx) => {
+    return `<option value="${sIdx}" ${sIdx === selectedTrainStatIndex ? "selected" : ""}>${sName} (${currentStats[sIdx]})</option>`;
   }).join("");
 
   const trainingBox = document.createElement("div");
@@ -709,21 +738,24 @@ function renderBuildings() {
 
   trainingBox.innerHTML = `
     <div>
-      <b>TREINO POR CLASSE — BASE MILITAR</b><br>
+      <b>ACADEMIA E TREINO LIVRE — BASE MILITAR</b><br>
       <small>${ptHint}</small>
     </div>
     <div style="display:flex;flex-direction:column;gap:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.07)">
-      <label style="font-size:11px;color:var(--muted)">Seleciona o operacional:</label>
-      <select id="train-op-select" style="width:100%;padding:9px;background:#0e161d;color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:6px;font-size:12px">
+      <label style="font-size:11px;color:var(--muted)">Personagem:</label>
+      <select id="train-op-select" ${!academyBuilt ? "disabled" : ""} style="width:100%;padding:9px;background:#0e161d;color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:6px;font-size:12px">
         ${opOptionsHtml}
       </select>
+      <label style="font-size:11px;color:var(--muted)">Atributo a subir (+1):</label>
+      <select id="train-stat-select" ${!academyBuilt ? "disabled" : ""} style="width:100%;padding:9px;background:#0e161d;color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:6px;font-size:12px">
+        ${statOptionsHtml}
+      </select>
       <small style="color:var(--muted)">
-        Classe <b>${currentOp[2]}</b> (${profile.label}) · ${focusName}: <b>${currentStats[profile.focusStat]}</b> · ${altName}: <b>${currentStats[profile.altStat]}</b>
+        ${currentOp[0]} · <b>${STAT_NAMES[selectedTrainStatIndex]}</b> atual: <b>${chosenStatVal}</b>/99
       </small>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button type="button" id="train-focus-btn" style="flex:1;min-width:140px;padding:8px 10px;font-size:10px">+1 ${focusName} (${currentProg.trainPts > 0 ? "1 PT" : trainCost + " cr"})</button>
-        <button type="button" id="train-alt-btn" class="secondary" style="flex:1;min-width:140px;padding:8px 10px;font-size:10px">+1 ${altName} (${currentProg.trainPts > 0 ? "1 PT" : trainCost + " cr"})</button>
-      </div>
+      <button type="button" id="train-confirm-btn" ${(!academyBuilt || chosenStatVal >= 99) ? "disabled" : ""} style="padding:8px 10px;font-size:10px">
+        ${!academyBuilt ? "REQUER ACADEMIA MILITAR" : (chosenStatVal >= 99 ? "NO MÁXIMO (99)" : `TREINAR +1 ${STAT_NAMES[selectedTrainStatIndex].toUpperCase()} (${currentProg.trainPts > 0 ? "1 PT" : trainCost + " CR"})`)}
+      </button>
     </div>
   `;
 
@@ -731,11 +763,12 @@ function renderBuildings() {
     selectedTrainOpIndex = Number(ev.target.value);
     renderBuildings();
   };
-  trainingBox.querySelector("#train-focus-btn").onclick = () => {
-    trainSelectedOperative(selectedTrainOpIndex, profile.focusStat);
+  trainingBox.querySelector("#train-stat-select").onchange = ev => {
+    selectedTrainStatIndex = Number(ev.target.value);
+    renderBuildings();
   };
-  trainingBox.querySelector("#train-alt-btn").onclick = () => {
-    trainSelectedOperative(selectedTrainOpIndex, profile.altStat);
+  trainingBox.querySelector("#train-confirm-btn").onclick = () => {
+    trainSelectedOperative(selectedTrainOpIndex, selectedTrainStatIndex);
   };
 
   el.appendChild(trainingBox);
