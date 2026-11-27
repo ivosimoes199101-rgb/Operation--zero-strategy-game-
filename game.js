@@ -1269,6 +1269,50 @@ function createMissionMap(missionIndex) {
   return grid;
 }
 
+function createMissionElevation(missionIndex, grid) {
+  const elev = Array.from({ length: GRID_H }, () => Array(GRID_W).fill(0));
+  if (missionIndex === 0) {
+    // Cumeada Norte elevada (nível 1) e plataforma de vigia rochosa (nível 2)
+    for (let y = 0; y <= 2; y++) {
+      for (let x = 2; x <= 12; x++) {
+        elev[y][x] = 1;
+      }
+    }
+    elev[1][6] = 2;
+    elev[1][7] = 2;
+    elev[1][8] = 2;
+    // Pequeno platô tático a Sudeste
+    for (let y = 9; y <= 10; y++) {
+      for (let x = 10; x <= 12; x++) {
+        elev[y][x] = 1;
+      }
+    }
+  } else {
+    // Plataformas elevadas táticas nos flancos
+    for (let y = 1; y <= 3; y++) {
+      for (let x = 4; x <= 8; x++) {
+        if (grid[y][x] !== 3) elev[y][x] = 1;
+      }
+    }
+    for (let y = 8; y <= 10; y++) {
+      for (let x = 6; x <= 10; x++) {
+        if (grid[y][x] !== 3) elev[y][x] = 1;
+      }
+    }
+    if (missionIndex >= 4) {
+      elev[2][6] = 2;
+      elev[9][8] = 2;
+    }
+  }
+  return elev;
+}
+
+function getTileElevation(battle, gx, gy) {
+  if (!battle || !battle.elevation) return 0;
+  if (gy < 0 || gy >= GRID_H || gx < 0 || gx >= GRID_W) return 0;
+  return battle.elevation[gy][gx] || 0;
+}
+
 function getTileCoverAt(battle, x, y) {
   if (!battle || !battle.grid) return 0;
   let best = 0;
@@ -1403,6 +1447,8 @@ function startMission(mission, missionIndex = 0) {
     panX: 0,
     panY: 0,
     grid: createMissionMap(missionIndex),
+    elevation: null,
+    vfxQueue: [],
     smokes: [],
     hoverTile: null,
     units,
@@ -1415,6 +1461,7 @@ function startMission(mission, missionIndex = 0) {
       : `Missão ${formatMissionNumber(mission.number)}: ${mission.title} — Toca num operacional para abrir as ordens flutuantes ou arrasta o plano isométrico.`
   };
 
+  state.battle.elevation = createMissionElevation(missionIndex, state.battle.grid);
   goToScreen("tactical");
   renderBattle();
 }
@@ -1540,6 +1587,11 @@ function calculateHitChance(unit, target, battle) {
   if (unit.crouched) {
     chance += 4;
   }
+
+  // Vantagem de altitude 2.5D (terreno elevado dá +8% por nível)
+  const elevDiff = getTileElevation(battle, unit.x, unit.y) - getTileElevation(battle, target.x, target.y);
+  if (elevDiff > 0) chance += Math.min(16, elevDiff * 8);
+  else if (elevDiff < 0) chance += Math.max(-10, elevDiff * 5);
 
   if (isInSmoke(battle, target.x, target.y)) chance -= 25;
   if (isInSmoke(battle, unit.x, unit.y)) chance -= 15;
@@ -1667,22 +1719,77 @@ function getIsoMetrics(canvas, ignoreBattlePan = false) {
   };
 }
 
-function worldToIso(gx, gy, battle, m) {
+function getElevationStepPx(m) {
+  return Math.max(6, Math.round(m.tileH * 0.42));
+}
+
+function worldToIso(gx, gy, battle, m, elevOverride = null) {
+  const elev = elevOverride !== null ? elevOverride : getTileElevation(battle, gx, gy);
+  const elevOffset = elev * getElevationStepPx(m);
   return {
     sx: m.originX + (gx - gy) * (m.tileW * 0.5),
-    sy: m.originY + (gx + gy) * (m.tileH * 0.5)
+    sy: m.originY + (gx + gy) * (m.tileH * 0.5) - elevOffset,
+    baseSy: m.originY + (gx + gy) * (m.tileH * 0.5),
+    elev
   };
 }
 
 function isoToWorld(px, py, battle, m) {
   const hw = m.tileW * 0.5;
   const hh = m.tileH * 0.5;
+  // Picking 2.5D: verifica primeiro os níveis mais altos para que cliques em plataformas elevadas sejam exatos
+  for (let testElev = 2; testElev >= 0; testElev--) {
+    const adjustedPy = py + testElev * getElevationStepPx(m);
+    const u = (px - m.originX) / hw;
+    const v = (adjustedPy - m.originY) / hh;
+    const gx = Math.floor((u + v) * 0.5 + 0.5);
+    const gy = Math.floor((v - u) * 0.5 + 0.5);
+    if (gx >= 0 && gx < GRID_W && gy >= 0 && gy < GRID_H) {
+      if (getTileElevation(battle, gx, gy) === testElev) {
+        return { x: gx, y: gy };
+      }
+    }
+  }
   const u = (px - m.originX) / hw;
   const v = (py - m.originY) / hh;
   const gx = Math.floor((u + v) * 0.5 + 0.5);
   const gy = Math.floor((v - u) * 0.5 + 0.5);
   if (gx < 0 || gx >= GRID_W || gy < 0 || gy >= GRID_H) return null;
   return { x: gx, y: gy };
+}
+
+function spawnBattleVfx(vfx) {
+  const b = state.battle;
+  if (!b) return;
+  if (!Array.isArray(b.vfxQueue)) b.vfxQueue = [];
+  b.vfxQueue.push({
+    ...vfx,
+    createdAt: performance.now(),
+    duration: vfx.duration || 520
+  });
+  ensureVfxAnimationLoop();
+}
+
+let ozVfxLoopActive = false;
+function ensureVfxAnimationLoop() {
+  if (ozVfxLoopActive) return;
+  ozVfxLoopActive = true;
+  const step = () => {
+    const b = state.battle;
+    if (!b || !Array.isArray(b.vfxQueue) || b.vfxQueue.length === 0) {
+      ozVfxLoopActive = false;
+      return;
+    }
+    const now = performance.now();
+    b.vfxQueue = b.vfxQueue.filter((item) => now - item.createdAt < item.duration);
+    renderBattle();
+    if (b.vfxQueue.length > 0) {
+      requestAnimationFrame(step);
+    } else {
+      ozVfxLoopActive = false;
+    }
+  };
+  requestAnimationFrame(step);
 }
 
 function drawIsoDiamond(ctx, sx, sy, w, h, fill, stroke, lw = 1.2) {
@@ -1705,56 +1812,139 @@ function drawIsoDiamond(ctx, sx, sy, w, h, fill, stroke, lw = 1.2) {
   }
 }
 
+function drawIsoTerrainColumn(ctx, sx, sy, w, h, elev, isAlt, canMoveHere, isMoveMode, smokeHere) {
+  const hw = w * 0.5;
+  const hh = h * 0.5;
+  const stepPx = Math.max(6, Math.round(h * 0.42));
+  const depthPx = Math.max(5, Math.round(h * 0.35)) + elev * stepPx;
+
+  // Laterais 2.5D do bloco de terreno (dá volume e leitura clara das alturas)
+  ctx.beginPath();
+  ctx.moveTo(sx - hw, sy);
+  ctx.lineTo(sx, sy + hh);
+  ctx.lineTo(sx, sy + hh + depthPx);
+  ctx.lineTo(sx - hw, sy + depthPx);
+  ctx.closePath();
+  ctx.fillStyle = elev === 2 ? "#1e3a52" : elev === 1 ? "#162a3d" : "#0f1c2a";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(56, 189, 248, 0.16)";
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(sx + hw, sy);
+  ctx.lineTo(sx, sy + hh);
+  ctx.lineTo(sx, sy + hh + depthPx);
+  ctx.lineTo(sx + hw, sy + depthPx);
+  ctx.closePath();
+  ctx.fillStyle = elev === 2 ? "#132638" : elev === 1 ? "#0e1c2b" : "#09121c";
+  ctx.fill();
+  ctx.stroke();
+
+  // Superfície superior do ladrilho isométrico
+  let fill = isAlt
+    ? (elev === 2 ? "rgba(44, 78, 108, 0.85)" : elev === 1 ? "rgba(35, 62, 88, 0.80)" : "rgba(26, 46, 66, 0.76)")
+    : (elev === 2 ? "rgba(36, 66, 94, 0.85)" : elev === 1 ? "rgba(28, 52, 74, 0.80)" : "rgba(19, 35, 52, 0.74)");
+  let stroke = elev > 0 ? "rgba(125, 211, 252, 0.44)" : "rgba(125, 211, 252, 0.25)";
+
+  if (canMoveHere) {
+    fill = isMoveMode ? "rgba(78, 242, 161, 0.34)" : "rgba(78, 242, 161, 0.18)";
+    stroke = "#4ef2a1";
+  } else if (smokeHere) {
+    fill = "rgba(203, 213, 225, 0.36)";
+    stroke = "rgba(241, 245, 249, 0.7)";
+  }
+
+  drawIsoDiamond(ctx, sx, sy, w, h, fill, stroke, canMoveHere ? 1.55 : 1);
+
+  // Indicador subtil de elevação no canto do ladrilho
+  if (elev > 0 && !canMoveHere) {
+    ctx.fillStyle = "rgba(147, 197, 253, 0.65)";
+    ctx.font = "bold 7px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(`+${elev}`, sx, sy + 2.5);
+  }
+}
+
 function drawIsoBoardSkirt(ctx, battle, m) {
-  const skirtH = Math.max(6, Math.round(m.wallH * 0.9));
+  const skirtH = Math.max(8, Math.round(m.wallH * 1.1));
   const hw = m.tileW * 0.5;
   const hh = m.tileH * 0.5;
 
-  const pSW = worldToIso(0, GRID_H - 1, battle, m);
-  const pS  = worldToIso(GRID_W - 1, GRID_H - 1, battle, m);
-  const pSE = worldToIso(GRID_W - 1, 0, battle, m);
+  const pSW = worldToIso(0, GRID_H - 1, battle, m, 0);
+  const pS  = worldToIso(GRID_W - 1, GRID_H - 1, battle, m, 0);
+  const pSE = worldToIso(GRID_W - 1, 0, battle, m, 0);
 
-  // Face esquerda inferior (x = 0..GRID_W-1, y = GRID_H-1)
   ctx.beginPath();
-  ctx.moveTo(pSW.sx - hw, pSW.sy);
-  ctx.lineTo(pS.sx, pS.sy + hh);
-  ctx.lineTo(pS.sx, pS.sy + hh + skirtH);
-  ctx.lineTo(pSW.sx - hw, pSW.sy + skirtH);
+  ctx.moveTo(pSW.sx - hw, pSW.sy + 4);
+  ctx.lineTo(pS.sx, pS.sy + hh + 4);
+  ctx.lineTo(pS.sx, pS.sy + hh + skirtH + 4);
+  ctx.lineTo(pSW.sx - hw, pSW.sy + skirtH + 4);
   ctx.closePath();
-  ctx.fillStyle = "#101b28";
+  ctx.fillStyle = "#0d1722";
   ctx.fill();
-  ctx.strokeStyle = "rgba(78, 242, 161, 0.34)";
+  ctx.strokeStyle = "rgba(78, 242, 161, 0.35)";
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  // Face direita inferior (x = GRID_W-1, y = 0..GRID_H-1)
   ctx.beginPath();
-  ctx.moveTo(pS.sx, pS.sy + hh);
-  ctx.lineTo(pSE.sx + hw, pSE.sy);
-  ctx.lineTo(pSE.sx + hw, pSE.sy + skirtH);
-  ctx.lineTo(pS.sx, pS.sy + hh + skirtH);
+  ctx.moveTo(pS.sx, pS.sy + hh + 4);
+  ctx.lineTo(pSE.sx + hw, pSE.sy + 4);
+  ctx.lineTo(pSE.sx + hw, pSE.sy + skirtH + 4);
+  ctx.lineTo(pS.sx, pS.sy + hh + skirtH + 4);
   ctx.closePath();
-  ctx.fillStyle = "#0a111a";
+  ctx.fillStyle = "#080e16";
   ctx.fill();
   ctx.strokeStyle = "rgba(78, 242, 161, 0.24)";
   ctx.lineWidth = 1;
   ctx.stroke();
 }
 
-function drawIsoCoverBlock(ctx, sx, sy, w, h, wallH, isHigh, isDestructible) {
-  const cw = w * 0.72;
-  const ch = h * 0.72;
+function drawIsoCoverBlock(ctx, sx, sy, w, h, wallH, tileType) {
+  // tileType: 1 = meia cobertura (barreira/mureta), 2 = cobertura alta (muro blindado), 3 = edifício/estrutura alta, 4 = caixa explosiva/suprimentos
+  const isBuilding = tileType === 3;
+  const isHigh = tileType === 2 || isBuilding;
+  const isCrate = tileType === 4;
+
+  const scale = isBuilding ? 0.86 : isCrate ? 0.64 : 0.74;
+  const cw = w * scale;
+  const ch = h * scale;
   const chw = cw * 0.5;
   const chh = ch * 0.5;
   const topY = sy - wallH;
 
-  drawIsoDiamond(ctx, sx, sy + 1, w * 0.88, h * 0.88, "rgba(0,0,0,0.38)", null, 0);
+  // Sombra projetada direcional no chão (estilo XCOM 2.5D)
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(sx + w * 0.14, sy + h * 0.12, cw * 0.56, ch * 0.52, -0.25, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0, 0, 0, 0.48)";
+  ctx.fill();
+  ctx.restore();
 
-  const leftCol = isHigh ? "#1d4ed8" : isDestructible ? "#b45309" : "#3f4e63";
-  const rightCol = isHigh ? "#1e3a8a" : isDestructible ? "#78350f" : "#273242";
-  const topCol = isHigh ? "#60a5fa" : isDestructible ? "#f59e0b" : "#64748b";
-  const borderCol = isHigh ? "#93c5fd" : isDestructible ? "#fde68a" : "#94a3b8";
+  let leftCol, rightCol, topCol, borderCol;
+  if (isBuilding) {
+    leftCol = "#263547";
+    rightCol = "#182330";
+    topCol = "#475569";
+    borderCol = "#94a3b8";
+  } else if (isHigh) {
+    leftCol = "#1d4ed8";
+    rightCol = "#1e3a8a";
+    topCol = "#3b82f6";
+    borderCol = "#93c5fd";
+  } else if (isCrate) {
+    leftCol = "#b45309";
+    rightCol = "#78350f";
+    topCol = "#f59e0b";
+    borderCol = "#fde68a";
+  } else {
+    leftCol = "#334155";
+    rightCol = "#1e293b";
+    topCol = "#64748b";
+    borderCol = "#cbd5e1";
+  }
 
+  // Face esquerda
   ctx.beginPath();
   ctx.moveTo(sx - chw, topY);
   ctx.lineTo(sx, topY + chh);
@@ -1767,6 +1957,7 @@ function drawIsoCoverBlock(ctx, sx, sy, w, h, wallH, isHigh, isDestructible) {
   ctx.lineWidth = 1;
   ctx.stroke();
 
+  // Face direita
   ctx.beginPath();
   ctx.moveTo(sx + chw, topY);
   ctx.lineTo(sx, topY + chh);
@@ -1777,84 +1968,160 @@ function drawIsoCoverBlock(ctx, sx, sy, w, h, wallH, isHigh, isDestructible) {
   ctx.fill();
   ctx.stroke();
 
+  // Detalhes arquitetónicos / táticos nas faces 2.5D
+  if (isBuilding) {
+    // Janelas iluminadas / painéis estruturais do edifício
+    ctx.fillStyle = "rgba(56, 189, 248, 0.45)";
+    const winY1 = topY + wallH * 0.28;
+    const winY2 = topY + wallH * 0.62;
+    ctx.fillRect(sx - chw * 0.68, winY1, chw * 0.35, 3);
+    ctx.fillRect(sx - chw * 0.68, winY2, chw * 0.35, 3);
+    ctx.fillStyle = "rgba(14, 165, 233, 0.28)";
+    ctx.fillRect(sx + chw * 0.25, winY1, chw * 0.35, 3);
+    ctx.fillRect(sx + chw * 0.25, winY2, chw * 0.35, 3);
+  } else if (isCrate) {
+    // Faixas diagonais de caixa de munição/combustível
+    ctx.strokeStyle = "rgba(254, 240, 138, 0.75)";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(sx - chw * 0.85, topY + wallH * 0.25);
+    ctx.lineTo(sx - chw * 0.15, sy - wallH * 0.2);
+    ctx.stroke();
+  }
+
+  // Topo isométrico
   drawIsoDiamond(ctx, sx, topY, cw, ch, topCol, borderCol, 1.2);
 
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 8px monospace";
-  ctx.textAlign = "center";
-  ctx.fillText(isHigh ? "◈" : "◇", sx, topY + 3);
+  if (isBuilding) {
+    // Rebordo de cobertura no telhado
+    drawIsoDiamond(ctx, sx, topY, cw * 0.65, ch * 0.65, "#1e293b", "rgba(148,163,184,0.6)", 0.9);
+  } else {
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 8px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(isCrate ? "☢" : isHigh ? "◈" : "◇", sx, topY + 3);
+  }
 }
 
 function drawIsoSoldierSprite(ctx, sx, sy, w, h, unit, isSelected) {
+  // Sombra projetada realista no chão isométrico
+  ctx.save();
   ctx.beginPath();
-  ctx.ellipse(sx, sy + 1, w * 0.28, h * 0.28, 0, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(0, 0, 0, 0.48)";
+  ctx.ellipse(sx + w * 0.12, sy + h * 0.08, w * 0.32, h * 0.24, -0.3, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0, 0, 0, 0.56)";
   ctx.fill();
+  ctx.restore();
 
+  // Anel tático de seleção no chão
   if (isSelected) {
-    drawIsoDiamond(ctx, sx, sy, w * 0.94, h * 0.94, "rgba(78, 242, 161, 0.24)", "#4ef2a1", 1.8);
+    drawIsoDiamond(ctx, sx, sy, w * 0.92, h * 0.92, "rgba(78, 242, 161, 0.24)", "#4ef2a1", 1.8);
+    drawIsoDiamond(ctx, sx, sy, w * 0.66, h * 0.66, null, "rgba(187, 247, 208, 0.7)", 1.0);
+  } else {
+    drawIsoDiamond(ctx, sx, sy, w * 0.68, h * 0.68, "rgba(56, 189, 248, 0.14)", "rgba(96, 165, 250, 0.55)", 1.0);
   }
 
-  const crouchOffset = unit.crouched ? 3.5 : 0;
-  const bodyH = Math.max(12, Math.round(h * 0.85));
-  const headR = Math.max(3.5, Math.round(w * 0.11));
-  const hipY = sy - bodyH * 0.32 + crouchOffset * 0.5;
-  const shoulderY = sy - bodyH * 0.82 + crouchOffset;
-  const headY = shoulderY - headR - 1.5;
+  const crouchOffset = unit.crouched ? 4.0 : 0;
+  const scaleU = Math.max(0.85, w / 44);
+  const bodyH = Math.round(16 * scaleU);
+  const headR = Math.max(3.8, 4.4 * scaleU);
+  const footY = sy - 1;
+  const hipY = footY - bodyH * 0.38 + crouchOffset * 0.5;
+  const shoulderY = footY - bodyH * 0.88 + crouchOffset;
+  const headY = shoulderY - headR - 1.2;
 
-  ctx.strokeStyle = isSelected ? "#bbf7d0" : "#94a3b8";
-  ctx.lineWidth = 2.4;
+  const roleArmorCol = {
+    "Fuzileiro": "#15803d",
+    "Atirador de Elite": "#0369a1",
+    "Médico": "#0f766e",
+    "Demolições": "#c2410c",
+    "Pesado": "#a16207",
+    "Comando": "#7e22ce",
+    "Reconhecimento": "#4d7c0f",
+    "Engenheiro": "#1d4ed8"
+  }[unit.role] || "#1e3a5f";
+
+  // Mochila tática (camada traseira 2.5D)
+  ctx.fillStyle = "#1e293b";
+  ctx.strokeStyle = "#64748b";
+  ctx.lineWidth = 1;
+  ctx.fillRect(sx - 6.5 * scaleU, shoulderY + 1, 4 * scaleU, bodyH * 0.44);
+  ctx.strokeRect(sx - 6.5 * scaleU, shoulderY + 1, 4 * scaleU, bodyH * 0.44);
+
+  // Pernas com botas blindadas
+  ctx.strokeStyle = isSelected ? "#d1fae5" : "#94a3b8";
+  ctx.lineWidth = 2.6 * scaleU;
+  ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.moveTo(sx - 3, hipY);
-  ctx.lineTo(sx - 4, sy);
-  ctx.moveTo(sx + 3, hipY);
-  ctx.lineTo(sx + 4, sy);
+  ctx.moveTo(sx - 2.5 * scaleU, hipY);
+  ctx.lineTo(sx - 4.0 * scaleU, footY);
+  ctx.moveTo(sx + 2.5 * scaleU, hipY);
+  ctx.lineTo(sx + 4.2 * scaleU, footY);
   ctx.stroke();
 
-  ctx.fillStyle = isSelected ? "#16a34a" : "#1e3a5f";
-  ctx.strokeStyle = isSelected ? "#4ef2a1" : "#60a5fa";
+  // Tronco / Colete tático 2D
+  ctx.fillStyle = isSelected ? "#16a34a" : roleArmorCol;
+  ctx.strokeStyle = isSelected ? "#86efac" : "#93c5fd";
   ctx.lineWidth = 1.2;
   ctx.beginPath();
-  const rx = sx - 5.5;
+  const rw = 11 * scaleU;
+  const rh = bodyH * 0.54;
+  const rx = sx - rw * 0.5;
   const ry = shoulderY;
-  const rw = 11;
-  const rh = bodyH * 0.52;
-  const rad = Math.min(2.5, rw * 0.5, rh * 0.5);
-  ctx.moveTo(rx + rad, ry);
-  ctx.lineTo(rx + rw - rad, ry);
-  ctx.quadraticCurveTo(rx + rw, ry, rx + rw, ry + rad);
-  ctx.lineTo(rx + rw, ry + rh - rad);
-  ctx.quadraticCurveTo(rx + rw, ry + rh, rx + rw - rad, ry + rh);
-  ctx.lineTo(rx + rad, ry + rh);
-  ctx.quadraticCurveTo(rx, ry + rh, rx, ry + rh - rad);
-  ctx.lineTo(rx, ry + rad);
-  ctx.quadraticCurveTo(rx, ry, rx + rad, ry);
-  ctx.closePath();
+  ctx.roundRect ? ctx.roundRect(rx, ry, rw, rh, 2.5) : ctx.rect(rx, ry, rw, rh);
   ctx.fill();
   ctx.stroke();
 
+  // Ombreiras
+  ctx.fillStyle = "#334155";
+  ctx.beginPath();
+  ctx.arc(sx - rw * 0.48, shoulderY + 2, 2.2 * scaleU, 0, Math.PI * 2);
+  ctx.arc(sx + rw * 0.48, shoulderY + 2, 2.2 * scaleU, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Capacete militar + viseira tática brilhante
   ctx.beginPath();
   ctx.arc(sx, headY, headR, 0, Math.PI * 2);
   ctx.fillStyle = isSelected ? "#4ef2a1" : "#cbd5e1";
   ctx.fill();
   ctx.strokeStyle = "#0f172a";
-  ctx.lineWidth = 1;
+  ctx.lineWidth = 1.1;
+  ctx.stroke();
+
+  // Viseira azul/ciano estilo XCOM
+  ctx.fillStyle = "#38bdf8";
+  ctx.fillRect(sx - 0.5 * scaleU, headY - 1.5 * scaleU, headR * 0.95, 2.4 * scaleU);
+
+  // Esquadria da arma / espingarda de assalto
+  ctx.strokeStyle = "#0f172a";
+  ctx.lineWidth = 3.2 * scaleU;
+  ctx.beginPath();
+  ctx.moveTo(sx - 1 * scaleU, shoulderY + 4.5 * scaleU);
+  ctx.lineTo(sx + 11.5 * scaleU, shoulderY + 1.5 * scaleU);
   ctx.stroke();
 
   ctx.strokeStyle = "#e2e8f0";
-  ctx.lineWidth = 2.2;
+  ctx.lineWidth = 1.6 * scaleU;
   ctx.beginPath();
-  ctx.moveTo(sx + 2, shoulderY + 4);
-  ctx.lineTo(sx + 10, shoulderY + 1);
+  ctx.moveTo(sx - 1 * scaleU, shoulderY + 4.5 * scaleU);
+  ctx.lineTo(sx + 11.5 * scaleU, shoulderY + 1.5 * scaleU);
   ctx.stroke();
 
-  const barW = 24;
-  const barH = 3.5;
+  // Indicador de Vigilância (Overwatch) ou Hunker
+  if (unit.overwatch || unit.hunker) {
+    ctx.fillStyle = unit.overwatch ? "#facc15" : "#38bdf8";
+    ctx.font = "bold 8px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(unit.overwatch ? "◉ VIG" : "🛡 HNK", sx, headY - headR - 15);
+  }
+
+  // Barra de vida 2.5D flutuante
+  const barW = Math.max(24, Math.round(26 * scaleU));
+  const barH = 3.8;
   const barX = sx - barW * 0.5;
   const barY = headY - headR - 8;
   const ratio = Math.max(0, Math.min(1, unit.hp / Math.max(1, unit.maxHp)));
 
-  ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
+  ctx.fillStyle = "rgba(2, 6, 12, 0.85)";
   ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
   ctx.fillStyle = ratio > 0.5 ? "#22c55e" : ratio > 0.25 ? "#eab308" : "#ef4444";
   ctx.fillRect(barX, barY, barW * ratio, barH);
@@ -1866,46 +2133,66 @@ function drawIsoSoldierSprite(ctx, sx, sy, w, h, unit, isSelected) {
 }
 
 function drawIsoAlienSprite(ctx, sx, sy, w, h, enemy, isTargeted) {
+  // Sombra projetada no chão
+  ctx.save();
   ctx.beginPath();
-  ctx.ellipse(sx, sy + 1, w * 0.28, h * 0.28, 0, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+  ctx.ellipse(sx + w * 0.12, sy + h * 0.08, w * 0.34, h * 0.24, -0.3, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0, 0, 0, 0.58)";
   ctx.fill();
+  ctx.restore();
 
   if (isTargeted) {
-    drawIsoDiamond(ctx, sx, sy, w * 0.94, h * 0.94, "rgba(255, 209, 102, 0.24)", "#ffd166", 1.8);
+    drawIsoDiamond(ctx, sx, sy, w * 0.94, h * 0.94, "rgba(255, 209, 102, 0.25)", "#ffd166", 1.8);
+  } else {
+    drawIsoDiamond(ctx, sx, sy, w * 0.68, h * 0.68, "rgba(239, 68, 68, 0.14)", "rgba(248, 113, 113, 0.5)", 1.0);
   }
 
   const isBig = enemy.archetypeId === "brute" || enemy.archetypeId === "overlord";
-  const bodyH = Math.max(13, Math.round(h * (isBig ? 1.05 : 0.85)));
-  const headR = Math.max(4, Math.round(w * (isBig ? 0.14 : 0.11)));
-  const hipY = sy - bodyH * 0.35;
-  const shoulderY = sy - bodyH * 0.82;
-  const headY = shoulderY - headR - 1.5;
+  const isPsycher = enemy.archetypeId === "psycher";
+  const scaleE = Math.max(0.85, w / 44) * (isBig ? 1.24 : 1.0);
+  const bodyH = Math.round(16 * scaleE);
+  const headR = Math.max(3.8, 4.5 * scaleE);
+  const footY = sy - 1;
+  const hipY = footY - bodyH * 0.36;
+  const shoulderY = footY - bodyH * 0.86;
+  const headY = shoulderY - headR - 1.2;
 
+  // Aura psiónica para Psycher/Overlord
+  if (isPsycher || enemy.archetypeId === "overlord") {
+    ctx.beginPath();
+    ctx.arc(sx, shoulderY, 11 * scaleE, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(168, 85, 247, 0.18)";
+    ctx.fill();
+  }
+
+  // Membros alienígenas articulados
   ctx.strokeStyle = "#f87171";
-  ctx.lineWidth = isBig ? 3 : 2.2;
+  ctx.lineWidth = (isBig ? 3.2 : 2.3) * scaleE;
+  ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.moveTo(sx - 4, hipY);
-  ctx.lineTo(sx - 5, sy);
-  ctx.moveTo(sx + 4, hipY);
-  ctx.lineTo(sx + 5, sy);
+  ctx.moveTo(sx - 3.5 * scaleE, hipY);
+  ctx.lineTo(sx - 5.2 * scaleE, footY);
+  ctx.moveTo(sx + 3.5 * scaleE, hipY);
+  ctx.lineTo(sx + 5.2 * scaleE, footY);
   ctx.stroke();
 
-  ctx.fillStyle = isBig ? "#7f1d1d" : "#991b1b";
+  // Carapaça Xeno
+  ctx.fillStyle = isBig ? "#7f1d1d" : isPsycher ? "#581c87" : "#991b1b";
   ctx.strokeStyle = isTargeted ? "#fde047" : "#fca5a5";
   ctx.lineWidth = 1.2;
   ctx.beginPath();
-  ctx.moveTo(sx, shoulderY - 2);
-  ctx.lineTo(sx + (isBig ? 8 : 6), hipY);
-  ctx.lineTo(sx, sy - 2);
-  ctx.lineTo(sx - (isBig ? 8 : 6), hipY);
+  ctx.moveTo(sx, shoulderY - 2 * scaleE);
+  ctx.lineTo(sx + 7.5 * scaleE, hipY);
+  ctx.lineTo(sx, footY - 2);
+  ctx.lineTo(sx - 7.5 * scaleE, hipY);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
 
+  // Crânio alienígena alongado + olhos bioluminescentes
   ctx.beginPath();
   ctx.arc(sx, headY, headR, 0, Math.PI * 2);
-  ctx.fillStyle = "#ef4444";
+  ctx.fillStyle = isPsycher ? "#c084fc" : "#ef4444";
   ctx.fill();
   ctx.strokeStyle = "#fecaca";
   ctx.lineWidth = 1;
@@ -1913,16 +2200,18 @@ function drawIsoAlienSprite(ctx, sx, sy, w, h, enemy, isTargeted) {
 
   ctx.fillStyle = "#fef08a";
   ctx.beginPath();
-  ctx.arc(sx - 1.5, headY - 0.5, 1.5, 0, Math.PI * 2);
+  ctx.arc(sx - 2 * scaleE, headY - 0.5, 1.5 * scaleE, 0, Math.PI * 2);
+  ctx.arc(sx + 1.5 * scaleE, headY - 0.5, 1.3 * scaleE, 0, Math.PI * 2);
   ctx.fill();
 
-  const barW = 24;
-  const barH = 3.5;
+  // Barra de vida inimiga
+  const barW = Math.max(24, Math.round(26 * scaleE));
+  const barH = 3.8;
   const barX = sx - barW * 0.5;
   const barY = headY - headR - 8;
   const ratio = Math.max(0, Math.min(1, enemy.hp / Math.max(1, enemy.maxHp)));
 
-  ctx.fillStyle = "rgba(0, 0, 0, 0.78)";
+  ctx.fillStyle = "rgba(2, 6, 12, 0.85)";
   ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
   ctx.fillStyle = "#ef4444";
   ctx.fillRect(barX, barY, barW * ratio, barH);
@@ -1931,6 +2220,107 @@ function drawIsoAlienSprite(ctx, sx, sy, w, h, enemy, isTargeted) {
   ctx.font = "bold 8px monospace";
   ctx.textAlign = "center";
   ctx.fillText(`${enemy.archetypeId.slice(0, 5).toUpperCase()} ${enemy.hp}`, sx, barY - 3);
+}
+
+function drawBattleVfxLayer(ctx, battle, m) {
+  if (!battle || !Array.isArray(battle.vfxQueue) || battle.vfxQueue.length === 0) return;
+  const now = performance.now();
+
+  battle.vfxQueue.forEach((vfx) => {
+    const elapsed = now - vfx.createdAt;
+    const t = Math.max(0, Math.min(1, elapsed / vfx.duration));
+
+    if (vfx.type === "shot") {
+      const from = worldToIso(vfx.fromX, vfx.fromY, battle, m);
+      const to = worldToIso(vfx.toX, vfx.toY, battle, m);
+      const fy = from.sy - 12;
+      const ty = to.sy - 10;
+
+      // Flash na boca do cano
+      if (t < 0.35) {
+        const flashR = (1 - t / 0.35) * 14;
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(from.sx, fy, flashR, 0, Math.PI * 2);
+        ctx.fillStyle = vfx.color || "rgba(250, 204, 21, 0.85)";
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // Projétil / feixe traçante
+      const headT = Math.min(1, t * 1.45);
+      const tailT = Math.max(0, headT - 0.32);
+      const hx = from.sx + (to.sx - from.sx) * headT;
+      const hy = fy + (ty - fy) * headT;
+      const tx = from.sx + (to.sx - from.sx) * tailT;
+      const ty2 = fy + (ty - fy) * tailT;
+
+      ctx.save();
+      ctx.strokeStyle = vfx.color || "#38bdf8";
+      ctx.lineWidth = 3;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(tx, ty2);
+      ctx.lineTo(hx, hy);
+      ctx.stroke();
+      ctx.restore();
+
+      // Faíscas no impacto
+      if (t > 0.55) {
+        const impT = (t - 0.55) / 0.45;
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(to.sx, ty, 4 + impT * 14, 0, Math.PI * 2);
+        ctx.strokeStyle = vfx.hit ? `rgba(248, 113, 113, ${1 - impT})` : `rgba(148, 163, 184, ${1 - impT})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+      }
+    } else if (vfx.type === "explosion") {
+      const center = worldToIso(vfx.x, vfx.y, battle, m);
+      const maxR = m.tileW * 1.25;
+      const curR = 8 + t * maxR;
+      const alpha = 1 - t;
+
+      ctx.save();
+      // Onda de choque isométrica no chão
+      drawIsoDiamond(
+        ctx,
+        center.sx,
+        center.sy,
+        m.tileW * (1.2 + t * 1.9),
+        m.tileH * (1.2 + t * 1.9),
+        `rgba(249, 115, 22, ${alpha * 0.28})`,
+        `rgba(253, 224, 71, ${alpha * 0.9})`,
+        2.2
+      );
+
+      // Núcleo incandescente da explosão
+      const grad = ctx.createRadialGradient(center.sx, center.sy - 8, 2, center.sx, center.sy - 8, curR);
+      grad.addColorStop(0, `rgba(254, 249, 195, ${alpha})`);
+      grad.addColorStop(0.45, `rgba(249, 115, 22, ${alpha * 0.85})`);
+      grad.addColorStop(1, "rgba(127, 29, 29, 0)");
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(center.sx, center.sy - 8, curR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    } else if (vfx.type === "floater") {
+      const pos = worldToIso(vfx.x, vfx.y, battle, m);
+      const floatY = pos.sy - 26 - t * 24;
+      const alpha = t < 0.7 ? 1 : (1 - t) / 0.3;
+
+      ctx.save();
+      ctx.font = "bold 12px monospace";
+      ctx.textAlign = "center";
+      ctx.fillStyle = `rgba(0, 0, 0, ${alpha * 0.85})`;
+      ctx.fillText(vfx.text, pos.sx + 1, floatY + 1);
+      ctx.fillStyle = vfx.color || "#facc15";
+      ctx.globalAlpha = Math.max(0, alpha);
+      ctx.fillText(vfx.text, pos.sx, floatY);
+      ctx.restore();
+    }
+  });
 }
 
 function ensureIsoCanvasStage(gridEl) {
@@ -2570,20 +2960,20 @@ function _renderBattleInner(b) {
     ctx.fillStyle = "rgba(78, 242, 161, 0.82)";
     ctx.font = "bold 9px monospace";
     ctx.textAlign = "left";
-    ctx.fillText(`MAPA ISOMÉTRICO XCOM · ${GRID_W}x${GRID_H}`, 10, 14);
+    ctx.fillText(`MOTOR TÁTICO ISOMÉTRICO 2.5D · ${GRID_W}x${GRID_H}`, 10, 14);
 
     drawIsoBoardSkirt(ctx, b, m);
 
     const maxMoveRange = getUnitMoveRange(selUnit);
 
-    // 1. Losangos do chão isométrico ordenados por profundidade (x + y)
+    // 1. Terreno isométrico 2.5D com níveis de elevação ordenados por profundidade (Y-sorting)
     for (let sum = 0; sum <= ISO_VIEW_W + ISO_VIEW_H - 2; sum++) {
       for (let vy = 0; vy < ISO_VIEW_H; vy++) {
         const vx = sum - vy;
         if (vx < 0 || vx >= ISO_VIEW_W) continue;
         const gx = b.camera.x + vx;
         const gy = b.camera.y + vy;
-        const { sx, sy } = worldToIso(gx, gy, b, m);
+        const { sx, sy, elev } = worldToIso(gx, gy, b, m);
 
         const tileType = b.grid[gy][gx];
         const unitHere = b.units.find((u) => u.x === gx && u.y === gy && u.hp > 0);
@@ -2605,18 +2995,7 @@ function _renderBattleInner(b) {
           distFromSel <= maxMoveRange;
 
         const isAlt = (gx + gy) % 2 === 0;
-        let fill = isAlt ? "rgba(28, 48, 68, 0.65)" : "rgba(18, 32, 48, 0.60)";
-        let stroke = "rgba(125, 211, 252, 0.28)";
-
-        if (canMoveHere) {
-          fill = b.mode === "move" ? "rgba(78, 242, 161, 0.30)" : "rgba(78, 242, 161, 0.16)";
-          stroke = "#4ef2a1";
-        } else if (smokeHere) {
-          fill = "rgba(203, 213, 225, 0.34)";
-          stroke = "rgba(241, 245, 249, 0.62)";
-        }
-
-        drawIsoDiamond(ctx, sx, sy, m.tileW, m.tileH, fill, stroke, canMoveHere ? 1.5 : 1);
+        drawIsoTerrainColumn(ctx, sx, sy, m.tileW, m.tileH, elev, isAlt, canMoveHere, b.mode === "move", smokeHere);
 
         if (canMoveHere) {
           const cCov = getTileCoverAt(b, gx, gy);
@@ -2664,22 +3043,22 @@ function _renderBattleInner(b) {
       }
     }
 
-    // 2. Linha de mira entre o soldado selecionado e o alvo selecionado
+    // 2. Linha de visão / mira 2.5D entre o soldado selecionado e o alvo selecionado
     if (selUnit && selEnemy) {
       const uPos = worldToIso(selUnit.x, selUnit.y, b, m);
       const ePos = worldToIso(selEnemy.x, selEnemy.y, b, m);
       ctx.save();
-      ctx.setLineDash([4, 4]);
-      ctx.strokeStyle = "rgba(255, 209, 102, 0.72)";
-      ctx.lineWidth = 1.4;
+      ctx.setLineDash([5, 4]);
+      ctx.strokeStyle = "rgba(255, 209, 102, 0.78)";
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(uPos.sx, uPos.sy - 8);
-      ctx.lineTo(ePos.sx, ePos.sy - 8);
+      ctx.moveTo(uPos.sx, uPos.sy - 11);
+      ctx.lineTo(ePos.sx, ePos.sy - 11);
       ctx.stroke();
       ctx.restore();
     }
 
-    // 3. Coberturas 3D, soldados e inimigos Xeno por profundidade
+    // 3. Y-Sorting de edifícios, obstáculos, caixas, soldados 2D e alienígenas 2D
     for (let sum = 0; sum <= ISO_VIEW_W + ISO_VIEW_H - 2; sum++) {
       for (let vy = 0; vy < ISO_VIEW_H; vy++) {
         const vx = sum - vy;
@@ -2693,11 +3072,11 @@ function _renderBattleInner(b) {
         const enemyHere = b.enemies.find((e) => e.x === gx && e.y === gy && e.hp > 0);
 
         if (tileType === 3) {
-          drawIsoCoverBlock(ctx, sx, sy, m.tileW, m.tileH, m.wallH * 1.45, true, false);
+          drawIsoCoverBlock(ctx, sx, sy, m.tileW, m.tileH, m.wallH * 1.65, 3);
         } else if (tileType === 2) {
-          drawIsoCoverBlock(ctx, sx, sy, m.tileW, m.tileH, m.wallH * 0.95, true, false);
+          drawIsoCoverBlock(ctx, sx, sy, m.tileW, m.tileH, m.wallH * 1.05, 2);
         } else if (tileType === 1 || tileType === 4) {
-          drawIsoCoverBlock(ctx, sx, sy, m.tileW, m.tileH, m.wallH * 0.72, false, tileType === 4);
+          drawIsoCoverBlock(ctx, sx, sy, m.tileW, m.tileH, m.wallH * 0.72, tileType);
         }
 
         const hostageSpriteHere = (b.hostages || []).find((h) => !h.rescued && h.x === gx && h.y === gy);
@@ -2719,6 +3098,9 @@ function _renderBattleInner(b) {
         }
       }
     }
+
+    // 4. Camada de efeitos visuais 2.5D (disparos traçantes, explosões e dano flutuante)
+    drawBattleVfxLayer(ctx, b, m);
 
     ctx.restore();
   }
@@ -3037,6 +3419,8 @@ function throwFragGrenade(unit, tx, ty) {
     }
   }
 
+  spawnBattleVfx({ type: "explosion", x: tx, y: ty, duration: 640 });
+  spawnBattleVfx({ type: "floater", x: tx, y: ty, text: hits > 0 ? `BOOM! (${hits})` : "EXPLOSÃO", color: "#fb923c", duration: 760 });
   addBattleLog(`${unit.name} lançou granada de fragmentação em (${tx + 1},${ty + 1}) — ${hits} inimigo(s) atingido(s).`);
   renderBattle();
   checkBattleOutcome();
@@ -3092,8 +3476,12 @@ function fireAtTarget() {
     const armorMitigation = Math.floor((target.armor || 0) * 0.45);
     const finalDmg = Math.max(8, rawDmg - armorMitigation);
     target.hp = Math.max(0, target.hp - finalDmg);
+    spawnBattleVfx({ type: "shot", fromX: unit.x, fromY: unit.y, toX: target.x, toY: target.y, color: "#38bdf8", hit: true, duration: 420 });
+    spawnBattleVfx({ type: "floater", x: target.x, y: target.y, text: `-${finalDmg} HP`, color: "#4ef2a1", duration: 750 });
     addBattleLog(`${unit.name} acertou em ${target.name} (${chance}%) — ${finalDmg} de dano!`);
   } else {
+    spawnBattleVfx({ type: "shot", fromX: unit.x, fromY: unit.y, toX: target.x, toY: target.y, color: "#94a3b8", hit: false, duration: 380 });
+    spawnBattleVfx({ type: "floater", x: target.x, y: target.y, text: "FALHOU", color: "#cbd5e1", duration: 680 });
     addBattleLog(`${unit.name} falhou o disparo contra ${target.name} (${chance}%).`);
   }
 
@@ -3240,8 +3628,11 @@ function endPlayerTurn() {
       dmg = Math.max(6, dmg);
       target.hp = Math.max(0, target.hp - dmg);
       if (en.archetypeId === "psycher") target.stunned = true;
+      spawnBattleVfx({ type: "shot", fromX: en.x, fromY: en.y, toX: target.x, toY: target.y, color: "#f87171", hit: true, duration: 420 });
+      spawnBattleVfx({ type: "floater", x: target.x, y: target.y, text: `-${dmg} HP`, color: "#f87171", duration: 750 });
       addBattleLog(`${en.name} atingiu ${target.name} por ${dmg} HP!`);
     } else {
+      spawnBattleVfx({ type: "shot", fromX: en.x, fromY: en.y, toX: target.x, toY: target.y, color: "#fca5a5", hit: false, duration: 380 });
       addBattleLog(`${en.name} disparou contra ${target.name}, mas falhou.`);
     }
   });
