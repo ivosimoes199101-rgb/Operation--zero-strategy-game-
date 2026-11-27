@@ -79,10 +79,10 @@ const INITIAL_BUILDINGS = [
 ];
 
 const CAMPAIGN_METRICS = {
-  trust: 50,
-  resources: 50,
-  research: 20,
-  threat: 20
+  trust: 50,      // Confiança (0-100)
+  resources: 50,  // Recursos (0-100)
+  research: 20,   // Investigação (0-100)
+  threat: 20      // Ameaça (0-100)
 };
 
 const ENEMY_ARCHETYPES = {
@@ -160,20 +160,20 @@ const CAMPAIGN_MISSIONS = [
     chapter: "I — Primeiro Contacto",
     number: 1,
     title: "Primeiro Contacto",
-    type: "Floresta / Resgate",
-    objective: "Investigar a explosão na floresta, resgatar os dois colegas reféns e eliminar a patrulha.",
-    secondaryObjective: "Salvar ambos os operacionais desaparecidos sem perder a equipa.",
-    enemies: ["scout", "swarm", "stalker"],
-    rewards: { credits: 400, materials: 25, alien: 1, research: 12, xp: 40 },
+    type: "Resgate / Contenção",
+    objective: "Estabilizar os 2 colegas reféns na floresta e eliminar a patrulha alienígena.",
+    secondaryObjective: "Resgatar ambos os colegas sem baixas no esquadrão.",
+    enemies: ["scout", "swarm", "scout", "stalker", "swarm", "scout"],
+    rewards: { credits: 420, materials: 25, alien: 1, research: 12, xp: 45 },
     choice: {
-      prompt: "Após a explosão na floresta e o resgate dos dois colegas reféns em choque, como procedes?",
+      prompt: "Encontraste sobreviventes e registos militares sob fogo cruzado.",
       optionA: {
-        label: "Estabilizar e evacuar os dois colegas em segurança (+14 Confiança)",
-        effects: { trust: 14, resources: 4, threat: 3, credits: 75 }
+        label: "Priorizar resgate total de sobreviventes (+Confiança)",
+        effects: { trust: 12, resources: 5, threat: 3, credits: 50 }
       },
       optionB: {
-        label: "Rastrear a origem da explosão na mata antes da extração (+12 Investigação)",
-        effects: { trust: -3, resources: 10, research: 12, threat: 4, materials: 10 }
+        label: "Extrair rápido com os registos essenciais (+Investigação)",
+        effects: { trust: -4, resources: 12, research: 10, threat: 2, materials: 10 }
       }
     }
   },
@@ -581,9 +581,7 @@ function setTacticalViewportLock(active) {
         z-index: 60 !important;
       }
       #tactical.active .battle-top {
-        flex: 0 0 auto !important;
-        height: auto !important;
-        min-height: 0 !important;
+        flex-shrink: 0 !important;
         display: flex !important;
         align-items: center !important;
         justify-content: space-between !important;
@@ -591,28 +589,16 @@ function setTacticalViewportLock(active) {
         margin: 0 !important;
         gap: 6px !important;
       }
-      #tactical.active .battle-top > div,
-      #tactical.active .battle-top > span {
-        margin: 0 !important;
-        padding: 0 !important;
-      }
       #tactical.active .battle-top .tag,
-      #tactical.active .battle-top .status-pill,
-      #tactical.active .battle-top .eyebrow,
-      #tactical.active .battle-top small {
+      #tactical.active .battle-top .status-pill {
         display: none !important;
       }
       #tactical.active .battle-top h2,
       #tactical.active #battle-title {
-        font-size: 0.82em !important;
-        line-height: 1.1 !important;
+        font-size: 0.85em !important;
+        line-height: 1.15 !important;
         margin: 0 !important;
-        padding: 0 !important;
         letter-spacing: 0.5px !important;
-      }
-      #tactical.active > * {
-        margin-top: 0 !important;
-        margin-bottom: 0 !important;
       }
       #tactical.active .battle-info {
         flex-shrink: 0 !important;
@@ -1010,57 +996,89 @@ function renderCampaignMissions() {
 }
 
 // ---------------------------------------------------------------------------
-// 6. COMBATE TÁTICO ISOMÉTRICO XCOM (CAMPOS GRANDES 14x12 + MÚLTIPLAS ROTAS)
+// 6. COMBATE TÁTICO ISOMÉTRICO XCOM (NAVEGAÇÃO TÁTIL + BARRA FLUTUANTE)
 // ---------------------------------------------------------------------------
 
 const GRID_W = 14;
 const GRID_H = 12;
-const ISO_VIEW_W = 9;
-const ISO_VIEW_H = 9;
+const ISO_VIEW_W = 6;
+const ISO_VIEW_H = 6;
 
 function createMissionMap(missionIndex) {
   const grid = Array.from({ length: GRID_H }, () => Array(GRID_W).fill(0));
 
   if (missionIndex === 0) {
-    // Floresta ampla (14x12) com 3 rotas: flanco norte, clareira central e flanco sul
-    grid[2][4] = 1; grid[2][5] = 4; grid[2][6] = 2;
-    grid[3][4] = 3; grid[3][8] = 3;
+    // --- MISSÃO 01: FLORESTA COM 3 ROTAS INTERLIGADAS POR LIGAÇÕES TRANSVERSAIS ---
+    // Divisória Norte <-> Centro (y = 3): ligações abertas em x=4,5 (ravina) e x=9,10 (passagem rochosa)
+    [2, 3, 6, 7, 8, 11].forEach((x) => { grid[3][x] = 3; });
 
-    grid[5][3] = 4; grid[5][5] = 1; grid[5][7] = 2; grid[5][9] = 4;
-    grid[6][4] = 2; grid[6][6] = 4; grid[6][8] = 1;
+    // Divisória Centro <-> Sul (y = 8): ligações abertas em x=4,5 (trilho da mata) e x=10,11 (clareira lateral)
+    [2, 3, 6, 7, 8, 9].forEach((x) => { grid[8][x] = 3; });
 
-    grid[8][3] = 3; grid[8][7] = 3;
-    grid[9][4] = 1; grid[9][5] = 4; grid[9][6] = 2; grid[9][9] = 1;
+    // --- ROTA NORTE (y = 1..2): CUMEADA ROCHOSA (cobertura pesada e linhas de tiro longas) ---
+    grid[1][3] = 2;
+    grid[2][5] = 1;
+    grid[1][7] = 2;
+    grid[2][9] = 2;
+    grid[1][11] = 1;
+
+    // --- ROTA CENTRAL (y = 5..6): CLAREIRA DA EXPLOSÃO (destroços, troncos e caixotes inflamáveis) ---
+    grid[5][3] = 1;
+    grid[6][4] = 4;
+    grid[5][6] = 4;
+    grid[6][7] = 2;
+    grid[5][8] = 4;
+    grid[6][10] = 1;
+    grid[5][11] = 2;
+
+    // --- ROTA SUL (y = 9..10): MATA DENSA E RIACHO (avanço furtivo e flanqueamento) ---
+    grid[10][3] = 1;
+    grid[9][5] = 1;
+    grid[10][7] = 2;
+    grid[9][9] = 1;
+    grid[10][11] = 1;
+
+    // Cobertura tática junto às ligações entre caminhos para trocas de rota seguras
+    grid[4][4] = 1;
+    grid[4][9] = 1;
+    grid[7][5] = 1;
+    grid[7][10] = 1;
+
     return grid;
   }
 
-  // Campos abertos multi-estratégia: rotas superior, central e inferior com aberturas de flanqueio
-  grid[2][4] = 2; grid[2][5] = 1; grid[2][8] = 2; grid[2][9] = 4;
-  grid[3][6] = 3; grid[3][10] = 3;
+  // Restantes missões escaladas para 14x12
+  grid[2][4] = 4;
+  grid[3][4] = 1;
+  grid[4][4] = 2;
+  grid[6][4] = 1;
+  grid[7][4] = 4;
+  grid[9][4] = 1;
 
-  grid[5][4] = 4; grid[5][6] = 1; grid[5][8] = 2; grid[5][10] = 4;
-  grid[6][5] = 2; grid[6][7] = 4; grid[6][9] = 1;
+  grid[3][7] = 2;
+  grid[5][7] = 4;
+  grid[6][7] = 4;
+  grid[8][7] = 2;
 
-  grid[8][6] = 3; grid[8][10] = 3;
-  grid[9][4] = 1; grid[9][5] = 4; grid[9][8] = 2; grid[9][9] = 1;
+  grid[0][6] = 3;
+  grid[11][6] = 3;
 
   if (missionIndex >= 2) {
-    grid[1][7] = 2;
-    grid[10][7] = 2;
-    grid[4][7] = 1;
-    grid[7][7] = 1;
+    grid[2][9] = 3;
+    grid[9][9] = 3;
+    grid[5][6] = 1;
   }
   if (missionIndex >= 5) {
-    grid[4][9] = 2;
-    grid[7][9] = 2;
-    grid[3][5] = 4;
-    grid[8][5] = 4;
+    grid[5][9] = 2;
+    grid[6][9] = 2;
+    grid[3][6] = 4;
+    grid[8][6] = 4;
   }
   if (missionIndex >= 8) {
-    grid[1][10] = 2;
-    grid[10][10] = 2;
-    grid[2][7] = 4;
-    grid[9][7] = 4;
+    grid[1][9] = 2;
+    grid[10][9] = 2;
+    grid[2][6] = 1;
+    grid[9][6] = 1;
   }
 
   return grid;
@@ -1094,12 +1112,16 @@ function startMission(mission, missionIndex = 0) {
   }
 
   const medbayBonusKits = getBuildingLevel("b-medbay");
-  const startPositions = [
-    [1, 2], [1, 5], [1, 6], [1, 9], [2, 5]
-  ];
+  const startPositions = missionIndex === 0
+    ? [
+        [0, 5], [0, 6], [1, 2], [1, 9], [0, 4]
+      ]
+    : [
+        [0, 2], [0, 4], [0, 6], [0, 8], [1, 5]
+      ];
 
   const units = activeSquad.map((u, idx) => {
-    const pos = startPositions[idx] || [1, idx % GRID_H];
+    const pos = startPositions[idx] || [0, idx % GRID_H];
     return {
       ...u,
       side: "player",
@@ -1118,50 +1140,22 @@ function startMission(mission, missionIndex = 0) {
     };
   });
 
-  if (missionIndex === 0) {
-    const hostageCoords = [[5, 2], [6, 9]];
-    const hostageNames = ["COLEGA REFÉM A", "COLEGA REFÉM B"];
-    hostageCoords.forEach(([hx, hy], hIdx) => {
-      if (!units.some((u) => u.x === hx && u.y === hy)) {
-        units.push({
-          id: `hostage-m01-${hIdx}`,
-          name: hostageNames[hIdx],
-          codename: `LOST-0${hIdx + 1}`,
-          role: "Reconhecimento",
-          level: 1,
-          xp: 10,
-          hp: 55,
-          maxHp: 75,
-          ap: 2,
-          maxAp: 2,
-          ammo: 8,
-          maxAmmo: 8,
-          aim: 70,
-          dodge: 12,
-          status: "EM CHOQUE",
-          medkits: 1,
-          frags: 0,
-          smokes: 1,
-          overwatch: false,
-          hunker: true,
-          crouched: true,
-          stunned: true,
-          isHostageRescued: true,
-          side: "player",
-          x: hx,
-          y: hy
-        });
-      }
-    });
-  }
-
-  const enemyPositions = [
-    [11, 2], [12, 4], [11, 6], [12, 8], [11, 9], [12, 5]
-  ];
+  const enemyPositions = missionIndex === 0
+    ? [
+        [8, 1],   // Scout a vigiar a Cumeada Norte
+        [7, 5],   // Swarm na Clareira Central (explosão)
+        [9, 6],   // Scout na retaguarda da Clareira
+        [10, 4],  // Stalker a guardar a ligação Norte <-> Centro
+        [8, 10],  // Swarm na Mata Sul
+        [12, 7]   // Scout de reforço na ligação Centro <-> Sul
+      ]
+    : [
+        [10, 2], [11, 4], [10, 6], [12, 8], [11, 10], [12, 5]
+      ];
 
   const enemies = mission.enemies.map((archId, idx) => {
     const arch = ENEMY_ARCHETYPES[archId] || ENEMY_ARCHETYPES.scout;
-    const pos = enemyPositions[idx] || [11, idx % GRID_H];
+    const pos = enemyPositions[idx] || [10, idx % GRID_H];
     const scaleFactor = 1 + missionIndex * 0.05;
     const maxHp = Math.round(arch.maxHp * scaleFactor);
     return {
@@ -1186,23 +1180,51 @@ function startMission(mission, missionIndex = 0) {
     };
   });
 
+  const hostages = missionIndex === 0
+    ? [
+        {
+          id: "hostage-01",
+          name: "CABO RUI SANTOS",
+          role: "Reconhecimento",
+          x: 6,
+          y: 5,
+          hp: 65,
+          maxHp: 85,
+          aim: 78,
+          rescued: false
+        },
+        {
+          id: "hostage-02",
+          name: "TEN. SARA LOPES",
+          role: "Médico",
+          x: 9,
+          y: 10,
+          hp: 70,
+          maxHp: 90,
+          aim: 75,
+          rescued: false
+        }
+      ]
+    : [];
+
   state.battle = {
     mission,
     missionIndex,
     turn: 1,
     phase: "player",
     mode: "normal",
-    camera: { x: 2, y: 1 },
+    camera: missionIndex === 0 ? { x: 0, y: 3 } : { x: 2, y: 2 },
     grid: createMissionMap(missionIndex),
     smokes: [],
     hoverTile: null,
     units,
     enemies,
+    hostages,
     selectedUnitId: null,
     selectedTargetId: enemies[0] ? enemies[0].id : null,
     log: missionIndex === 0
-      ? "Campo amplo da floresta (14x12): escolhe entre flanco norte, rota central ou sul para investigar a explosão e salvar os dois colegas reféns!"
-      : `Missão ${formatMissionNumber(mission.number)}: ${mission.title} — Campo grande (14x12) com várias rotas táticas; arrasta o plano ou toca num operacional.`
+      ? `Missão 01: Primeiro Contacto (14x12) — Explora as 3 rotas da floresta e aproxima-te dos 2 colegas [SOS] para os resgatar!`
+      : `Missão ${formatMissionNumber(mission.number)}: ${mission.title} — Toca num operacional para abrir as ordens flutuantes ou arrasta o plano isométrico.`
   };
 
   goToScreen("tactical");
@@ -1345,26 +1367,20 @@ function addBattleLog(msg) {
   if (logEl) logEl.textContent = msg;
 }
 
-function ozHash(x, y, seed = 1337) {
-  let h = (x * 374761393 + y * 668265263 + seed * 1442695041) | 0;
-  h = ((h ^ (h >> 13)) * 1274126177) | 0;
-  return ((h ^ (h >> 16)) >>> 0) / 4294967295;
-}
-
+// --- GEOMETRIA ISOMÉTRICA XCOM (2:1) ---
 function getIsoMetrics(canvas) {
   const rect = canvas.getBoundingClientRect();
-  const w = Math.max(320, rect.width || canvas.parentElement?.clientWidth || 360);
-  const h = Math.max(320, rect.height || 520);
+  const w = Math.max(300, rect.width || canvas.parentElement?.clientWidth || 360);
+  const h = Math.max(240, rect.height || 360);
 
-  const avgView = (ISO_VIEW_W + ISO_VIEW_H) * 0.5;
-  const maxTileWByWidth = Math.ceil((w + 24) / avgView);
-  const maxTileWByHeight = Math.ceil(((h + 36) / avgView) * 2);
-  const tileW = Math.max(54, Math.min(96, Math.max(maxTileWByWidth, maxTileWByHeight)));
+  const maxTileWByWidth = Math.floor((w - 16) / ISO_VIEW_W);
+  const maxTileWByHeight = Math.floor(((h - 44) / ISO_VIEW_H) * 2);
+  const tileW = Math.max(44, Math.min(76, Math.min(maxTileWByWidth, maxTileWByHeight)));
   const tileH = Math.round(tileW * 0.5);
-  const wallH = Math.max(10, Math.round(tileH * 0.52));
+  const wallH = Math.max(8, Math.round(tileH * 0.45));
   const originX = w * 0.5;
-  const boardPixelH = avgView * tileH;
-  const originY = Math.max(34, Math.round((h - boardPixelH) * 0.44));
+  const boardPixelH = ISO_VIEW_W * tileH;
+  const originY = Math.max(28, Math.round((h - boardPixelH) * 0.34));
 
   return { w, h, tileW, tileH, wallH, originX, originY };
 }
@@ -1416,156 +1432,14 @@ function drawIsoDiamond(ctx, sx, sy, w, h, fill, stroke, lw = 1.2) {
   }
 }
 
-function drawAtmosphericGroundTile(ctx, sx, sy, w, h, gx, gy, battle, timeSec) {
-  const hw = w * 0.5;
-  const hh = h * 0.5;
-  const n = ozHash(gx, gy, 42);
-
-  const gGrad = ctx.createLinearGradient(sx, sy - hh, sx, sy + hh);
-  if (n > 0.55) {
-    gGrad.addColorStop(0, "#2a231e");
-    gGrad.addColorStop(1, "#181412");
-  } else {
-    gGrad.addColorStop(0, "#23201d");
-    gGrad.addColorStop(1, "#141211");
-  }
-  drawIsoDiamond(ctx, sx, sy, w + 0.5, h + 0.5, gGrad, "rgba(255,255,255,0.04)", 0.7);
-
-  ctx.fillStyle = "rgba(214, 196, 172, 0.08)";
-  for (let i = 0; i < 4; i++) {
-    const px = sx + (ozHash(gx + i, gy, 91) - 0.5) * hw * 1.1;
-    const py = sy + (ozHash(gx, gy + i, 97) - 0.5) * hh * 1.1;
-    ctx.fillRect(px, py, 1.5, 1.2);
-  }
-
-  if (gx + gy === 7 || gx + gy === 8) {
-    ctx.save();
-    ctx.strokeStyle = "rgba(62, 46, 36, 0.85)";
-    ctx.lineWidth = 2.2;
-    for (let s = -1; s <= 1; s++) {
-      const rx = sx + s * hw * 0.28;
-      const ry = sy + s * hh * 0.28;
-      ctx.beginPath();
-      ctx.moveTo(rx - hw * 0.22, ry + hh * 0.22);
-      ctx.lineTo(rx + hw * 0.22, ry - hh * 0.22);
-      ctx.stroke();
-    }
-    ctx.strokeStyle = "rgba(168, 182, 198, 0.52)";
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.moveTo(sx - hw * 0.45, sy - hh * 0.25);
-    ctx.lineTo(sx + hw * 0.45, sy + hh * 0.25);
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  const hasFire = (gx === 5 && gy === 3) || (gx === 6 && gy === 2) || (gx === 7 && gy === 4) || (gx === 5 && gy === 6);
-  if (hasFire) {
-    const flicker = 0.78 + 0.22 * Math.sin(timeSec * 8 + gx * 2.1 + gy * 1.7);
-    const glowR = w * 0.48 * flicker;
-    const rad = ctx.createRadialGradient(sx, sy - 4, 1, sx, sy - 2, glowR);
-    rad.addColorStop(0, "rgba(255, 240, 150, 0.75)");
-    rad.addColorStop(0.35, "rgba(255, 115, 20, 0.55)");
-    rad.addColorStop(0.75, "rgba(190, 35, 10, 0.22)");
-    rad.addColorStop(1, "rgba(190, 35, 10, 0)");
-    ctx.fillStyle = rad;
-    ctx.beginPath();
-    ctx.arc(sx, sy - 2, glowR, 0, Math.PI * 2);
-    ctx.fill();
-
-    for (let f = -1; f <= 1; f++) {
-      const fx = sx + f * 5;
-      const fh = (8 + ozHash(gx, gy + f + 3, 55) * 8) * flicker;
-      ctx.beginPath();
-      ctx.moveTo(fx - 3.5, sy);
-      ctx.quadraticCurveTo(fx - 1, sy - fh * 0.7, fx + Math.sin(timeSec * 10 + f) * 2, sy - fh);
-      ctx.quadraticCurveTo(fx + 1.5, sy - fh * 0.6, fx + 3.5, sy);
-      ctx.closePath();
-      ctx.fillStyle = f === 0 ? "#fde047" : "#f97316";
-      ctx.fill();
-    }
-  }
-
-  if ((gx === 3 && gy === 8) || (gx === 4 && gy === 9)) {
-    const pulse = 0.85 + 0.15 * Math.cos(timeSec * 3.5 + gx);
-    const tGrad = ctx.createRadialGradient(sx, sy, 2, sx, sy, w * 0.55 * pulse);
-    tGrad.addColorStop(0, "rgba(74, 222, 128, 0.34)");
-    tGrad.addColorStop(0.6, "rgba(22, 163, 74, 0.14)");
-    tGrad.addColorStop(1, "rgba(22, 163, 74, 0)");
-    ctx.fillStyle = tGrad;
-    ctx.beginPath();
-    ctx.arc(sx, sy, w * 0.55 * pulse, 0, Math.PI * 2);
-    ctx.fill();
-  }
-}
-
-function drawMovementBoundaryContour(ctx, battle, m, selUnit, maxMoveRange) {
-  if (!selUnit || selUnit.ap < 1 || battle.phase !== "player") return;
-  const camX = battle.camera ? battle.camera.x : 0;
-  const camY = battle.camera ? battle.camera.y : 0;
-
-  const isReachable = (gx, gy) => {
-    if (gx < 0 || gx >= GRID_W || gy < 0 || gy >= GRID_H) return false;
-    if (battle.grid[gy][gx] === 3) return false;
-    if (battle.units.some((u) => u.x === gx && u.y === gy && u.hp > 0)) return false;
-    if (battle.enemies.some((e) => e.x === gx && e.y === gy && e.hp > 0)) return false;
-    const d = Math.abs(selUnit.x - gx) + Math.abs(selUnit.y - gy);
-    return d > 0 && d <= maxMoveRange;
-  };
-
-  ctx.save();
-  ctx.strokeStyle = battle.mode === "move" ? "#38bdf8" : "rgba(125, 211, 252, 0.78)";
-  ctx.lineWidth = battle.mode === "move" ? 2.4 : 1.7;
-  ctx.shadowColor = "rgba(56, 189, 248, 0.65)";
-  ctx.shadowBlur = 7;
-
-  const hw = m.tileW * 0.5;
-  const hh = m.tileH * 0.5;
-
-  for (let vy = 0; vy < ISO_VIEW_H; vy++) {
-    for (let vx = 0; vx < ISO_VIEW_W; vx++) {
-      const gx = camX + vx;
-      const gy = camY + vy;
-      if (!isReachable(gx, gy)) continue;
-      const { sx, sy } = worldToIso(gx, gy, battle, m);
-
-      if (!isReachable(gx, gy - 1)) {
-        ctx.beginPath();
-        ctx.moveTo(sx - hw, sy);
-        ctx.lineTo(sx, sy - hh);
-        ctx.stroke();
-      }
-      if (!isReachable(gx + 1, gy)) {
-        ctx.beginPath();
-        ctx.moveTo(sx, sy - hh);
-        ctx.lineTo(sx + hw, sy);
-        ctx.stroke();
-      }
-      if (!isReachable(gx, gy + 1)) {
-        ctx.beginPath();
-        ctx.moveTo(sx + hw, sy);
-        ctx.lineTo(sx, sy + hh);
-        ctx.stroke();
-      }
-      if (!isReachable(gx - 1, gy)) {
-        ctx.beginPath();
-        ctx.moveTo(sx, sy + hh);
-        ctx.lineTo(sx - hw, sy);
-        ctx.stroke();
-      }
-    }
-  }
-
-  ctx.restore();
-}
-
 function drawIsoBoardSkirt(ctx, battle, m) {
   const camX = battle.camera ? battle.camera.x : 0;
   const camY = battle.camera ? battle.camera.y : 0;
-  const skirtH = Math.max(12, Math.round(m.wallH * 1.25));
+  const skirtH = Math.max(10, Math.round(m.wallH * 1.15));
   const hw = m.tileW * 0.5;
   const hh = m.tileH * 0.5;
 
+  // Borda lateral esquerda do plano isométrico
   ctx.beginPath();
   for (let vx = 0; vx < ISO_VIEW_W; vx++) {
     const p = worldToIso(camX + vx, camY + ISO_VIEW_H - 1, battle, m);
@@ -1577,12 +1451,13 @@ function drawIsoBoardSkirt(ctx, battle, m) {
   const startL = worldToIso(camX, camY + ISO_VIEW_H - 1, battle, m);
   ctx.lineTo(startL.sx - hw, startL.sy + skirtH);
   ctx.closePath();
-  ctx.fillStyle = "#120e0c";
+  ctx.fillStyle = "#101b28";
   ctx.fill();
-  ctx.strokeStyle = "rgba(251, 146, 60, 0.28)";
+  ctx.strokeStyle = "rgba(78, 242, 161, 0.34)";
   ctx.lineWidth = 1;
   ctx.stroke();
 
+  // Borda lateral direita do plano isométrico
   ctx.beginPath();
   const topR = worldToIso(camX + ISO_VIEW_W - 1, camY, battle, m);
   ctx.moveTo(topR.sx + hw, topR.sy);
@@ -1594,27 +1469,26 @@ function drawIsoBoardSkirt(ctx, battle, m) {
   ctx.lineTo(botR.sx, botR.sy + hh + skirtH);
   ctx.lineTo(topR.sx + hw, topR.sy + skirtH);
   ctx.closePath();
-  ctx.fillStyle = "#0b0908";
+  ctx.fillStyle = "#0a111a";
   ctx.fill();
-  ctx.strokeStyle = "rgba(125, 211, 252, 0.22)";
+  ctx.strokeStyle = "rgba(78, 242, 161, 0.24)";
   ctx.lineWidth = 1;
   ctx.stroke();
 }
 
 function drawIsoCoverBlock(ctx, sx, sy, w, h, wallH, isHigh, isDestructible) {
-  const cw = w * 0.74;
-  const ch = h * 0.74;
+  const cw = w * 0.72;
+  const ch = h * 0.72;
   const chw = cw * 0.5;
   const chh = ch * 0.5;
   const topY = sy - wallH;
 
-  drawIsoDiamond(ctx, sx, sy + 1, w * 0.9, h * 0.9, "rgba(0,0,0,0.48)", null, 0);
+  drawIsoDiamond(ctx, sx, sy + 1, w * 0.88, h * 0.88, "rgba(0,0,0,0.38)", null, 0);
 
-  const isCrate = isDestructible || !isHigh;
-  const leftCol = isHigh ? "#1e3a5f" : isCrate ? "#7c3f1d" : "#3b424c";
-  const rightCol = isHigh ? "#142740" : isCrate ? "#542912" : "#252a30";
-  const topCol = isHigh ? "#3b6998" : isCrate ? "#a4582a" : "#566170";
-  const borderCol = isHigh ? "#7dd3fc" : isCrate ? "#d99b66" : "#94a3b8";
+  const leftCol = isHigh ? "#1d4ed8" : isDestructible ? "#b45309" : "#3f4e63";
+  const rightCol = isHigh ? "#1e3a8a" : isDestructible ? "#78350f" : "#273242";
+  const topCol = isHigh ? "#60a5fa" : isDestructible ? "#f59e0b" : "#64748b";
+  const borderCol = isHigh ? "#93c5fd" : isDestructible ? "#fde68a" : "#94a3b8";
 
   ctx.beginPath();
   ctx.moveTo(sx - chw, topY);
@@ -1640,73 +1514,31 @@ function drawIsoCoverBlock(ctx, sx, sy, w, h, wallH, isHigh, isDestructible) {
 
   drawIsoDiamond(ctx, sx, topY, cw, ch, topCol, borderCol, 1.2);
 
-  ctx.strokeStyle = isHigh ? "rgba(186,230,253,0.45)" : "rgba(253,224,171,0.35)";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(sx - chw * 0.8, topY + chh * 0.45);
-  ctx.lineTo(sx - chw * 0.2, sy + chh * 0.75);
-  ctx.stroke();
-}
-
-function drawUnitPipsAndShield(ctx, sx, topY, hp, maxHp, isEnemy, isSelected) {
-  const pips = 5;
-  const filled = Math.max(0, Math.min(pips, Math.ceil((hp / Math.max(1, maxHp)) * pips)));
-  const pipW = 4.2;
-  const gap = 1.4;
-  const totalW = pips * pipW + (pips - 1) * gap;
-  const startX = sx - totalW * 0.5;
-
-  for (let i = 0; i < pips; i++) {
-    const px = startX + i * (pipW + gap);
-    ctx.fillStyle = i < filled ? (isEnemy ? "#ef4444" : "#38bdf8") : "rgba(15, 23, 42, 0.75)";
-    ctx.strokeStyle = isEnemy ? "#fca5a5" : "#bae6fd";
-    ctx.lineWidth = 0.8;
-    ctx.fillRect(px, topY, pipW, 3.2);
-    ctx.strokeRect(px, topY, pipW, 3.2);
-  }
-
-  const shX = startX + totalW + 5;
-  const shY = topY + 1.6;
-  ctx.beginPath();
-  ctx.moveTo(shX, shY - 3.2);
-  ctx.lineTo(shX + 3.2, shY - 1.6);
-  ctx.lineTo(shX + 2.4, shY + 2.6);
-  ctx.lineTo(shX, shY + 4.2);
-  ctx.lineTo(shX - 2.4, shY + 2.6);
-  ctx.lineTo(shX - 3.2, shY - 1.6);
-  ctx.closePath();
-  ctx.fillStyle = isEnemy ? "#dc2626" : "#0284c7";
-  ctx.fill();
-  ctx.strokeStyle = isSelected ? "#fef08a" : "#e2e8f0";
-  ctx.lineWidth = 0.7;
-  ctx.stroke();
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 8px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText(isHigh ? "◈" : "◇", sx, topY + 3);
 }
 
 function drawIsoSoldierSprite(ctx, sx, sy, w, h, unit, isSelected) {
   ctx.beginPath();
-  ctx.ellipse(sx, sy + 1, w * 0.3, h * 0.3, 0, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(0, 0, 0, 0.52)";
+  ctx.ellipse(sx, sy + 1, w * 0.28, h * 0.28, 0, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0, 0, 0, 0.48)";
   ctx.fill();
 
   if (isSelected) {
-    ctx.save();
-    ctx.strokeStyle = "#7dd3fc";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.ellipse(sx, sy, w * 0.38, h * 0.38, 0, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
+    drawIsoDiamond(ctx, sx, sy, w * 0.94, h * 0.94, "rgba(78, 242, 161, 0.24)", "#4ef2a1", 1.8);
   }
 
   const crouchOffset = unit.crouched ? 3.5 : 0;
-  const bodyH = Math.max(13, Math.round(h * 0.92));
-  const headR = Math.max(3.8, Math.round(w * 0.11));
+  const bodyH = Math.max(12, Math.round(h * 0.85));
+  const headR = Math.max(3.5, Math.round(w * 0.11));
   const hipY = sy - bodyH * 0.32 + crouchOffset * 0.5;
   const shoulderY = sy - bodyH * 0.82 + crouchOffset;
   const headY = shoulderY - headR - 1.5;
 
-  ctx.strokeStyle = isSelected ? "#bae6fd" : "#94a3b8";
-  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = isSelected ? "#bbf7d0" : "#94a3b8";
+  ctx.lineWidth = 2.4;
   ctx.beginPath();
   ctx.moveTo(sx - 3, hipY);
   ctx.lineTo(sx - 4, sy);
@@ -1714,8 +1546,8 @@ function drawIsoSoldierSprite(ctx, sx, sy, w, h, unit, isSelected) {
   ctx.lineTo(sx + 4, sy);
   ctx.stroke();
 
-  ctx.fillStyle = isSelected ? "#0369a1" : "#1e3a5f";
-  ctx.strokeStyle = isSelected ? "#7dd3fc" : "#60a5fa";
+  ctx.fillStyle = isSelected ? "#16a34a" : "#1e3a5f";
+  ctx.strokeStyle = isSelected ? "#4ef2a1" : "#60a5fa";
   ctx.lineWidth = 1.2;
   ctx.beginPath();
   ctx.roundRect(sx - 5.5, shoulderY, 11, bodyH * 0.52, 2.5);
@@ -1724,41 +1556,55 @@ function drawIsoSoldierSprite(ctx, sx, sy, w, h, unit, isSelected) {
 
   ctx.beginPath();
   ctx.arc(sx, headY, headR, 0, Math.PI * 2);
-  ctx.fillStyle = isSelected ? "#e0f2fe" : "#cbd5e1";
+  ctx.fillStyle = isSelected ? "#4ef2a1" : "#cbd5e1";
   ctx.fill();
   ctx.strokeStyle = "#0f172a";
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  ctx.strokeStyle = "#f1f5f9";
-  ctx.lineWidth = 2.3;
+  ctx.strokeStyle = "#e2e8f0";
+  ctx.lineWidth = 2.2;
   ctx.beginPath();
   ctx.moveTo(sx + 2, shoulderY + 4);
-  ctx.lineTo(sx + 11, shoulderY + 1);
+  ctx.lineTo(sx + 10, shoulderY + 1);
   ctx.stroke();
 
-  drawUnitPipsAndShield(ctx, sx, headY - headR - 7, unit.hp, unit.maxHp, false, isSelected);
+  const barW = 24;
+  const barH = 3.5;
+  const barX = sx - barW * 0.5;
+  const barY = headY - headR - 8;
+  const ratio = Math.max(0, Math.min(1, unit.hp / Math.max(1, unit.maxHp)));
+
+  ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
+  ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
+  ctx.fillStyle = ratio > 0.5 ? "#22c55e" : ratio > 0.25 ? "#eab308" : "#ef4444";
+  ctx.fillRect(barX, barY, barW * ratio, barH);
+
+  ctx.fillStyle = "#f8fafc";
+  ctx.font = "bold 8px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText(`${unit.name.split(" ")[0]} ${unit.hp}`, sx, barY - 3);
 }
 
 function drawIsoAlienSprite(ctx, sx, sy, w, h, enemy, isTargeted) {
   ctx.beginPath();
-  ctx.ellipse(sx, sy + 1, w * 0.32, h * 0.32, 0, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+  ctx.ellipse(sx, sy + 1, w * 0.28, h * 0.28, 0, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
   ctx.fill();
 
   if (isTargeted) {
-    drawIsoDiamond(ctx, sx, sy, w * 0.96, h * 0.96, "rgba(250, 204, 21, 0.18)", "#facc15", 1.8);
+    drawIsoDiamond(ctx, sx, sy, w * 0.94, h * 0.94, "rgba(255, 209, 102, 0.24)", "#ffd166", 1.8);
   }
 
   const isBig = enemy.archetypeId === "brute" || enemy.archetypeId === "overlord";
-  const bodyH = Math.max(14, Math.round(h * (isBig ? 1.12 : 0.9)));
-  const headR = Math.max(4.2, Math.round(w * (isBig ? 0.15 : 0.11)));
+  const bodyH = Math.max(13, Math.round(h * (isBig ? 1.05 : 0.85)));
+  const headR = Math.max(4, Math.round(w * (isBig ? 0.14 : 0.11)));
   const hipY = sy - bodyH * 0.35;
   const shoulderY = sy - bodyH * 0.82;
   const headY = shoulderY - headR - 1.5;
 
   ctx.strokeStyle = "#f87171";
-  ctx.lineWidth = isBig ? 3.2 : 2.3;
+  ctx.lineWidth = isBig ? 3 : 2.2;
   ctx.beginPath();
   ctx.moveTo(sx - 4, hipY);
   ctx.lineTo(sx - 5, sy);
@@ -1771,9 +1617,9 @@ function drawIsoAlienSprite(ctx, sx, sy, w, h, enemy, isTargeted) {
   ctx.lineWidth = 1.2;
   ctx.beginPath();
   ctx.moveTo(sx, shoulderY - 2);
-  ctx.lineTo(sx + (isBig ? 9 : 6), hipY);
+  ctx.lineTo(sx + (isBig ? 8 : 6), hipY);
   ctx.lineTo(sx, sy - 2);
-  ctx.lineTo(sx - (isBig ? 9 : 6), hipY);
+  ctx.lineTo(sx - (isBig ? 8 : 6), hipY);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
@@ -1791,7 +1637,21 @@ function drawIsoAlienSprite(ctx, sx, sy, w, h, enemy, isTargeted) {
   ctx.arc(sx - 1.5, headY - 0.5, 1.5, 0, Math.PI * 2);
   ctx.fill();
 
-  drawUnitPipsAndShield(ctx, sx, headY - headR - 7, enemy.hp, enemy.maxHp, true, isTargeted);
+  const barW = 24;
+  const barH = 3.5;
+  const barX = sx - barW * 0.5;
+  const barY = headY - headR - 8;
+  const ratio = Math.max(0, Math.min(1, enemy.hp / Math.max(1, enemy.maxHp)));
+
+  ctx.fillStyle = "rgba(0, 0, 0, 0.78)";
+  ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
+  ctx.fillStyle = "#ef4444";
+  ctx.fillRect(barX, barY, barW * ratio, barH);
+
+  ctx.fillStyle = isTargeted ? "#fde047" : "#fca5a5";
+  ctx.font = "bold 8px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText(`${enemy.archetypeId.slice(0, 5).toUpperCase()} ${enemy.hp}`, sx, barY - 3);
 }
 
 function ensureIsoCanvasStage(gridEl) {
@@ -1820,6 +1680,7 @@ function ensureIsoCanvasStage(gridEl) {
     canvas.style.cssText = "width:100%;height:100%;display:block;touch-action:none;user-select:none;-webkit-user-select:none;cursor:pointer;";
     stage.appendChild(canvas);
 
+    // Navegação tátil suave por arrasto/deslize direto no canvas isométrico
     let pointerDown = false;
     let totalMoved = 0;
     let startClientX = 0;
@@ -2216,16 +2077,14 @@ function renderBattle() {
       squadBar.id = "iso-squad-strip";
       squadBar.style.cssText = `
         position:absolute;
-        top:20px;
-        left:6px;
-        right:6px;
+        top:6px;
+        right:8px;
         z-index:15;
         display:flex;
-        flex-wrap:nowrap;
-        overflow-x:auto;
+        flex-wrap:wrap;
         gap:4px;
-        justify-content:flex-start;
-        scrollbar-width:none;
+        max-width:64%;
+        justify-content:flex-end;
       `;
       canvas.parentElement.appendChild(squadBar);
     }
@@ -2256,7 +2115,6 @@ function renderBattle() {
       squadBar.appendChild(chip);
     });
   }
-
   const selUnit = getSelectedUnit();
   const selEnemy = getSelectedEnemy();
 
@@ -2283,8 +2141,8 @@ function renderBattle() {
     drawIsoBoardSkirt(ctx, b, m);
 
     const maxMoveRange = getUnitMoveRange(selUnit);
-    const timeSec = performance.now() * 0.001;
 
+    // 1. Losangos do chão isométrico ordenados por profundidade (x + y)
     for (let sum = 0; sum <= ISO_VIEW_W + ISO_VIEW_H - 2; sum++) {
       for (let vy = 0; vy < ISO_VIEW_H; vy++) {
         const vx = sum - vy;
@@ -2293,15 +2151,12 @@ function renderBattle() {
         const gy = b.camera.y + vy;
         const { sx, sy } = worldToIso(gx, gy, b, m);
 
-        drawAtmosphericGroundTile(ctx, sx, sy, m.tileW, m.tileH, gx, gy, b, timeSec);
-
-        const smokeHere = isInSmoke(b, gx, gy);
-        if (smokeHere) {
-          drawIsoDiamond(ctx, sx, sy, m.tileW, m.tileH, "rgba(203, 213, 225, 0.36)", "rgba(241, 245, 249, 0.65)", 1.1);
-        }
-
+        const tileType = b.grid[gy][gx];
         const unitHere = b.units.find((u) => u.x === gx && u.y === gy && u.hp > 0);
         const enemyHere = b.enemies.find((e) => e.x === gx && e.y === gy && e.hp > 0);
+        const hostageHere = (b.hostages || []).find((h) => !h.rescued && h.x === gx && h.y === gy);
+        const smokeHere = isInSmoke(b, gx, gy);
+
         const distFromSel = selUnit ? Math.abs(selUnit.x - gx) + Math.abs(selUnit.y - gy) : 99;
         const canMoveHere =
           b.phase === "player" &&
@@ -2310,12 +2165,33 @@ function renderBattle() {
           selUnit.ap >= 1 &&
           !unitHere &&
           !enemyHere &&
-          b.grid[gy][gx] !== 3 &&
+          !hostageHere &&
+          tileType !== 3 &&
           distFromSel > 0 &&
           distFromSel <= maxMoveRange;
 
-        if (canMoveHere && b.mode === "move") {
-          drawIsoDiamond(ctx, sx, sy, m.tileW, m.tileH, "rgba(56, 189, 248, 0.16)", null, 0);
+        const isAlt = (gx + gy) % 2 === 0;
+        let fill = isAlt ? "rgba(28, 48, 68, 0.65)" : "rgba(18, 32, 48, 0.60)";
+        let stroke = "rgba(125, 211, 252, 0.28)";
+
+        if (canMoveHere) {
+          fill = b.mode === "move" ? "rgba(78, 242, 161, 0.30)" : "rgba(78, 242, 161, 0.16)";
+          stroke = "#4ef2a1";
+        } else if (smokeHere) {
+          fill = "rgba(203, 213, 225, 0.34)";
+          stroke = "rgba(241, 245, 249, 0.62)";
+        }
+
+        drawIsoDiamond(ctx, sx, sy, m.tileW, m.tileH, fill, stroke, canMoveHere ? 1.5 : 1);
+
+        if (canMoveHere) {
+          const cCov = getTileCoverAt(b, gx, gy);
+          if (cCov > 0) {
+            ctx.fillStyle = cCov === 2 ? "#93c5fd" : "#fde68a";
+            ctx.font = "bold 8px monospace";
+            ctx.textAlign = "center";
+            ctx.fillText(cCov === 2 ? "▲" : "▪", sx, sy + 2.5);
+          }
         }
 
         if (b.hoverTile && (b.mode === "frag" || b.mode === "smoke")) {
@@ -2354,8 +2230,7 @@ function renderBattle() {
       }
     }
 
-    drawMovementBoundaryContour(ctx, b, m, selUnit, maxMoveRange);
-
+    // 2. Linha de mira entre o soldado selecionado e o alvo selecionado
     if (selUnit && selEnemy) {
       const uPos = worldToIso(selUnit.x, selUnit.y, b, m);
       const ePos = worldToIso(selEnemy.x, selEnemy.y, b, m);
@@ -2370,6 +2245,7 @@ function renderBattle() {
       ctx.restore();
     }
 
+    // 3. Coberturas 3D, soldados e inimigos Xeno por profundidade
     for (let sum = 0; sum <= ISO_VIEW_W + ISO_VIEW_H - 2; sum++) {
       for (let vy = 0; vy < ISO_VIEW_H; vy++) {
         const vx = sum - vy;
@@ -2388,6 +2264,16 @@ function renderBattle() {
           drawIsoCoverBlock(ctx, sx, sy, m.tileW, m.tileH, m.wallH * 0.95, true, false);
         } else if (tileType === 1 || tileType === 4) {
           drawIsoCoverBlock(ctx, sx, sy, m.tileW, m.tileH, m.wallH * 0.72, false, tileType === 4);
+        }
+
+        const hostageSpriteHere = (b.hostages || []).find((h) => !h.rescued && h.x === gx && h.y === gy);
+        if (hostageSpriteHere) {
+          drawIsoDiamond(ctx, sx, sy, m.tileW * 0.9, m.tileH * 0.9, "rgba(250, 204, 21, 0.28)", "#facc15", 1.8);
+          drawIsoSoldierSprite(ctx, sx, sy, m.tileW, m.tileH, { ...hostageSpriteHere, crouched: true }, false);
+          ctx.fillStyle = "#fde047";
+          ctx.font = "bold 8px monospace";
+          ctx.textAlign = "center";
+          ctx.fillText("SOS", sx, sy - m.tileH * 0.95);
         }
 
         if (unitHere) {
@@ -2603,6 +2489,12 @@ function handleCellClick(x, y) {
     return;
   }
 
+  const hostageAtClick = (b.hostages || []).find((h) => !h.rescued && h.x === x && h.y === y);
+  if (hostageAtClick) {
+    addBattleLog(`${hostageAtClick.name} [SOS] aguarda resgate — aproxima um operacional a 1 casa.`);
+    return;
+  }
+
   if (selUnit && selUnit.ap >= 1 && b.grid[y][x] !== 3) {
     const dist = Math.abs(selUnit.x - x) + Math.abs(selUnit.y - y);
     const maxStep = getUnitMoveRange(selUnit);
@@ -2615,7 +2507,42 @@ function handleCellClick(x, y) {
       selUnit.stunned = false;
       if (b.mode === "move") { b.mode = "normal"; b.ordersMinimized = false; }
       centerCameraOnUnit(selUnit);
-      addBattleLog(`${selUnit.name} ${moveType} para (${x + 1},${y + 1}).`);
+
+      let rescuedMsg = "";
+      if (b.hostages && b.hostages.length) {
+        b.hostages.forEach((h) => {
+          if (!h.rescued && Math.abs(selUnit.x - h.x) + Math.abs(selUnit.y - h.y) <= 1) {
+            h.rescued = true;
+            b.units.push({
+              id: h.id,
+              name: h.name,
+              codename: "RESGATE",
+              role: h.role,
+              side: "player",
+              x: h.x,
+              y: h.y,
+              hp: h.hp,
+              maxHp: h.maxHp,
+              ap: 2,
+              maxAp: 2,
+              ammo: 10,
+              maxAmmo: 10,
+              aim: h.aim,
+              dodge: 14,
+              medkits: h.role === "Médico" ? 2 : 0,
+              frags: 1,
+              smokes: 1,
+              overwatch: false,
+              hunker: false,
+              crouched: false,
+              stunned: false
+            });
+            rescuedMsg = ` | RESGATE: ${h.name} estabilizado e ativo na equipa!`;
+          }
+        });
+      }
+
+      addBattleLog(`${selUnit.name} ${moveType} para (${x + 1},${y + 1}).${rescuedMsg}`);
       renderBattle();
     }
   }
@@ -2813,10 +2740,29 @@ function endPlayerTurn() {
     const dist = Math.abs(en.x - target.x) + Math.abs(en.y - target.y);
 
     if (dist > 2) {
-      const stepX = en.x + Math.sign(target.x - en.x);
-      const stepY = en.y;
-      if (stepX >= 0 && stepX < GRID_W && b.grid[stepY][stepX] !== 3 && !b.units.some((u) => u.x === stepX && u.y === stepY && u.hp > 0)) {
-        en.x = stepX;
+      const steps = Math.min(en.moveRange || 2, dist - 2);
+      for (let s = 0; s < steps; s++) {
+        const candidates = [
+          [en.x + Math.sign(target.x - en.x), en.y],
+          [en.x, en.y + Math.sign(target.y - en.y)],
+          [en.x, en.y - 1],
+          [en.x, en.y + 1],
+          [en.x - 1, en.y]
+        ];
+        let moved = false;
+        for (const [nx, ny] of candidates) {
+          if (nx === en.x && ny === en.y) continue;
+          if (nx < 0 || nx >= GRID_W || ny < 0 || ny >= GRID_H) continue;
+          if (b.grid[ny][nx] === 3) continue;
+          if (b.units.some((u) => u.x === nx && u.y === ny && u.hp > 0)) continue;
+          if (b.enemies.some((other) => other.id !== en.id && other.x === nx && other.y === ny && other.hp > 0)) continue;
+          if ((b.hostages || []).some((h) => !h.rescued && h.x === nx && h.y === ny)) continue;
+          en.x = nx;
+          en.y = ny;
+          moved = true;
+          break;
+        }
+        if (!moved) break;
       }
     }
 
