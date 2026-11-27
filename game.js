@@ -1298,20 +1298,27 @@ function addBattleLog(msg) {
 }
 
 // --- GEOMETRIA ISOMÉTRICA XCOM (2:1) ---
+// Seeded deterministic pseudo-random helper for rich terrain detail
+function ozHash(x, y, seed = 1337) {
+  let h = (x * 374761393 + y * 668265263 + seed * 1442695041) | 0;
+  h = ((h ^ (h >> 13)) * 1274126177) | 0;
+  return ((h ^ (h >> 16)) >>> 0) / 4294967295;
+}
+
 function getIsoMetrics(canvas) {
   const rect = canvas.getBoundingClientRect();
-  const w = Math.max(300, rect.width || canvas.parentElement?.clientWidth || 360);
-  const h = Math.max(260, rect.height || 420);
+  const w = Math.max(320, rect.width || canvas.parentElement?.clientWidth || 360);
+  const h = Math.max(320, rect.height || 520);
 
   const avgView = (ISO_VIEW_W + ISO_VIEW_H) * 0.5;
-  const maxTileWByWidth = Math.floor((w - 12) / avgView);
-  const maxTileWByHeight = Math.floor(((h - 46) / avgView) * 2);
-  const tileW = Math.max(46, Math.min(84, Math.min(maxTileWByWidth, maxTileWByHeight)));
+  const maxTileWByWidth = Math.ceil((w + 24) / avgView);
+  const maxTileWByHeight = Math.ceil(((h + 36) / avgView) * 2);
+  const tileW = Math.max(54, Math.min(96, Math.max(maxTileWByWidth, maxTileWByHeight)));
   const tileH = Math.round(tileW * 0.5);
-  const wallH = Math.max(8, Math.round(tileH * 0.44));
+  const wallH = Math.max(10, Math.round(tileH * 0.52));
   const originX = w * 0.5;
   const boardPixelH = avgView * tileH;
-  const originY = Math.max(42, Math.round((h - boardPixelH) * 0.48));
+  const originY = Math.max(34, Math.round((h - boardPixelH) * 0.44));
 
   return { w, h, tileW, tileH, wallH, originX, originY };
 }
@@ -1363,14 +1370,170 @@ function drawIsoDiamond(ctx, sx, sy, w, h, fill, stroke, lw = 1.2) {
   }
 }
 
-function drawIsoBoardSkirt(ctx, battle, m) {
+// Desenha solo industrial com cascalho, trilhos ferroviários diagonais, chamas e névoa verde
+function drawAtmosphericGroundTile(ctx, sx, sy, w, h, gx, gy, battle, timeSec) {
+  const hw = w * 0.5;
+  const hh = h * 0.5;
+  const n = ozHash(gx, gy, 42);
+
+  // Base de cascalho / terra escura do pátio ferroviário
+  const gGrad = ctx.createLinearGradient(sx, sy - hh, sx, sy + hh);
+  if (n > 0.55) {
+    gGrad.addColorStop(0, "#2a231e");
+    gGrad.addColorStop(1, "#181412");
+  } else {
+    gGrad.addColorStop(0, "#23201d");
+    gGrad.addColorStop(1, "#141211");
+  }
+  drawIsoDiamond(ctx, sx, sy, w + 0.5, h + 0.5, gGrad, "rgba(255,255,255,0.04)", 0.7);
+
+  // Textura de gravilha/pedras pequenas
+  ctx.fillStyle = "rgba(214, 196, 172, 0.08)";
+  for (let i = 0; i < 4; i++) {
+    const px = sx + (ozHash(gx + i, gy, 91) - 0.5) * hw * 1.1;
+    const py = sy + (ozHash(gx, gy + i, 97) - 0.5) * hh * 1.1;
+    ctx.fillRect(px, py, 1.5, 1.2);
+  }
+
+  // Trilhos de linha férrea atravessando o mapa (gx + gy == 5 ou gx == 4)
+  if (gx + gy === 5 || gx + gy === 6) {
+    ctx.save();
+    ctx.strokeStyle = "rgba(62, 46, 36, 0.85)";
+    ctx.lineWidth = 2.2;
+    const steps = 3;
+    for (let s = -1; s <= 1; s++) {
+      const rx = sx + s * hw * 0.28;
+      const ry = sy + s * hh * 0.28;
+      ctx.beginPath();
+      ctx.moveTo(rx - hw * 0.22, ry + hh * 0.22);
+      ctx.lineTo(rx + hw * 0.22, ry - hh * 0.22);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = "rgba(168, 182, 198, 0.52)";
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(sx - hw * 0.45, sy - hh * 0.25);
+    ctx.lineTo(sx + hw * 0.45, sy + hh * 0.25);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(sx - hw * 0.35, sy - hh * 0.35);
+    ctx.lineTo(sx + hw * 0.55, sy + hh * 0.15);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Focos de incêndio / chamas ambientais em zonas de escombros
+  const hasFire = (gx === 3 && gy === 2) || (gx === 4 && gy === 1) || (gx === 5 && gy === 2) || (gx === 3 && gy === 4);
+  if (hasFire) {
+    const flicker = 0.78 + 0.22 * Math.sin(timeSec * 8 + gx * 2.1 + gy * 1.7);
+    const glowR = w * 0.48 * flicker;
+    const rad = ctx.createRadialGradient(sx, sy - 4, 1, sx, sy - 2, glowR);
+    rad.addColorStop(0, "rgba(255, 240, 150, 0.75)");
+    rad.addColorStop(0.35, "rgba(255, 115, 20, 0.55)");
+    rad.addColorStop(0.75, "rgba(190, 35, 10, 0.22)");
+    rad.addColorStop(1, "rgba(190, 35, 10, 0)");
+    ctx.fillStyle = rad;
+    ctx.beginPath();
+    ctx.arc(sx, sy - 2, glowR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Línguas de fogo
+    for (let f = -1; f <= 1; f++) {
+      const fx = sx + f * 5;
+      const fh = (8 + ozHash(gx, gy + f + 3, 55) * 8) * flicker;
+      ctx.beginPath();
+      ctx.moveTo(fx - 3.5, sy);
+      ctx.quadraticCurveTo(fx - 1, sy - fh * 0.7, fx + Math.sin(timeSec * 10 + f) * 2, sy - fh);
+      ctx.quadraticCurveTo(fx + 1.5, sy - fh * 0.6, fx + 3.5, sy);
+      ctx.closePath();
+      ctx.fillStyle = f === 0 ? "#fde047" : "#f97316";
+      ctx.fill();
+    }
+  }
+
+  // Névoa / emanação tóxica verde perto de zonas de contenção
+  if ((gx === 2 && gy === 5) || (gx === 3 && gy === 6)) {
+    const pulse = 0.85 + 0.15 * Math.cos(timeSec * 3.5 + gx);
+    const tGrad = ctx.createRadialGradient(sx, sy, 2, sx, sy, w * 0.55 * pulse);
+    tGrad.addColorStop(0, "rgba(74, 222, 128, 0.34)");
+    tGrad.addColorStop(0.6, "rgba(22, 163, 74, 0.14)");
+    tGrad.addColorStop(1, "rgba(22, 163, 74, 0)");
+    ctx.fillStyle = tGrad;
+    ctx.beginPath();
+    ctx.arc(sx, sy, w * 0.55 * pulse, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// Contorno azulado orgânico à volta da área alcançável de movimento (estilo XCOM)
+function drawMovementBoundaryContour(ctx, battle, m, selUnit, maxMoveRange) {
+  if (!selUnit || selUnit.ap < 1 || battle.phase !== "player") return;
   const camX = battle.camera ? battle.camera.x : 0;
   const camY = battle.camera ? battle.camera.y : 0;
-  const skirtH = Math.max(10, Math.round(m.wallH * 1.15));
+
+  const isReachable = (gx, gy) => {
+    if (gx < 0 || gx >= GRID_W || gy < 0 || gy >= GRID_H) return false;
+    if (battle.grid[gy][gx] === 3) return false;
+    if (battle.units.some((u) => u.x === gx && u.y === gy && u.hp > 0)) return false;
+    if (battle.enemies.some((e) => e.x === gx && e.y === gy && e.hp > 0)) return false;
+    const d = Math.abs(selUnit.x - gx) + Math.abs(selUnit.y - gy);
+    return d > 0 && d <= maxMoveRange;
+  };
+
+  ctx.save();
+  ctx.strokeStyle = battle.mode === "move" ? "#38bdf8" : "rgba(125, 211, 252, 0.78)";
+  ctx.lineWidth = battle.mode === "move" ? 2.4 : 1.7;
+  ctx.shadowColor = "rgba(56, 189, 248, 0.65)";
+  ctx.shadowBlur = 7;
+
   const hw = m.tileW * 0.5;
   const hh = m.tileH * 0.5;
 
-  // Borda lateral esquerda do plano isométrico
+  for (let vy = 0; vy < ISO_VIEW_H; vy++) {
+    for (let vx = 0; vx < ISO_VIEW_W; vx++) {
+      const gx = camX + vx;
+      const gy = camY + vy;
+      if (!isReachable(gx, gy)) continue;
+      const { sx, sy } = worldToIso(gx, gy, battle, m);
+
+      // Arestas exteriores do losango onde a casa vizinha não é alcançável
+      if (!isReachable(gx, gy - 1)) {
+        ctx.beginPath();
+        ctx.moveTo(sx - hw, sy);
+        ctx.lineTo(sx, sy - hh);
+        ctx.stroke();
+      }
+      if (!isReachable(gx + 1, gy)) {
+        ctx.beginPath();
+        ctx.moveTo(sx, sy - hh);
+        ctx.lineTo(sx + hw, sy);
+        ctx.stroke();
+      }
+      if (!isReachable(gx, gy + 1)) {
+        ctx.beginPath();
+        ctx.moveTo(sx + hw, sy);
+        ctx.lineTo(sx, sy + hh);
+        ctx.stroke();
+      }
+      if (!isReachable(gx - 1, gy)) {
+        ctx.beginPath();
+        ctx.moveTo(sx, sy + hh);
+        ctx.lineTo(sx - hw, sy);
+        ctx.stroke();
+      }
+    }
+  }
+
+  ctx.restore();
+}
+
+function drawIsoBoardSkirt(ctx, battle, m) {
+  const camX = battle.camera ? battle.camera.x : 0;
+  const camY = battle.camera ? battle.camera.y : 0;
+  const skirtH = Math.max(12, Math.round(m.wallH * 1.25));
+  const hw = m.tileW * 0.5;
+  const hh = m.tileH * 0.5;
+
   ctx.beginPath();
   for (let vx = 0; vx < ISO_VIEW_W; vx++) {
     const p = worldToIso(camX + vx, camY + ISO_VIEW_H - 1, battle, m);
@@ -1382,13 +1545,12 @@ function drawIsoBoardSkirt(ctx, battle, m) {
   const startL = worldToIso(camX, camY + ISO_VIEW_H - 1, battle, m);
   ctx.lineTo(startL.sx - hw, startL.sy + skirtH);
   ctx.closePath();
-  ctx.fillStyle = "#101b28";
+  ctx.fillStyle = "#120e0c";
   ctx.fill();
-  ctx.strokeStyle = "rgba(78, 242, 161, 0.34)";
+  ctx.strokeStyle = "rgba(251, 146, 60, 0.28)";
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  // Borda lateral direita do plano isométrico
   ctx.beginPath();
   const topR = worldToIso(camX + ISO_VIEW_W - 1, camY, battle, m);
   ctx.moveTo(topR.sx + hw, topR.sy);
@@ -1400,26 +1562,28 @@ function drawIsoBoardSkirt(ctx, battle, m) {
   ctx.lineTo(botR.sx, botR.sy + hh + skirtH);
   ctx.lineTo(topR.sx + hw, topR.sy + skirtH);
   ctx.closePath();
-  ctx.fillStyle = "#0a111a";
+  ctx.fillStyle = "#0b0908";
   ctx.fill();
-  ctx.strokeStyle = "rgba(78, 242, 161, 0.24)";
+  ctx.strokeStyle = "rgba(125, 211, 252, 0.22)";
   ctx.lineWidth = 1;
   ctx.stroke();
 }
 
+// Caixotes de madeira, contentores/vagões e barricadas industriais
 function drawIsoCoverBlock(ctx, sx, sy, w, h, wallH, isHigh, isDestructible) {
-  const cw = w * 0.72;
-  const ch = h * 0.72;
+  const cw = w * 0.74;
+  const ch = h * 0.74;
   const chw = cw * 0.5;
   const chh = ch * 0.5;
   const topY = sy - wallH;
 
-  drawIsoDiamond(ctx, sx, sy + 1, w * 0.88, h * 0.88, "rgba(0,0,0,0.38)", null, 0);
+  drawIsoDiamond(ctx, sx, sy + 1, w * 0.9, h * 0.9, "rgba(0,0,0,0.48)", null, 0);
 
-  const leftCol = isHigh ? "#1d4ed8" : isDestructible ? "#b45309" : "#3f4e63";
-  const rightCol = isHigh ? "#1e3a8a" : isDestructible ? "#78350f" : "#273242";
-  const topCol = isHigh ? "#60a5fa" : isDestructible ? "#f59e0b" : "#64748b";
-  const borderCol = isHigh ? "#93c5fd" : isDestructible ? "#fde68a" : "#94a3b8";
+  const isCrate = isDestructible || !isHigh;
+  const leftCol = isHigh ? "#1e3a5f" : isCrate ? "#7c3f1d" : "#3b424c";
+  const rightCol = isHigh ? "#142740" : isCrate ? "#542912" : "#252a30";
+  const topCol = isHigh ? "#3b6998" : isCrate ? "#a4582a" : "#566170";
+  const borderCol = isHigh ? "#7dd3fc" : isCrate ? "#d99b66" : "#94a3b8";
 
   ctx.beginPath();
   ctx.moveTo(sx - chw, topY);
@@ -1445,31 +1609,75 @@ function drawIsoCoverBlock(ctx, sx, sy, w, h, wallH, isHigh, isDestructible) {
 
   drawIsoDiamond(ctx, sx, topY, cw, ch, topCol, borderCol, 1.2);
 
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 8px monospace";
-  ctx.textAlign = "center";
-  ctx.fillText(isHigh ? "◈" : "◇", sx, topY + 3);
+  // Ripas diagonais em caixotes ou nervuras em contentores
+  ctx.strokeStyle = isHigh ? "rgba(186,230,253,0.45)" : "rgba(253,224,171,0.35)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(sx - chw * 0.8, topY + chh * 0.45);
+  ctx.lineTo(sx - chw * 0.2, sy + chh * 0.75);
+  ctx.stroke();
+}
+
+function drawUnitPipsAndShield(ctx, sx, topY, hp, maxHp, isEnemy, isSelected) {
+  const pips = 5;
+  const filled = Math.max(0, Math.min(pips, Math.ceil((hp / Math.max(1, maxHp)) * pips)));
+  const pipW = 4.2;
+  const gap = 1.4;
+  const totalW = pips * pipW + (pips - 1) * gap;
+  const startX = sx - totalW * 0.5;
+
+  for (let i = 0; i < pips; i++) {
+    const px = startX + i * (pipW + gap);
+    ctx.fillStyle = i < filled ? (isEnemy ? "#ef4444" : "#38bdf8") : "rgba(15, 23, 42, 0.75)";
+    ctx.strokeStyle = isEnemy ? "#fca5a5" : "#bae6fd";
+    ctx.lineWidth = 0.8;
+    ctx.fillRect(px, topY, pipW, 3.2);
+    ctx.strokeRect(px, topY, pipW, 3.2);
+  }
+
+  // Ícone de escudo tático ao lado da barra
+  const shX = startX + totalW + 5;
+  const shY = topY + 1.6;
+  ctx.beginPath();
+  ctx.moveTo(shX, shY - 3.2);
+  ctx.lineTo(shX + 3.2, shY - 1.6);
+  ctx.lineTo(shX + 2.4, shY + 2.6);
+  ctx.lineTo(shX, shY + 4.2);
+  ctx.lineTo(shX - 2.4, shY + 2.6);
+  ctx.lineTo(shX - 3.2, shY - 1.6);
+  ctx.closePath();
+  ctx.fillStyle = isEnemy ? "#dc2626" : "#0284c7";
+  ctx.fill();
+  ctx.strokeStyle = isSelected ? "#fef08a" : "#e2e8f0";
+  ctx.lineWidth = 0.7;
+  ctx.stroke();
 }
 
 function drawIsoSoldierSprite(ctx, sx, sy, w, h, unit, isSelected) {
   ctx.beginPath();
-  ctx.ellipse(sx, sy + 1, w * 0.28, h * 0.28, 0, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(0, 0, 0, 0.48)";
+  ctx.ellipse(sx, sy + 1, w * 0.3, h * 0.3, 0, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0, 0, 0, 0.52)";
   ctx.fill();
 
   if (isSelected) {
-    drawIsoDiamond(ctx, sx, sy, w * 0.94, h * 0.94, "rgba(78, 242, 161, 0.24)", "#4ef2a1", 1.8);
+    ctx.save();
+    ctx.strokeStyle = "#7dd3fc";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(sx, sy, w * 0.38, h * 0.38, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
   }
 
   const crouchOffset = unit.crouched ? 3.5 : 0;
-  const bodyH = Math.max(12, Math.round(h * 0.85));
-  const headR = Math.max(3.5, Math.round(w * 0.11));
+  const bodyH = Math.max(13, Math.round(h * 0.92));
+  const headR = Math.max(3.8, Math.round(w * 0.11));
   const hipY = sy - bodyH * 0.32 + crouchOffset * 0.5;
   const shoulderY = sy - bodyH * 0.82 + crouchOffset;
   const headY = shoulderY - headR - 1.5;
 
-  ctx.strokeStyle = isSelected ? "#bbf7d0" : "#94a3b8";
-  ctx.lineWidth = 2.4;
+  ctx.strokeStyle = isSelected ? "#bae6fd" : "#94a3b8";
+  ctx.lineWidth = 2.5;
   ctx.beginPath();
   ctx.moveTo(sx - 3, hipY);
   ctx.lineTo(sx - 4, sy);
@@ -1477,8 +1685,8 @@ function drawIsoSoldierSprite(ctx, sx, sy, w, h, unit, isSelected) {
   ctx.lineTo(sx + 4, sy);
   ctx.stroke();
 
-  ctx.fillStyle = isSelected ? "#16a34a" : "#1e3a5f";
-  ctx.strokeStyle = isSelected ? "#4ef2a1" : "#60a5fa";
+  ctx.fillStyle = isSelected ? "#0369a1" : "#1e3a5f";
+  ctx.strokeStyle = isSelected ? "#7dd3fc" : "#60a5fa";
   ctx.lineWidth = 1.2;
   ctx.beginPath();
   ctx.roundRect(sx - 5.5, shoulderY, 11, bodyH * 0.52, 2.5);
@@ -1487,55 +1695,41 @@ function drawIsoSoldierSprite(ctx, sx, sy, w, h, unit, isSelected) {
 
   ctx.beginPath();
   ctx.arc(sx, headY, headR, 0, Math.PI * 2);
-  ctx.fillStyle = isSelected ? "#4ef2a1" : "#cbd5e1";
+  ctx.fillStyle = isSelected ? "#e0f2fe" : "#cbd5e1";
   ctx.fill();
   ctx.strokeStyle = "#0f172a";
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  ctx.strokeStyle = "#e2e8f0";
-  ctx.lineWidth = 2.2;
+  ctx.strokeStyle = "#f1f5f9";
+  ctx.lineWidth = 2.3;
   ctx.beginPath();
   ctx.moveTo(sx + 2, shoulderY + 4);
-  ctx.lineTo(sx + 10, shoulderY + 1);
+  ctx.lineTo(sx + 11, shoulderY + 1);
   ctx.stroke();
 
-  const barW = 24;
-  const barH = 3.5;
-  const barX = sx - barW * 0.5;
-  const barY = headY - headR - 8;
-  const ratio = Math.max(0, Math.min(1, unit.hp / Math.max(1, unit.maxHp)));
-
-  ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
-  ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
-  ctx.fillStyle = ratio > 0.5 ? "#22c55e" : ratio > 0.25 ? "#eab308" : "#ef4444";
-  ctx.fillRect(barX, barY, barW * ratio, barH);
-
-  ctx.fillStyle = "#f8fafc";
-  ctx.font = "bold 8px monospace";
-  ctx.textAlign = "center";
-  ctx.fillText(`${unit.name.split(" ")[0]} ${unit.hp}`, sx, barY - 3);
+  drawUnitPipsAndShield(ctx, sx, headY - headR - 7, unit.hp, unit.maxHp, false, isSelected);
 }
 
 function drawIsoAlienSprite(ctx, sx, sy, w, h, enemy, isTargeted) {
   ctx.beginPath();
-  ctx.ellipse(sx, sy + 1, w * 0.28, h * 0.28, 0, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+  ctx.ellipse(sx, sy + 1, w * 0.32, h * 0.32, 0, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
   ctx.fill();
 
   if (isTargeted) {
-    drawIsoDiamond(ctx, sx, sy, w * 0.94, h * 0.94, "rgba(255, 209, 102, 0.24)", "#ffd166", 1.8);
+    drawIsoDiamond(ctx, sx, sy, w * 0.96, h * 0.96, "rgba(250, 204, 21, 0.18)", "#facc15", 1.8);
   }
 
   const isBig = enemy.archetypeId === "brute" || enemy.archetypeId === "overlord";
-  const bodyH = Math.max(13, Math.round(h * (isBig ? 1.05 : 0.85)));
-  const headR = Math.max(4, Math.round(w * (isBig ? 0.14 : 0.11)));
+  const bodyH = Math.max(14, Math.round(h * (isBig ? 1.12 : 0.9)));
+  const headR = Math.max(4.2, Math.round(w * (isBig ? 0.15 : 0.11)));
   const hipY = sy - bodyH * 0.35;
   const shoulderY = sy - bodyH * 0.82;
   const headY = shoulderY - headR - 1.5;
 
   ctx.strokeStyle = "#f87171";
-  ctx.lineWidth = isBig ? 3 : 2.2;
+  ctx.lineWidth = isBig ? 3.2 : 2.3;
   ctx.beginPath();
   ctx.moveTo(sx - 4, hipY);
   ctx.lineTo(sx - 5, sy);
@@ -1548,9 +1742,9 @@ function drawIsoAlienSprite(ctx, sx, sy, w, h, enemy, isTargeted) {
   ctx.lineWidth = 1.2;
   ctx.beginPath();
   ctx.moveTo(sx, shoulderY - 2);
-  ctx.lineTo(sx + (isBig ? 8 : 6), hipY);
+  ctx.lineTo(sx + (isBig ? 9 : 6), hipY);
   ctx.lineTo(sx, sy - 2);
-  ctx.lineTo(sx - (isBig ? 8 : 6), hipY);
+  ctx.lineTo(sx - (isBig ? 9 : 6), hipY);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
@@ -1568,23 +1762,8 @@ function drawIsoAlienSprite(ctx, sx, sy, w, h, enemy, isTargeted) {
   ctx.arc(sx - 1.5, headY - 0.5, 1.5, 0, Math.PI * 2);
   ctx.fill();
 
-  const barW = 24;
-  const barH = 3.5;
-  const barX = sx - barW * 0.5;
-  const barY = headY - headR - 8;
-  const ratio = Math.max(0, Math.min(1, enemy.hp / Math.max(1, enemy.maxHp)));
-
-  ctx.fillStyle = "rgba(0, 0, 0, 0.78)";
-  ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
-  ctx.fillStyle = "#ef4444";
-  ctx.fillRect(barX, barY, barW * ratio, barH);
-
-  ctx.fillStyle = isTargeted ? "#fde047" : "#fca5a5";
-  ctx.font = "bold 8px monospace";
-  ctx.textAlign = "center";
-  ctx.fillText(`${enemy.archetypeId.slice(0, 5).toUpperCase()} ${enemy.hp}`, sx, barY - 3);
+  drawUnitPipsAndShield(ctx, sx, headY - headR - 7, enemy.hp, enemy.maxHp, true, isTargeted);
 }
-
 function ensureIsoCanvasStage(gridEl) {
   if (!gridEl || !gridEl.parentElement) return null;
   gridEl.style.display = "none";
@@ -2075,7 +2254,9 @@ function renderBattle() {
 
     const maxMoveRange = getUnitMoveRange(selUnit);
 
-    // 1. Losangos do chão isométrico ordenados por profundidade (x + y)
+    const timeSec = performance.now() * 0.001;
+
+    // 1. Terreno atmosférico com trilhos, chamas e fumo
     for (let sum = 0; sum <= ISO_VIEW_W + ISO_VIEW_H - 2; sum++) {
       for (let vy = 0; vy < ISO_VIEW_H; vy++) {
         const vx = sum - vy;
@@ -2084,11 +2265,15 @@ function renderBattle() {
         const gy = b.camera.y + vy;
         const { sx, sy } = worldToIso(gx, gy, b, m);
 
-        const tileType = b.grid[gy][gx];
+        drawAtmosphericGroundTile(ctx, sx, sy, m.tileW, m.tileH, gx, gy, b, timeSec);
+
+        const smokeHere = isInSmoke(b, gx, gy);
+        if (smokeHere) {
+          drawIsoDiamond(ctx, sx, sy, m.tileW, m.tileH, "rgba(203, 213, 225, 0.36)", "rgba(241, 245, 249, 0.65)", 1.1);
+        }
+
         const unitHere = b.units.find((u) => u.x === gx && u.y === gy && u.hp > 0);
         const enemyHere = b.enemies.find((e) => e.x === gx && e.y === gy && e.hp > 0);
-        const smokeHere = isInSmoke(b, gx, gy);
-
         const distFromSel = selUnit ? Math.abs(selUnit.x - gx) + Math.abs(selUnit.y - gy) : 99;
         const canMoveHere =
           b.phase === "player" &&
@@ -2097,32 +2282,12 @@ function renderBattle() {
           selUnit.ap >= 1 &&
           !unitHere &&
           !enemyHere &&
-          tileType !== 3 &&
+          b.grid[gy][gx] !== 3 &&
           distFromSel > 0 &&
           distFromSel <= maxMoveRange;
 
-        const isAlt = (gx + gy) % 2 === 0;
-        let fill = isAlt ? "rgba(28, 48, 68, 0.65)" : "rgba(18, 32, 48, 0.60)";
-        let stroke = "rgba(125, 211, 252, 0.28)";
-
-        if (canMoveHere) {
-          fill = b.mode === "move" ? "rgba(78, 242, 161, 0.30)" : "rgba(78, 242, 161, 0.16)";
-          stroke = "#4ef2a1";
-        } else if (smokeHere) {
-          fill = "rgba(203, 213, 225, 0.34)";
-          stroke = "rgba(241, 245, 249, 0.62)";
-        }
-
-        drawIsoDiamond(ctx, sx, sy, m.tileW, m.tileH, fill, stroke, canMoveHere ? 1.5 : 1);
-
-        if (canMoveHere) {
-          const cCov = getTileCoverAt(b, gx, gy);
-          if (cCov > 0) {
-            ctx.fillStyle = cCov === 2 ? "#93c5fd" : "#fde68a";
-            ctx.font = "bold 8px monospace";
-            ctx.textAlign = "center";
-            ctx.fillText(cCov === 2 ? "▲" : "▪", sx, sy + 2.5);
-          }
+        if (canMoveHere && b.mode === "move") {
+          drawIsoDiamond(ctx, sx, sy, m.tileW, m.tileH, "rgba(56, 189, 248, 0.16)", null, 0);
         }
 
         if (b.hoverTile && (b.mode === "frag" || b.mode === "smoke")) {
@@ -2160,6 +2325,8 @@ function renderBattle() {
         }
       }
     }
+
+    drawMovementBoundaryContour(ctx, b, m, selUnit, maxMoveRange);
 
     // 2. Linha de mira entre o soldado selecionado e o alvo selecionado
     if (selUnit && selEnemy) {
