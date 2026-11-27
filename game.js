@@ -1,6 +1,6 @@
 // ============================================================================
 // OPERATION ZERO — TACTICAL COMMAND SYSTEM (game.js)
-// Compatível com index.html, 12 Operacionais, Base ZERO, Combate 10x8 Isométrico,
+// Compatível com index.html, 12 Operacionais, Base ZERO, Combate 8x6,
 // Campanha de 12 Missões (4 Capítulos), Inimigos Xeno, Granadas e 4 Finais.
 // ============================================================================
 
@@ -26,61 +26,451 @@ const INITIAL_ROSTER = [
 ];
 
 const INITIAL_BUILDINGS = [
-  { id: "b-command", name: "CENTRO DE COMANDO", level: 1, maxLevel: 3, costCredits: 500, costMaterials: 20, energyDelta: -5, desc: "Coordena operações ZERO e melhora a precisão base da equipa (+4% pontaria por nível)." },
-  { id: "b-barracks", name: "QUARTEL & ACADEMIA", level: 1, maxLevel: 3, costCredits: 450, costMaterials: 15, energyDelta: -5, desc: "Acelera o treino e fornece +10 HP máximo por nível aos operacionais." },
-  { id: "b-medbay", name: "ENFERMARIA AVANÇADA", level: 1, maxLevel: 3, costCredits: 400, costMaterials: 15, energyDelta: -5, desc: "Recupera feridos entre missões e fornece +1 kit médico extra por nível em operação." },
-  { id: "b-armory", name: "ARSENAL & OFICINA", level: 1, maxLevel: 3, costCredits: 600, costMaterials: 25, energyDelta: -10, desc: "Fabrica granadas de fragmentação e fumo e melhora o dano de combate (+4 dano por nível)." },
-  { id: "b-lab", name: "LABORATÓRIO XENO", level: 0, maxLevel: 3, costCredits: 750, costMaterials: 30, energyDelta: -10, desc: "Analisa tecnologia alienígena, aumenta Investigação e gera núcleos xeno nas missões." }
+  {
+    id: "b-command",
+    name: "CENTRO DE COMANDO",
+    level: 1,
+    maxLevel: 3,
+    costCredits: 500,
+    costMaterials: 20,
+    energyDelta: -5,
+    desc: "Coordena operações ZERO e melhora a precisão base da equipa (+4% pontaria por nível)."
+  },
+  {
+    id: "b-barracks",
+    name: "QUARTEL & ACADEMIA",
+    level: 1,
+    maxLevel: 3,
+    costCredits: 450,
+    costMaterials: 15,
+    energyDelta: -5,
+    desc: "Acelera o treino e fornece +10 HP máximo por nível aos operacionais."
+  },
+  {
+    id: "b-medbay",
+    name: "ENFERMARIA AVANÇADA",
+    level: 1,
+    maxLevel: 3,
+    costCredits: 400,
+    costMaterials: 15,
+    energyDelta: -5,
+    desc: "Recupera feridos entre missões e fornece +1 kit médico extra por nível em operação."
+  },
+  {
+    id: "b-armory",
+    name: "ARSENAL & OFICINA",
+    level: 1,
+    maxLevel: 3,
+    costCredits: 600,
+    costMaterials: 25,
+    energyDelta: -10,
+    desc: "Fabrica granadas de fragmentação e fumo e melhora o dano de combate (+4 dano por nível)."
+  },
+  {
+    id: "b-lab",
+    name: "LABORATÓRIO XENO",
+    level: 0,
+    maxLevel: 3,
+    costCredits: 750,
+    costMaterials: 30,
+    energyDelta: -10,
+    desc: "Analisa tecnologia alienígena, aumenta Investigação e gera núcleos xeno nas missões."
+  }
 ];
 
 const CAMPAIGN_METRICS = {
-  trust: 50,
-  resources: 50,
-  research: 20,
-  threat: 20
+  trust: 50,      // Confiança (0-100)
+  resources: 50,  // Recursos (0-100)
+  research: 20,   // Investigação (0-100)
+  threat: 20      // Ameaça (0-100)
 };
 
 const ENEMY_ARCHETYPES = {
-  scout: { id: "scout", name: "Scout", role: "Batedor rápido", maxHp: 50, damage: 16, moveRange: 4, armor: 0, aim: 62, trait: "Alta mobilidade; avança rápido e pressiona a linha de frente." },
-  stalker: { id: "stalker", name: "Stalker", role: "Flanqueador / emboscada", maxHp: 65, damage: 24, moveRange: 3, armor: 5, aim: 68, trait: "Causa dano extra contra alvos sem cobertura." },
-  swarm: { id: "swarm", name: "Swarm", role: "Pressão em grupo", maxHp: 40, damage: 14, moveRange: 3, armor: 0, aim: 60, trait: "Ataca em enxame; ganha bónus de precisão quando há aliados perto." },
-  psycher: { id: "psycher", name: "Psycher", role: "Perturbação mental", maxHp: 70, damage: 18, moveRange: 2, armor: 5, aim: 66, trait: "Perturba o alvo ao acertar (-1 PA no turno seguinte)." },
-  brute: { id: "brute", name: "Brute", role: "Tanque pesado", maxHp: 140, damage: 34, moveRange: 2, armor: 20, aim: 65, trait: "Alta vida e blindagem; vulnerável a explosivos e flanqueio." },
-  overlord: { id: "overlord", name: "Overlord Omega", role: "Boss Final", maxHp: 240, damage: 36, moveRange: 2, armor: 25, aim: 74, trait: "Comandante supremo da invasão com ataque potente e armadura pesada." }
+  scout: {
+    id: "scout",
+    name: "Scout",
+    role: "Batedor rápido",
+    maxHp: 50,
+    damage: 16,
+    moveRange: 4,
+    armor: 0,
+    aim: 62,
+    trait: "Alta mobilidade; avança rápido e pressiona a linha de frente."
+  },
+  stalker: {
+    id: "stalker",
+    name: "Stalker",
+    role: "Flanqueador / emboscada",
+    maxHp: 65,
+    damage: 24,
+    moveRange: 3,
+    armor: 5,
+    aim: 68,
+    trait: "Causa dano extra contra alvos sem cobertura."
+  },
+  swarm: {
+    id: "swarm",
+    name: "Swarm",
+    role: "Pressão em grupo",
+    maxHp: 40,
+    damage: 14,
+    moveRange: 3,
+    armor: 0,
+    aim: 60,
+    trait: "Ataca em enxame; ganha bónus de precisão quando há aliados perto."
+  },
+  psycher: {
+    id: "psycher",
+    name: "Psycher",
+    role: "Perturbação mental",
+    maxHp: 70,
+    damage: 18,
+    moveRange: 2,
+    armor: 5,
+    aim: 66,
+    trait: "Perturba o alvo ao acertar (-1 PA no turno seguinte)."
+  },
+  brute: {
+    id: "brute",
+    name: "Brute",
+    role: "Tanque pesado",
+    maxHp: 140,
+    damage: 34,
+    moveRange: 2,
+    armor: 20,
+    aim: 65,
+    trait: "Alta vida e blindagem; vulnerável a explosivos e flanqueio."
+  },
+  overlord: {
+    id: "overlord",
+    name: "Overlord Omega",
+    role: "Boss Final",
+    maxHp: 240,
+    damage: 36,
+    moveRange: 2,
+    armor: 25,
+    aim: 74,
+    trait: "Comandante supremo da invasão com ataque potente e armadura pesada."
+  }
 };
 
 const CAMPAIGN_MISSIONS = [
-  { id: "m01_first_contact", chapter: "I — Primeiro Contacto", number: 1, title: "Primeiro Contacto", type: "Resgate / Contenção", objective: "Resgatar a equipa desaparecida e eliminar a patrulha inicial.", secondaryObjective: "Recuperar registos sem baixas no esquadrão.", enemies: ["scout", "swarm", "scout"], rewards: { credits: 350, materials: 20, alien: 1, research: 10, xp: 35 }, choice: { prompt: "Encontraste sobreviventes e registos militares sob fogo cruzado.", optionA: { label: "Priorizar resgate total de sobreviventes (+Confiança)", effects: { trust: 12, resources: 5, threat: 3, credits: 50 } }, optionB: { label: "Extrair rápido com os registos essenciais (+Investigação)", effects: { trust: -4, resources: 12, research: 10, threat: 2, materials: 10 } } } },
-  { id: "m02_dead_signal", chapter: "I — Primeiro Contacto", number: 2, title: "Sinal Morto", type: "Recuperação", objective: "Reativar o relé de comunicações e recolher dados encriptados.", secondaryObjective: "Eliminar batedores antes de o alarme disparar.", enemies: ["scout", "stalker", "scout"], rewards: { credits: 400, materials: 25, alien: 1, research: 15, xp: 40 }, choice: { prompt: "Os dados estão prontos para transmissão imediata ou envio encriptado.", optionA: { label: "Transmitir dados de imediato para a base (+15 Investigação, +10 Ameaça)", effects: { research: 15, threat: 10 } }, optionB: { label: "Encriptar localmente e extrair em silêncio (+8 Confiança)", effects: { trust: 8, research: 8, threat: 3 } } } },
-  { id: "m03_quarantine_zone", chapter: "II — Zona de Quarentena", number: 3, title: "Zona de Quarentena", type: "Defesa", objective: "Defender o perímetro urbano e neutralizar as forças invasoras.", secondaryObjective: "Manter civis e barricadas intactos.", enemies: ["scout", "stalker", "swarm", "swarm"], rewards: { credits: 450, materials: 30, alien: 2, research: 10, xp: 45 }, choice: { prompt: "A pressão alienígena intensifica-se em dois pontos do setor urbano.", optionA: { label: "Defender ambos os setores até ao fim (+15 Confiança)", effects: { trust: 15, resources: -10, threat: 5 } }, optionB: { label: "Recuar de um setor para preservar tropas (+10 Recursos)", effects: { trust: -8, resources: 10, threat: 10 } } } },
-  { id: "m04_black_lab", chapter: "II — Zona de Quarentena", number: 4, title: "Laboratório Negro", type: "Sabotagem / Recuperação", objective: "Extrair amostras xeno e neutralizar os alvos na instalação.", secondaryObjective: "Evitar a rutura total das câmaras biológicas.", enemies: ["stalker", "swarm", "psycher", "scout"], rewards: { credits: 500, materials: 30, alien: 2, research: 20, xp: 50 }, choice: { prompt: "No núcleo do laboratório, podes extrair amostras ou sabotar os reatores.", optionA: { label: "Extrair amostras para estudo avançado (+20 Investigação, +14 Ameaça)", effects: { research: 20, threat: 14, alien: 1 } }, optionB: { label: "Sabotar os reatores e conter a ameaça (-8 Ameaça)", effects: { research: 5, threat: -8, resources: 8 } } } },
-  { id: "m05_orbital_echo", chapter: "II — Zona de Quarentena", number: 5, title: "Eco Orbital", type: "Interceção / Recuperação", objective: "Intercetar o sinal da baliza caída e neutralizar a patrulha de contenção.", secondaryObjective: "Impedir a transmissão completa das coordenadas.", enemies: ["scout", "stalker", "psycher", "scout"], rewards: { credits: 520, materials: 32, alien: 2, research: 18, xp: 52 }, choice: { prompt: "A baliza contém telemetria orbital valiosa mas ativa um farol de alerta.", optionA: { label: "Descarregar telemetria completa (+18 Investigação, +10 Ameaça)", effects: { research: 18, threat: 10, alien: 1 } }, optionB: { label: "Cortar o sinal e recolher apenas o núcleo (+8 Confiança, -5 Ameaça)", effects: { trust: 8, threat: -5, resources: 8 } } } },
-  { id: "m06_the_hive", chapter: "III — A Verdade", number: 6, title: "A Colmeia", type: "Sabotagem / Eliminação", objective: "Destruir o núcleo biológico e eliminar a guarda da colmeia.", secondaryObjective: "Evitar flanqueamentos e recolher amostra pura.", enemies: ["swarm", "psycher", "brute", "stalker"], rewards: { credits: 600, materials: 40, alien: 3, research: 15, xp: 55 }, choice: { prompt: "Tens cargas explosivas pesadas junto ao núcleo biológico.", optionA: { label: "Detonar cargas pesadas para destruir rápido (+12 Ameaça)", effects: { resources: -8, threat: 12, research: 8 } }, optionB: { label: "Avançar com precisão tática e contenção (+10 Confiança)", effects: { trust: 10, threat: 4, research: 12 } } } },
-  { id: "m07_ghost_protocol", chapter: "III — A Verdade", number: 7, title: "Protocolo Fantasma", type: "Infiltração / Resgate", objective: "Resgatar o especialista ligado ao Projeto ZERO e neutralizar o setor.", secondaryObjective: "Aceder ao arquivo confidencial sem baixas.", enemies: ["stalker", "psycher", "brute", "psycher"], rewards: { credits: 650, materials: 40, alien: 3, research: 20, xp: 60 }, choice: { prompt: "O especialista pede acesso livre aos ficheiros e proteção da unidade.", optionA: { label: "Partilhar os ficheiros e apoiar a aliança (+15 Confiança, +15 Investigação)", effects: { trust: 15, research: 15, threat: -4 } }, optionB: { label: "Reter os ficheiros sob controlo estrito da ZERO (+15 Recursos)", effects: { resources: 15, trust: -10, research: 10 } } } },
-  { id: "m08_sunken_citadel", chapter: "III — A Verdade", number: 8, title: "Cidadela Submersa", type: "Infiltração / Recuperação", objective: "Infiltrar a instalação subterrânea e extrair os registos do Projeto ZERO.", secondaryObjective: "Neutralizar as forças pesadas sem perder a rota de extração.", enemies: ["stalker", "psycher", "brute", "brute"], rewards: { credits: 700, materials: 45, alien: 3, research: 22, xp: 65 }, choice: { prompt: "Nos arquivos submersos, encontras o registo original da chegada em 2089.", optionA: { label: "Tornar a verdade pública à coligação (+14 Confiança, +12 Investigação)", effects: { trust: 14, research: 12, threat: 4 } }, optionB: { label: "Selar o arquivo e reforçar a defesa militar (+14 Recursos, -6 Ameaça)", effects: { resources: 14, threat: -6, trust: -5 } } } },
-  { id: "m09_last_stand", chapter: "IV — Operation Zero", number: 9, title: "Última Defesa", type: "Defesa Crítica", objective: "Resistir ao assalto coordenado e eliminar os comandantes de campo.", secondaryObjective: "Manter os sistemas estratégicos operacionais.", enemies: ["brute", "psycher", "stalker", "brute"], rewards: { credits: 750, materials: 50, alien: 4, research: 15, xp: 70 }, choice: { prompt: "As forças principais convergem para a última linha antes do assalto final.", optionA: { label: "Empenhar reservas totais para segurar a linha (+10 Confiança, -5 Ameaça)", effects: { trust: 10, resources: -15, threat: -5 } }, optionB: { label: "Manter reserva estratégica para o golpe decisivo (+10 Recursos)", effects: { resources: 10, threat: 8 } } } },
-  { id: "m10_eclipse_operation", chapter: "IV — Operation Zero", number: 10, title: "Operação Eclipse", type: "Sabotagem / Ataque", objective: "Cortar a rede energética das defesas inimigas e abrir passagem ao núcleo.", secondaryObjective: "Eliminação cirúrgica das unidades de guarda.", enemies: ["psycher", "brute", "stalker", "psycher"], rewards: { credits: 820, materials: 55, alien: 4, research: 18, xp: 75 }, choice: { prompt: "Ao desligar a rede principal, podes redirecionar energia para a equipa ou desativar sensores.", optionA: { label: "Desativar sensores de alerta (-10 Ameaça, +10 Investigação)", effects: { threat: -10, research: 10 } }, optionB: { label: "Sobrecarregar linhas para enfraquecer a guarda (+10 Confiança, +10 Recursos)", effects: { trust: 10, resources: 10, threat: 4 } } } },
-  { id: "m11_vanguard_breach", chapter: "IV — Operation Zero", number: 11, title: "Rompimento da Vanguarda", type: "Assalto / Contenção", objective: "Romper a linha defensiva avançada antes da câmara do comando supremo.", secondaryObjective: "Concluir o assalto sem perder operacionais.", enemies: ["brute", "psycher", "stalker", "brute"], rewards: { credits: 900, materials: 58, alien: 4, research: 20, xp: 82 }, choice: { prompt: "A vanguarda alienígena tenta recuar para reforçar o núcleo central.", optionA: { label: "Avançar sem tréguas para cortar a retirada (+12 Confiança, +6 Ameaça)", effects: { trust: 12, threat: 6, resources: -8 } }, optionB: { label: "Reagrupar e reabastecer antes do assalto final (+15 Recursos, -6 Ameaça)", effects: { resources: 15, threat: -6 } } } },
-  { id: "m12_operation_zero", chapter: "IV — Operation Zero", number: 12, title: "Operation Zero", type: "Assalto Final / Boss", objective: "Derrotar o Overlord Omega e a guarda de elite para decidir o destino da Terra.", secondaryObjective: "Manter todos os operacionais ativos até ao confronto final.", enemies: ["brute", "psycher", "overlord"], rewards: { credits: 1200, materials: 70, alien: 6, research: 25, xp: 100 }, choice: { prompt: "Núcleo exposto e Overlord neutralizado: qual é a diretiva final da ZERO?", optionA: { label: "Ativar protocolo de defesa e salvar a Terra", finalTag: "earth_saved" }, optionB: { label: "Abrir canal de negociação e pacto de coexistência", finalTag: "alien_alliance" }, optionC: { label: "Sobrecarregar o núcleo num sacrifício total da operação", finalTag: "final_sacrifice" } } } }
+  {
+    id: "m01_first_contact",
+    chapter: "I — Primeiro Contacto",
+    number: 1,
+    title: "Primeiro Contacto",
+    type: "Resgate / Contenção",
+    objective: "Resgatar a equipa desaparecida e eliminar a patrulha inicial.",
+    secondaryObjective: "Recuperar registos sem baixas no esquadrão.",
+    enemies: ["scout", "swarm", "scout"],
+    rewards: { credits: 350, materials: 20, alien: 1, research: 10, xp: 35 },
+    choice: {
+      prompt: "Encontraste sobreviventes e registos militares sob fogo cruzado.",
+      optionA: {
+        label: "Priorizar resgate total de sobreviventes (+Confiança)",
+        effects: { trust: 12, resources: 5, threat: 3, credits: 50 }
+      },
+      optionB: {
+        label: "Extrair rápido com os registos essenciais (+Investigação)",
+        effects: { trust: -4, resources: 12, research: 10, threat: 2, materials: 10 }
+      }
+    }
+  },
+  {
+    id: "m02_dead_signal",
+    chapter: "I — Primeiro Contacto",
+    number: 2,
+    title: "Sinal Morto",
+    type: "Recuperação",
+    objective: "Reativar o relé de comunicações e recolher dados encriptados.",
+    secondaryObjective: "Eliminar batedores antes de o alarme disparar.",
+    enemies: ["scout", "stalker", "scout"],
+    rewards: { credits: 400, materials: 25, alien: 1, research: 15, xp: 40 },
+    choice: {
+      prompt: "Os dados estão prontos para transmissão imediata ou envio encriptado.",
+      optionA: {
+        label: "Transmitir dados de imediato para a base (+15 Investigação, +10 Ameaça)",
+        effects: { research: 15, threat: 10 }
+      },
+      optionB: {
+        label: "Encriptar localmente e extrair em silêncio (+8 Confiança)",
+        effects: { trust: 8, research: 8, threat: 3 }
+      }
+    }
+  },
+  {
+    id: "m03_quarantine_zone",
+    chapter: "II — Zona de Quarentena",
+    number: 3,
+    title: "Zona de Quarentena",
+    type: "Defesa",
+    objective: "Defender o perímetro urbano e neutralizar as forças invasoras.",
+    secondaryObjective: "Manter civis e barricadas intactos.",
+    enemies: ["scout", "stalker", "swarm", "swarm"],
+    rewards: { credits: 450, materials: 30, alien: 2, research: 10, xp: 45 },
+    choice: {
+      prompt: "A pressão alienígena intensifica-se em dois pontos do setor urbano.",
+      optionA: {
+        label: "Defender ambos os setores até ao fim (+15 Confiança)",
+        effects: { trust: 15, resources: -10, threat: 5 }
+      },
+      optionB: {
+        label: "Recuar de um setor para preservar tropas (+10 Recursos)",
+        effects: { trust: -8, resources: 10, threat: 10 }
+      }
+    }
+  },
+  {
+    id: "m04_black_lab",
+    chapter: "II — Zona de Quarentena",
+    number: 4,
+    title: "Laboratório Negro",
+    type: "Sabotagem / Recuperação",
+    objective: "Extrair amostras xeno e neutralizar os alvos na instalação.",
+    secondaryObjective: "Evitar a rutura total das câmaras biológicas.",
+    enemies: ["stalker", "swarm", "psycher", "scout"],
+    rewards: { credits: 500, materials: 30, alien: 2, research: 20, xp: 50 },
+    choice: {
+      prompt: "No núcleo do laboratório, podes extrair amostras ou sabotar os reatores.",
+      optionA: {
+        label: "Extrair amostras para estudo avançado (+20 Investigação, +14 Ameaça)",
+        effects: { research: 20, threat: 14, alien: 1 }
+      },
+      optionB: {
+        label: "Sabotar os reatores e conter a ameaça (-8 Ameaça)",
+        effects: { research: 5, threat: -8, resources: 8 }
+      }
+    }
+  },
+  {
+    id: "m05_orbital_echo",
+    chapter: "II — Zona de Quarentena",
+    number: 5,
+    title: "Eco Orbital",
+    type: "Interceção / Recuperação",
+    objective: "Intercetar o sinal da baliza caída e neutralizar a patrulha de contenção.",
+    secondaryObjective: "Impedir a transmissão completa das coordenadas.",
+    enemies: ["scout", "stalker", "psycher", "scout"],
+    rewards: { credits: 520, materials: 32, alien: 2, research: 18, xp: 52 },
+    choice: {
+      prompt: "A baliza contém telemetria orbital valiosa mas ativa um farol de alerta.",
+      optionA: {
+        label: "Descarregar telemetria completa (+18 Investigação, +10 Ameaça)",
+        effects: { research: 18, threat: 10, alien: 1 }
+      },
+      optionB: {
+        label: "Cortar o sinal e recolher apenas o núcleo (+8 Confiança, -5 Ameaça)",
+        effects: { trust: 8, threat: -5, resources: 8 }
+      }
+    }
+  },
+  {
+    id: "m06_the_hive",
+    chapter: "III — A Verdade",
+    number: 6,
+    title: "A Colmeia",
+    type: "Sabotagem / Eliminação",
+    objective: "Destruir o núcleo biológico e eliminar a guarda da colmeia.",
+    secondaryObjective: "Evitar flanqueamentos e recolher amostra pura.",
+    enemies: ["swarm", "psycher", "brute", "stalker"],
+    rewards: { credits: 600, materials: 40, alien: 3, research: 15, xp: 55 },
+    choice: {
+      prompt: "Tens cargas explosivas pesadas junto ao núcleo biológico.",
+      optionA: {
+        label: "Detonar cargas pesadas para destruir rápido (+12 Ameaça)",
+        effects: { resources: -8, threat: 12, research: 8 }
+      },
+      optionB: {
+        label: "Avançar com precisão tática e contenção (+10 Confiança)",
+        effects: { trust: 10, threat: 4, research: 12 }
+      }
+    }
+  },
+  {
+    id: "m07_ghost_protocol",
+    chapter: "III — A Verdade",
+    number: 7,
+    title: "Protocolo Fantasma",
+    type: "Infiltração / Resgate",
+    objective: "Resgatar o especialista ligado ao Projeto ZERO e neutralizar o setor.",
+    secondaryObjective: "Aceder ao arquivo confidencial sem baixas.",
+    enemies: ["stalker", "psycher", "brute", "psycher"],
+    rewards: { credits: 650, materials: 40, alien: 3, research: 20, xp: 60 },
+    choice: {
+      prompt: "O especialista pede acesso livre aos ficheiros e proteção da unidade.",
+      optionA: {
+        label: "Partilhar os ficheiros e apoiar a aliança (+15 Confiança, +15 Investigação)",
+        effects: { trust: 15, research: 15, threat: -4 }
+      },
+      optionB: {
+        label: "Reter os ficheiros sob controlo estrito da ZERO (+15 Recursos)",
+        effects: { resources: 15, trust: -10, research: 10 }
+      }
+    }
+  },
+  {
+    id: "m08_sunken_citadel",
+    chapter: "III — A Verdade",
+    number: 8,
+    title: "Cidadela Submersa",
+    type: "Infiltração / Recuperação",
+    objective: "Infiltrar a instalação subterrânea e extrair os registos do Projeto ZERO.",
+    secondaryObjective: "Neutralizar as forças pesadas sem perder a rota de extração.",
+    enemies: ["stalker", "psycher", "brute", "brute"],
+    rewards: { credits: 700, materials: 45, alien: 3, research: 22, xp: 65 },
+    choice: {
+      prompt: "Nos arquivos submersos, encontras o registo original da chegada em 2089.",
+      optionA: {
+        label: "Tornar a verdade pública à coligação (+14 Confiança, +12 Investigação)",
+        effects: { trust: 14, research: 12, threat: 4 }
+      },
+      optionB: {
+        label: "Selar o arquivo e reforçar a defesa militar (+14 Recursos, -6 Ameaça)",
+        effects: { resources: 14, threat: -6, trust: -5 }
+      }
+    }
+  },
+  {
+    id: "m09_last_stand",
+    chapter: "IV — Operation Zero",
+    number: 9,
+    title: "Última Defesa",
+    type: "Defesa Crítica",
+    objective: "Resistir ao assalto coordenado e eliminar os comandantes de campo.",
+    secondaryObjective: "Manter os sistemas estratégicos operacionais.",
+    enemies: ["brute", "psycher", "stalker", "brute"],
+    rewards: { credits: 750, materials: 50, alien: 4, research: 15, xp: 70 },
+    choice: {
+      prompt: "As forças principais convergem para a última linha antes do assalto final.",
+      optionA: {
+        label: "Empenhar reservas totais para segurar a linha (+10 Confiança, -5 Ameaça)",
+        effects: { trust: 10, resources: -15, threat: -5 }
+      },
+      optionB: {
+        label: "Manter reserva estratégica para o golpe decisivo (+10 Recursos)",
+        effects: { resources: 10, threat: 8 }
+      }
+    }
+  },
+  {
+    id: "m10_eclipse_operation",
+    chapter: "IV — Operation Zero",
+    number: 10,
+    title: "Operação Eclipse",
+    type: "Sabotagem / Ataque",
+    objective: "Cortar a rede energética das defesas inimigas e abrir passagem ao núcleo.",
+    secondaryObjective: "Eliminação cirúrgica das unidades de guarda.",
+    enemies: ["psycher", "brute", "stalker", "psycher"],
+    rewards: { credits: 820, materials: 55, alien: 4, research: 18, xp: 75 },
+    choice: {
+      prompt: "Ao desligar a rede principal, podes redirecionar energia para a equipa ou desativar sensores.",
+      optionA: {
+        label: "Desativar sensores de alerta (-10 Ameaça, +10 Investigação)",
+        effects: { threat: -10, research: 10 }
+      },
+      optionB: {
+        label: "Sobrecarregar linhas para enfraquecer a guarda (+10 Confiança, +10 Recursos)",
+        effects: { trust: 10, resources: 10, threat: 4 }
+      }
+    }
+  },
+  {
+    id: "m11_vanguard_breach",
+    chapter: "IV — Operation Zero",
+    number: 11,
+    title: "Rompimento da Vanguarda",
+    type: "Assalto / Contenção",
+    objective: "Romper a linha defensiva avançada antes da câmara do comando supremo.",
+    secondaryObjective: "Concluir o assalto sem perder operacionais.",
+    enemies: ["brute", "psycher", "stalker", "brute"],
+    rewards: { credits: 900, materials: 58, alien: 4, research: 20, xp: 82 },
+    choice: {
+      prompt: "A vanguarda alienígena tenta recuar para reforçar o núcleo central.",
+      optionA: {
+        label: "Avançar sem tréguas para cortar a retirada (+12 Confiança, +6 Ameaça)",
+        effects: { trust: 12, threat: 6, resources: -8 }
+      },
+      optionB: {
+        label: "Reagrupar e reabastecer antes do assalto final (+15 Recursos, -6 Ameaça)",
+        effects: { resources: 15, threat: -6 }
+      }
+    }
+  },
+  {
+    id: "m12_operation_zero",
+    chapter: "IV — Operation Zero",
+    number: 12,
+    title: "Operation Zero",
+    type: "Assalto Final / Boss",
+    objective: "Derrotar o Overlord Omega e a guarda de elite para decidir o destino da Terra.",
+    secondaryObjective: "Manter todos os operacionais ativos até ao confronto final.",
+    enemies: ["brute", "psycher", "overlord"],
+    rewards: { credits: 1200, materials: 70, alien: 6, research: 25, xp: 100 },
+    choice: {
+      prompt: "Núcleo exposto e Overlord neutralizado: qual é a diretiva final da ZERO?",
+      optionA: {
+        label: "Ativar protocolo de defesa e salvar a Terra",
+        finalTag: "earth_saved"
+      },
+      optionB: {
+        label: "Abrir canal de negociação e pacto de coexistência",
+        finalTag: "alien_alliance"
+      },
+      optionC: {
+        label: "Sobrecarregar o núcleo num sacrifício total da operação",
+        finalTag: "final_sacrifice"
+      }
+    }
+  }
 ];
 
 function resolveCampaignEnding(metrics, finalChoiceTag) {
   if (metrics.threat >= 85 && metrics.trust < 35) {
-    return { id: "earth_conquered", title: "Terra Conquistada", summary: "A pressão da invasão superou as defesas e a humanidade caiu sob domínio alienígena." };
+    return {
+      id: "earth_conquered",
+      title: "Terra Conquistada",
+      summary: "A pressão da invasão superou as defesas e a humanidade caiu sob domínio alienígena."
+    };
   }
+
   if (finalChoiceTag === "final_sacrifice") {
-    return { id: "final_sacrifice", title: "Sacrifício Final", summary: "A operação ZERO pagou o preço máximo para travar a ameaça e proteger o que restava." };
+    return {
+      id: "final_sacrifice",
+      title: "Sacrifício Final",
+      summary: "A operação ZERO pagou o preço máximo para travar a ameaça e proteger o que restava."
+    };
   }
+
   if (finalChoiceTag === "alien_alliance" && metrics.research >= 55 && metrics.threat < 80) {
-    return { id: "alien_alliance", title: "Aliança Extraterrestre", summary: "Com base na investigação e numa postura diplomática, abriu-se uma via de coexistência." };
+    return {
+      id: "alien_alliance",
+      title: "Aliança Extraterrestre",
+      summary: "Com base na investigação e numa postura diplomática, abriu-se uma via de coexistência."
+    };
   }
+
   if (finalChoiceTag === "earth_saved" && metrics.threat < 85) {
-    return { id: "earth_saved", title: "Salvação da Terra", summary: "A unidade ZERO repeliu a invasão e garantiu a sobrevivência da Terra." };
+    return {
+      id: "earth_saved",
+      title: "Salvação da Terra",
+      summary: "A unidade ZERO repeliu a invasão e garantiu a sobrevivência da Terra."
+    };
   }
+
   if (metrics.threat >= 75) {
-    return { id: "earth_conquered", title: "Terra Conquistada", summary: "Apesar do esforço final, o nível de ameaça acumulado inviabilizou a vitória limpa." };
+    return {
+      id: "earth_conquered",
+      title: "Terra Conquistada",
+      summary: "Apesar do esforço final, o nível de ameaça acumulado inviabilizou a vitória limpa."
+    };
   }
-  return { id: "final_sacrifice", title: "Sacrifício Final", summary: "A vitória só foi possível através de um sacrifício duro e definitivo da linha de frente." };
+
+  return {
+    id: "final_sacrifice",
+    title: "Sacrifício Final",
+    summary: "A vitória só foi possível através de um sacrifício duro e definitivo da linha de frente."
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -130,6 +520,20 @@ function loadState() {
   }
 }
 
+function resetSaveState() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch (_) {}
+  state = createDefaultState();
+  syncUnitStatsWithBase();
+  saveState();
+  renderCommand();
+  renderSquad();
+  renderBase();
+  renderCampaignMissions();
+  renderIntelligence();
+}
+
 function saveState() {
   try {
     const toSave = { ...state, battle: null };
@@ -141,11 +545,95 @@ function saveState() {
 // 3. NAVEGAÇÃO ENTRE ECRÃS & MODAL
 // ---------------------------------------------------------------------------
 
+function setTacticalViewportLock(active) {
+  let styleEl = document.getElementById("tactical-fixed-viewport-style");
+  if (!styleEl) {
+    styleEl = document.createElement("style");
+    styleEl.id = "tactical-fixed-viewport-style";
+    styleEl.textContent = `
+      html.tactical-locked, body.tactical-locked {
+        overflow: hidden !important;
+        overscroll-behavior: none !important;
+        height: 100dvh !important;
+        width: 100vw !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      #tactical.active {
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100vw !important;
+        height: 100dvh !important;
+        max-height: 100dvh !important;
+        overflow: hidden !important;
+        overscroll-behavior: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+        box-sizing: border-box !important;
+        padding: 8px 10px !important;
+        z-index: 20 !important;
+      }
+      #tactical.active .battle-top,
+      #tactical.active .battle-info {
+        flex-shrink: 0 !important;
+      }
+      #tactical.active .battle-main {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+        overflow: hidden !important;
+        position: relative !important;
+      }
+      #tactical.active #battle-grid {
+        touch-action: none !important;
+        user-select: none !important;
+        -webkit-user-select: none !important;
+      }
+      #tactical.active #battle-log {
+        flex-shrink: 0 !important;
+        max-height: 54px !important;
+        overflow-y: auto !important;
+        font-size: 0.78em !important;
+      }
+      #tactical.active .battle-side {
+        flex-shrink: 0 !important;
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: wrap !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 6px !important;
+        margin-top: 6px !important;
+      }
+      #tactical.active .battle-side .side-panel:nth-of-type(1),
+      #tactical.active .battle-side .side-panel:nth-of-type(2) {
+        flex: 1 1 45% !important;
+        font-size: 0.72em !important;
+        padding: 5px 7px !important;
+        margin: 0 !important;
+      }
+      #tactical.active #end-turn {
+        flex: 1 1 100% !important;
+        margin-top: 2px !important;
+        padding: 7px 10px !important;
+        font-size: 0.82em !important;
+      }
+    `;
+    document.head.appendChild(styleEl);
+  }
+  document.documentElement.classList.toggle("tactical-locked", Boolean(active));
+  document.body.classList.toggle("tactical-locked", Boolean(active));
+}
+
 function goToScreen(screenId) {
   const screens = document.querySelectorAll(".screen");
   screens.forEach((s) => s.classList.remove("active"));
   const target = document.getElementById(screenId) || document.getElementById("home");
   if (target) target.classList.add("active");
+  setTacticalViewportLock(screenId === "tactical");
 
   if (screenId === "command") renderCommand();
   if (screenId === "squad") renderSquad();
@@ -193,6 +681,43 @@ function syncUnitStatsWithBase() {
   });
 }
 
+function ensureResetSaveButton() {
+  const cmdSection = document.getElementById("command");
+  if (!cmdSection) return;
+  let btn = document.getElementById("reset-save-btn");
+  if (!btn) {
+    btn = document.createElement("button");
+    btn.id = "reset-save-btn";
+    btn.type = "button";
+    btn.className = "secondary";
+    btn.textContent = "REPOR SAVE";
+    btn.style.cssText = "margin-top:10px;font-size:0.8em;opacity:0.88;";
+    btn.addEventListener("click", () => {
+      openModal(`
+        <h3>REPOR PROGRESSO GUARDADO</h3>
+        <p>Isto vai limpar o save atual no navegador e repor a campanha, base e recursos do início. Queres continuar?</p>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <button type="button" class="primary" id="confirm-reset-save">CONFIRMAR REPOSIÇÃO</button>
+          <button type="button" class="secondary" onclick="closeModal()">CANCELAR</button>
+        </div>
+      `);
+      const confirmBtn = document.getElementById("confirm-reset-save");
+      if (confirmBtn) {
+        confirmBtn.addEventListener("click", () => {
+          resetSaveState();
+          closeModal();
+          openModal(`
+            <h3>SAVE REPOSTO</h3>
+            <p>O estado inicial da operação foi reposto com sucesso.</p>
+            <button type="button" class="primary" onclick="closeModal()">OK</button>
+          `);
+        });
+      }
+    });
+    cmdSection.appendChild(btn);
+  }
+}
+
 function renderCommand() {
   const setText = (id, val) => {
     const el = document.getElementById(id);
@@ -202,6 +727,7 @@ function renderCommand() {
   setText("energy", state.energy);
   setText("materials", state.materials);
   setText("alien", state.alien);
+  ensureResetSaveButton();
 }
 
 function renderSquad() {
@@ -219,7 +745,10 @@ function renderSquad() {
     card.style.cssText = `border:1px solid ${selected ? "#4ef2a1" : "rgba(255,255,255,0.14)"};padding:10px;border-radius:6px;margin-bottom:8px;cursor:pointer;`;
     card.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
-        <b>${u.name}</b>
+        <div style="display:flex;align-items:center;gap:6px;">
+          ${getUnitVisualBadge(u, false)}
+          <b>${u.name}</b>
+        </div>
         <small>${selected ? "NA EQUIPA" : "RESERVA"} · NV.${u.level}</small>
       </div>
       <div style="font-size:0.85em;opacity:0.85;margin-top:4px;">
@@ -403,14 +932,17 @@ function renderCampaignMissions() {
 }
 
 // ---------------------------------------------------------------------------
-// 6. COMBATE TÁTICO ISOMÉTRICO (PLANO EM LOSANGO 2:1, COBERTURAS, IA E FINAIS)
+// 6. COMBATE TÁTICO ISOMÉTRICO XCOM (NAVEGAÇÃO TÁTIL + BARRA FLUTUANTE)
 // ---------------------------------------------------------------------------
 
 const GRID_W = 10;
 const GRID_H = 8;
+const ISO_VIEW_W = 6;
+const ISO_VIEW_H = 6;
 
 function createMissionMap(missionIndex) {
   const grid = Array.from({ length: GRID_H }, () => Array(GRID_W).fill(0));
+
   grid[1][3] = 4;
   grid[2][3] = 1;
   grid[3][3] = 2;
@@ -443,13 +975,16 @@ function createMissionMap(missionIndex) {
     grid[1][4] = 1;
     grid[6][4] = 1;
   }
+
   return grid;
 }
 
 function getTileCoverAt(battle, x, y) {
   if (!battle || !battle.grid) return 0;
   let best = 0;
-  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const dirs = [
+    [1, 0], [-1, 0], [0, 1], [0, -1]
+  ];
   for (const [dx, dy] of dirs) {
     const nx = x + dx;
     const ny = y + dy;
@@ -472,7 +1007,9 @@ function startMission(mission, missionIndex = 0) {
   }
 
   const medbayBonusKits = getBuildingLevel("b-medbay");
-  const startPositions = [[0, 1], [0, 3], [0, 4], [0, 6], [1, 3]];
+  const startPositions = [
+    [0, 1], [0, 3], [0, 4], [0, 6], [1, 3]
+  ];
 
   const units = activeSquad.map((u, idx) => {
     const pos = startPositions[idx] || [0, idx % GRID_H];
@@ -494,7 +1031,10 @@ function startMission(mission, missionIndex = 0) {
     };
   });
 
-  const enemyPositions = [[8, 1], [9, 2], [8, 4], [9, 5], [8, 6], [9, 3]];
+  const enemyPositions = [
+    [8, 1], [9, 2], [8, 4], [9, 5], [8, 6], [9, 3]
+  ];
+
   const enemies = mission.enemies.map((archId, idx) => {
     const arch = ENEMY_ARCHETYPES[archId] || ENEMY_ARCHETYPES.scout;
     const pos = enemyPositions[idx] || [7, idx % GRID_H];
@@ -528,14 +1068,14 @@ function startMission(mission, missionIndex = 0) {
     turn: 1,
     phase: "player",
     mode: "normal",
-    camera: { x: 0, y: 0 },
+    camera: { x: 0, y: 1 },
     grid: createMissionMap(missionIndex),
     smokes: [],
     units,
     enemies,
-    selectedUnitId: units[0] ? units[0].id : null,
+    selectedUnitId: null,
     selectedTargetId: enemies[0] ? enemies[0].id : null,
-    log: `Missão ${formatMissionNumber(mission.number)}: ${mission.title} — Toca no mapa isométrico para mover ou atacar.`
+    log: `Missão ${formatMissionNumber(mission.number)}: ${mission.title} — Toca num operacional para abrir as ordens flutuantes ou arrasta o plano isométrico.`
   };
 
   goToScreen("tactical");
@@ -547,6 +1087,70 @@ function getUnitMoveRange(unit) {
   let range = unit.crouched ? 2 : 4;
   if (unit.stunned) range = Math.max(1, range - 1);
   return range;
+}
+
+function toggleCrouchSelectedUnit() {
+  const b = state.battle;
+  if (!b || b.phase !== "player") return;
+  const unit = getSelectedUnit();
+  if (!unit || unit.ap < 1) {
+    addBattleLog("Sem PA para alterar a postura.");
+    return;
+  }
+  unit.ap -= 1;
+  unit.crouched = !unit.crouched;
+  if (unit.crouched) {
+    unit.hunker = true;
+    addBattleLog(`${unit.name} agachou-se (MOV CAUTELOSO: 2 casas, maior proteção).`);
+  } else {
+    unit.hunker = false;
+    addBattleLog(`${unit.name} levantou-se (CORRER: 4 casas de alcance).`);
+  }
+  renderBattle();
+}
+
+function toggleMoveModeSelectedUnit() {
+  const b = state.battle;
+  if (!b || b.phase !== "player") return;
+  const unit = getSelectedUnit();
+  if (!unit) {
+    addBattleLog("Seleciona primeiro um operacional.");
+    return;
+  }
+  if (unit.ap < 1) {
+    addBattleLog(`${unit.name} não tem PA para mover.`);
+    return;
+  }
+  b.mode = b.mode === "move" ? "normal" : "move";
+  const range = getUnitMoveRange(unit);
+  const stanceTxt = unit.crouched ? "agachado/cauteloso" : "de pé/corrida";
+  addBattleLog(
+    b.mode === "move"
+      ? `Modo MOVER ativo (${stanceTxt}, alcance ${range} casas): toca num losango realçado no mapa isométrico.`
+      : "Modo de seleção normal restaurado."
+  );
+  renderBattle();
+}
+
+function panCamera(dx, dy) {
+  const b = state.battle;
+  if (!b) return;
+  const maxCamX = Math.max(0, GRID_W - ISO_VIEW_W);
+  const maxCamY = Math.max(0, GRID_H - ISO_VIEW_H);
+  if (!b.camera) b.camera = { x: 0, y: 1 };
+  b.camera.x = Math.max(0, Math.min(maxCamX, b.camera.x + dx));
+  b.camera.y = Math.max(0, Math.min(maxCamY, b.camera.y + dy));
+  renderBattle();
+}
+
+function centerCameraOnUnit(unit) {
+  const b = state.battle;
+  if (!b || !unit) return;
+  const maxCamX = Math.max(0, GRID_W - ISO_VIEW_W);
+  const maxCamY = Math.max(0, GRID_H - ISO_VIEW_H);
+  if (!b.camera) b.camera = { x: 0, y: 1 };
+  b.camera.x = Math.max(0, Math.min(maxCamX, unit.x - Math.floor(ISO_VIEW_W / 2)));
+  b.camera.y = Math.max(0, Math.min(maxCamY, unit.y - Math.floor(ISO_VIEW_H / 2)));
 }
 
 function getSelectedUnit() {
@@ -577,15 +1181,20 @@ function calculateHitChance(unit, target, battle) {
   const dist = Math.abs(unit.x - target.x) + Math.abs(unit.y - target.y);
   const cmdBonus = getBuildingLevel("b-command") * 4;
   let chance = (unit.aim || 75) + cmdBonus - dist * 3;
+
   const cover = getTileCoverAt(battle, target.x, target.y);
   if (!unit.hunker && !unit.crouched) {
     if (cover === 1) chance -= target.hunker ? 40 : 25;
     if (cover === 2) chance -= target.hunker ? 55 : 40;
   }
-  if (unit.crouched) chance += 4;
+  if (unit.crouched) {
+    chance += 4;
+  }
+
   if (isInSmoke(battle, target.x, target.y)) chance -= 25;
   if (isInSmoke(battle, unit.x, unit.y)) chance -= 15;
   if (unit.stunned) chance -= 15;
+
   return Math.max(10, Math.min(98, Math.round(chance)));
 }
 
@@ -596,40 +1205,42 @@ function addBattleLog(msg) {
   if (logEl) logEl.textContent = msg;
 }
 
-// --- PROJEÇÃO ISOMÉTRICA REAL EM LOSANGO (2:1) ---
-const ISO_VIEW_W = 6;
-const ISO_VIEW_H = 6;
-
-function getIsoCanvasLayout(canvas) {
+// --- GEOMETRIA ISOMÉTRICA XCOM (2:1) ---
+function getIsoMetrics(canvas) {
   const rect = canvas.getBoundingClientRect();
   const w = Math.max(300, rect.width || canvas.parentElement?.clientWidth || 360);
-  const h = Math.max(290, rect.height || 340);
-  const tileW = Math.max(42, Math.min(64, Math.floor((w - 24) / (ISO_VIEW_W * 0.92))));
+  const h = Math.max(220, rect.height || 300);
+
+  const maxTileWByWidth = Math.floor((w - 24) / ISO_VIEW_W);
+  const maxTileWByHeight = Math.floor(((h - 62) / ISO_VIEW_H) * 2);
+  const tileW = Math.max(40, Math.min(68, Math.min(maxTileWByWidth, maxTileWByHeight)));
   const tileH = Math.round(tileW * 0.5);
-  const extrudeH = Math.max(8, Math.round(tileH * 0.42));
+  const wallH = Math.max(8, Math.round(tileH * 0.44));
   const originX = w * 0.5;
-  const originY = Math.max(54, Math.round(h * 0.24));
-  return { w, h, tileW, tileH, extrudeH, originX, originY };
+  const boardPixelH = ISO_VIEW_W * tileH;
+  const originY = Math.max(42, Math.round((h - boardPixelH) * 0.36));
+
+  return { w, h, tileW, tileH, wallH, originX, originY };
 }
 
-function worldToIsoScreen(gx, gy, battle, layout) {
+function worldToIso(gx, gy, battle, m) {
   const camX = battle.camera ? battle.camera.x : 0;
   const camY = battle.camera ? battle.camera.y : 0;
   const lx = gx - camX;
   const ly = gy - camY;
   return {
-    sx: layout.originX + (lx - ly) * (layout.tileW * 0.5),
-    sy: layout.originY + (lx + ly) * (layout.tileH * 0.5)
+    sx: m.originX + (lx - ly) * (m.tileW * 0.5),
+    sy: m.originY + (lx + ly) * (m.tileH * 0.5)
   };
 }
 
-function screenToWorldIso(px, py, battle, layout) {
+function isoToWorld(px, py, battle, m) {
   const camX = battle.camera ? battle.camera.x : 0;
   const camY = battle.camera ? battle.camera.y : 0;
-  const hw = layout.tileW * 0.5;
-  const hh = layout.tileH * 0.5;
-  const u = (px - layout.originX) / hw;
-  const v = (py - layout.originY) / hh;
+  const hw = m.tileW * 0.5;
+  const hh = m.tileH * 0.5;
+  const u = (px - m.originX) / hw;
+  const v = (py - m.originY) / hh;
   const lx = Math.floor((u + v) * 0.5 + 0.5);
   const ly = Math.floor((v - u) * 0.5 + 0.5);
   if (lx < 0 || lx >= ISO_VIEW_W || ly < 0 || ly >= ISO_VIEW_H) return null;
@@ -639,176 +1250,539 @@ function screenToWorldIso(px, py, battle, layout) {
   return { x: gx, y: gy };
 }
 
-function drawIsoTileDiamond(ctx, sx, sy, tileW, tileH, fillStyle, strokeStyle, lineWidth = 1.2) {
-  const hw = tileW * 0.5;
-  const hh = tileH * 0.5;
+function drawIsoDiamond(ctx, sx, sy, w, h, fill, stroke, lw = 1.2) {
+  const hw = w * 0.5;
+  const hh = h * 0.5;
   ctx.beginPath();
   ctx.moveTo(sx, sy - hh);
   ctx.lineTo(sx + hw, sy);
   ctx.lineTo(sx, sy + hh);
   ctx.lineTo(sx - hw, sy);
   ctx.closePath();
-  if (fillStyle) {
-    ctx.fillStyle = fillStyle;
+  if (fill) {
+    ctx.fillStyle = fill;
     ctx.fill();
   }
-  if (strokeStyle) {
-    ctx.strokeStyle = strokeStyle;
-    ctx.lineWidth = lineWidth;
+  if (stroke) {
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = lw;
     ctx.stroke();
   }
 }
 
-function drawIsoVolumePrism(ctx, sx, sy, tileW, tileH, heightPx, topFill, leftFill, rightFill, strokeStyle = "rgba(255,255,255,0.3)") {
-  const hw = tileW * 0.5;
-  const hh = tileH * 0.5;
-  const ty = sy - heightPx;
+function drawIsoBoardSkirt(ctx, battle, m) {
+  const camX = battle.camera ? battle.camera.x : 0;
+  const camY = battle.camera ? battle.camera.y : 0;
+  const skirtH = Math.max(10, Math.round(m.wallH * 1.15));
+  const hw = m.tileW * 0.5;
+  const hh = m.tileH * 0.5;
 
-  drawIsoTileDiamond(ctx, sx, sy + 1, tileW * 0.9, tileH * 0.9, "rgba(0,0,0,0.36)", null, 0);
+  // Borda lateral esquerda do plano isométrico
+  ctx.beginPath();
+  for (let vx = 0; vx < ISO_VIEW_W; vx++) {
+    const p = worldToIso(camX + vx, camY + ISO_VIEW_H - 1, battle, m);
+    if (vx === 0) ctx.moveTo(p.sx - hw, p.sy);
+    ctx.lineTo(p.sx, p.sy + hh);
+  }
+  const endL = worldToIso(camX + ISO_VIEW_W - 1, camY + ISO_VIEW_H - 1, battle, m);
+  ctx.lineTo(endL.sx, endL.sy + hh + skirtH);
+  const startL = worldToIso(camX, camY + ISO_VIEW_H - 1, battle, m);
+  ctx.lineTo(startL.sx - hw, startL.sy + skirtH);
+  ctx.closePath();
+  ctx.fillStyle = "#101b28";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(78, 242, 161, 0.34)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Borda lateral direita do plano isométrico
+  ctx.beginPath();
+  const topR = worldToIso(camX + ISO_VIEW_W - 1, camY, battle, m);
+  ctx.moveTo(topR.sx + hw, topR.sy);
+  for (let vy = 0; vy < ISO_VIEW_H; vy++) {
+    const p = worldToIso(camX + ISO_VIEW_W - 1, camY + vy, battle, m);
+    ctx.lineTo(p.sx, p.sy + hh);
+  }
+  const botR = worldToIso(camX + ISO_VIEW_W - 1, camY + ISO_VIEW_H - 1, battle, m);
+  ctx.lineTo(botR.sx, botR.sy + hh + skirtH);
+  ctx.lineTo(topR.sx + hw, topR.sy + skirtH);
+  ctx.closePath();
+  ctx.fillStyle = "#0a111a";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(78, 242, 161, 0.24)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
+
+function drawIsoCoverBlock(ctx, sx, sy, w, h, wallH, isHigh, isDestructible) {
+  const cw = w * 0.72;
+  const ch = h * 0.72;
+  const chw = cw * 0.5;
+  const chh = ch * 0.5;
+  const topY = sy - wallH;
+
+  drawIsoDiamond(ctx, sx, sy + 1, w * 0.88, h * 0.88, "rgba(0,0,0,0.38)", null, 0);
+
+  const leftCol = isHigh ? "#1d4ed8" : isDestructible ? "#b45309" : "#3f4e63";
+  const rightCol = isHigh ? "#1e3a8a" : isDestructible ? "#78350f" : "#273242";
+  const topCol = isHigh ? "#60a5fa" : isDestructible ? "#f59e0b" : "#64748b";
+  const borderCol = isHigh ? "#93c5fd" : isDestructible ? "#fde68a" : "#94a3b8";
 
   ctx.beginPath();
-  ctx.moveTo(sx - hw, ty);
-  ctx.lineTo(sx, ty + hh);
-  ctx.lineTo(sx, sy + hh);
-  ctx.lineTo(sx - hw, sy);
+  ctx.moveTo(sx - chw, topY);
+  ctx.lineTo(sx, topY + chh);
+  ctx.lineTo(sx, sy + chh);
+  ctx.lineTo(sx - chw, sy);
   ctx.closePath();
-  ctx.fillStyle = leftFill;
+  ctx.fillStyle = leftCol;
   ctx.fill();
-  ctx.strokeStyle = strokeStyle;
+  ctx.strokeStyle = borderCol;
   ctx.lineWidth = 1;
   ctx.stroke();
 
   ctx.beginPath();
-  ctx.moveTo(sx + hw, ty);
-  ctx.lineTo(sx, ty + hh);
-  ctx.lineTo(sx, sy + hh);
-  ctx.lineTo(sx + hw, sy);
+  ctx.moveTo(sx + chw, topY);
+  ctx.lineTo(sx, topY + chh);
+  ctx.lineTo(sx, sy + chh);
+  ctx.lineTo(sx + chw, sy);
   ctx.closePath();
-  ctx.fillStyle = rightFill;
+  ctx.fillStyle = rightCol;
   ctx.fill();
   ctx.stroke();
 
-  drawIsoTileDiamond(ctx, sx, ty, tileW, tileH, topFill, strokeStyle, 1.2);
+  drawIsoDiamond(ctx, sx, topY, cw, ch, topCol, borderCol, 1.2);
+
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 8px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText(isHigh ? "◈" : "◇", sx, topY + 3);
 }
 
-function drawIsoPlatformSkirt(ctx, battle, layout) {
-  const camX = battle.camera ? battle.camera.x : 0;
-  const camY = battle.camera ? battle.camera.y : 0;
-  const skirtH = Math.max(10, Math.round(layout.extrudeH * 1.1));
-  const hw = layout.tileW * 0.5;
-  const hh = layout.tileH * 0.5;
-
+function drawIsoSoldierSprite(ctx, sx, sy, w, h, unit, isSelected) {
   ctx.beginPath();
-  for (let vx = 0; vx < ISO_VIEW_W; vx++) {
-    const p = worldToIsoScreen(camX + vx, camY + ISO_VIEW_H - 1, battle, layout);
-    if (vx === 0) ctx.moveTo(p.sx - hw, p.sy);
-    ctx.lineTo(p.sx, p.sy + hh);
-  }
-  const endL = worldToIsoScreen(camX + ISO_VIEW_W - 1, camY + ISO_VIEW_H - 1, battle, layout);
-  ctx.lineTo(endL.sx, endL.sy + hh + skirtH);
-  const startL = worldToIsoScreen(camX, camY + ISO_VIEW_H - 1, battle, layout);
-  ctx.lineTo(startL.sx - hw, startL.sy + skirtH);
-  ctx.closePath();
-  ctx.fillStyle = "#141d28";
+  ctx.ellipse(sx, sy + 1, w * 0.28, h * 0.28, 0, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0, 0, 0, 0.48)";
   ctx.fill();
-  ctx.strokeStyle = "rgba(78, 242, 161, 0.35)";
+
+  if (isSelected) {
+    drawIsoDiamond(ctx, sx, sy, w * 0.94, h * 0.94, "rgba(78, 242, 161, 0.24)", "#4ef2a1", 1.8);
+  }
+
+  const crouchOffset = unit.crouched ? 3.5 : 0;
+  const bodyH = Math.max(12, Math.round(h * 0.85));
+  const headR = Math.max(3.5, Math.round(w * 0.11));
+  const hipY = sy - bodyH * 0.32 + crouchOffset * 0.5;
+  const shoulderY = sy - bodyH * 0.82 + crouchOffset;
+  const headY = shoulderY - headR - 1.5;
+
+  ctx.strokeStyle = isSelected ? "#bbf7d0" : "#94a3b8";
+  ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  ctx.moveTo(sx - 3, hipY);
+  ctx.lineTo(sx - 4, sy);
+  ctx.moveTo(sx + 3, hipY);
+  ctx.lineTo(sx + 4, sy);
+  ctx.stroke();
+
+  ctx.fillStyle = isSelected ? "#16a34a" : "#1e3a5f";
+  ctx.strokeStyle = isSelected ? "#4ef2a1" : "#60a5fa";
   ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.roundRect(sx - 5.5, shoulderY, 11, bodyH * 0.52, 2.5);
+  ctx.fill();
   ctx.stroke();
 
   ctx.beginPath();
-  const topR = worldToIsoScreen(camX + ISO_VIEW_W - 1, camY, battle, layout);
-  ctx.moveTo(topR.sx + hw, topR.sy);
-  for (let vy = 0; vy < ISO_VIEW_H; vy++) {
-    const p = worldToIsoScreen(camX + ISO_VIEW_W - 1, camY + vy, battle, layout);
-    ctx.lineTo(p.sx, p.sy + hh);
-  }
-  const botR = worldToIsoScreen(camX + ISO_VIEW_W - 1, camY + ISO_VIEW_H - 1, battle, layout);
-  ctx.lineTo(botR.sx, botR.sy + hh + skirtH);
-  ctx.lineTo(topR.sx + hw, topR.sy + skirtH);
-  ctx.closePath();
-  ctx.fillStyle = "#0e151e";
+  ctx.arc(sx, headY, headR, 0, Math.PI * 2);
+  ctx.fillStyle = isSelected ? "#4ef2a1" : "#cbd5e1";
   ctx.fill();
-  ctx.strokeStyle = "rgba(78, 242, 161, 0.25)";
-  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = "#0f172a";
+  ctx.lineWidth = 1;
   ctx.stroke();
+
+  ctx.strokeStyle = "#e2e8f0";
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.moveTo(sx + 2, shoulderY + 4);
+  ctx.lineTo(sx + 10, shoulderY + 1);
+  ctx.stroke();
+
+  const barW = 24;
+  const barH = 3.5;
+  const barX = sx - barW * 0.5;
+  const barY = headY - headR - 8;
+  const ratio = Math.max(0, Math.min(1, unit.hp / Math.max(1, unit.maxHp)));
+
+  ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
+  ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
+  ctx.fillStyle = ratio > 0.5 ? "#22c55e" : ratio > 0.25 ? "#eab308" : "#ef4444";
+  ctx.fillRect(barX, barY, barW * ratio, barH);
+
+  ctx.fillStyle = "#f8fafc";
+  ctx.font = "bold 8px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText(`${unit.name.split(" ")[0].slice(0, 6)} ${unit.hp}`, sx, barY - 3);
 }
 
-function ensureIsoBattleCanvas(gridEl) {
+function drawIsoAlienSprite(ctx, sx, sy, w, h, enemy, isTargeted) {
+  ctx.beginPath();
+  ctx.ellipse(sx, sy + 1, w * 0.28, h * 0.28, 0, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+  ctx.fill();
+
+  if (isTargeted) {
+    drawIsoDiamond(ctx, sx, sy, w * 0.94, h * 0.94, "rgba(255, 209, 102, 0.24)", "#ffd166", 1.8);
+  }
+
+  const isBig = enemy.archetypeId === "brute" || enemy.archetypeId === "overlord";
+  const bodyH = Math.max(13, Math.round(h * (isBig ? 1.05 : 0.85)));
+  const headR = Math.max(4, Math.round(w * (isBig ? 0.14 : 0.11)));
+  const hipY = sy - bodyH * 0.35;
+  const shoulderY = sy - bodyH * 0.82;
+  const headY = shoulderY - headR - 1.5;
+
+  ctx.strokeStyle = "#f87171";
+  ctx.lineWidth = isBig ? 3 : 2.2;
+  ctx.beginPath();
+  ctx.moveTo(sx - 4, hipY);
+  ctx.lineTo(sx - 5, sy);
+  ctx.moveTo(sx + 4, hipY);
+  ctx.lineTo(sx + 5, sy);
+  ctx.stroke();
+
+  ctx.fillStyle = isBig ? "#7f1d1d" : "#991b1b";
+  ctx.strokeStyle = isTargeted ? "#fde047" : "#fca5a5";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(sx, shoulderY - 2);
+  ctx.lineTo(sx + (isBig ? 8 : 6), hipY);
+  ctx.lineTo(sx, sy - 2);
+  ctx.lineTo(sx - (isBig ? 8 : 6), hipY);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(sx, headY, headR, 0, Math.PI * 2);
+  ctx.fillStyle = "#ef4444";
+  ctx.fill();
+  ctx.strokeStyle = "#fecaca";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.fillStyle = "#fef08a";
+  ctx.beginPath();
+  ctx.arc(sx - 1.5, headY - 0.5, 1.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  const barW = 24;
+  const barH = 3.5;
+  const barX = sx - barW * 0.5;
+  const barY = headY - headR - 8;
+  const ratio = Math.max(0, Math.min(1, enemy.hp / Math.max(1, enemy.maxHp)));
+
+  ctx.fillStyle = "rgba(0, 0, 0, 0.78)";
+  ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
+  ctx.fillStyle = "#ef4444";
+  ctx.fillRect(barX, barY, barW * ratio, barH);
+
+  ctx.fillStyle = isTargeted ? "#fde047" : "#fca5a5";
+  ctx.font = "bold 8px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText(`${enemy.archetypeId.slice(0, 5).toUpperCase()} ${enemy.hp}`, sx, barY - 3);
+}
+
+function ensureIsoCanvasStage(gridEl) {
   if (!gridEl || !gridEl.parentElement) return null;
   gridEl.style.display = "none";
-  let canvas = document.getElementById("iso-battle-canvas");
-  if (!canvas) {
-    canvas = document.createElement("canvas");
-    canvas.id = "iso-battle-canvas";
-    canvas.style.cssText = `
-      width: 100%;
-      height: 340px;
-      display: block;
-      touch-action: none;
-      user-select: none;
-      -webkit-user-select: none;
-      cursor: pointer;
-      border-radius: 10px;
-      background: radial-gradient(circle at 50% 20%, rgba(34, 58, 84, 0.5), rgba(7, 11, 18, 0.96));
-      border: 1px solid rgba(78, 242, 161, 0.28);
-      box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.65);
-    `;
-    gridEl.parentElement.insertBefore(canvas, gridEl);
 
-    let isDragging = false;
-    let movedDist = 0;
-    let startX = 0;
-    let startY = 0;
-    let lastPanX = 0;
-    let lastPanY = 0;
+  let stage = document.getElementById("oz-iso-stage");
+  if (!stage) {
+    stage = document.createElement("div");
+    stage.id = "oz-iso-stage";
+    stage.style.cssText = `
+      position:relative;
+      width:100%;
+      flex:1 1 auto;
+      min-height:220px;
+      border-radius:10px;
+      overflow:hidden;
+      border:1px solid rgba(78, 242, 161, 0.34);
+      background:radial-gradient(circle at 50% 25%, #16283b 0%, #09111a 75%, #05090f 100%);
+      box-shadow:inset 0 0 24px rgba(0, 0, 0, 0.72);
+    `;
+    gridEl.parentElement.insertBefore(stage, gridEl);
+
+    const canvas = document.createElement("canvas");
+    canvas.id = "iso-battle-canvas";
+    canvas.style.cssText = "width:100%;height:100%;display:block;touch-action:none;user-select:none;-webkit-user-select:none;cursor:pointer;";
+    stage.appendChild(canvas);
+
+    // Navegação tátil suave por arrasto/deslize direto no canvas isométrico
+    let pointerDown = false;
+    let totalMoved = 0;
+    let startClientX = 0;
+    let startClientY = 0;
+    let lastClientX = 0;
+    let lastClientY = 0;
 
     canvas.addEventListener("pointerdown", (ev) => {
-      isDragging = true;
-      movedDist = 0;
-      startX = ev.clientX;
-      startY = ev.clientY;
-      lastPanX = ev.clientX;
-      lastPanY = ev.clientY;
+      pointerDown = true;
+      totalMoved = 0;
+      startClientX = ev.clientX;
+      startClientY = ev.clientY;
+      lastClientX = ev.clientX;
+      lastClientY = ev.clientY;
     });
 
     window.addEventListener("pointermove", (ev) => {
-      if (!isDragging || !state.battle) return;
-      movedDist = Math.hypot(ev.clientX - startX, ev.clientY - startY);
-      if (movedDist > 22) {
-        const dx = ev.clientX - lastPanX;
-        const dy = ev.clientY - lastPanY;
-        const panX = Math.abs(dx) >= 32 ? (dx > 0 ? -1 : 1) : 0;
-        const panY = Math.abs(dy) >= 24 ? (dy > 0 ? -1 : 1) : 0;
-        if (panX !== 0 || panY !== 0) {
-          lastPanX = ev.clientX;
-          lastPanY = ev.clientY;
-          const b = state.battle;
-          b.camera.x = Math.max(0, Math.min(GRID_W - ISO_VIEW_W, b.camera.x + panX));
-          b.camera.y = Math.max(0, Math.min(GRID_H - ISO_VIEW_H, b.camera.y + panY));
-          renderBattle();
+      if (!pointerDown || !state.battle) return;
+      totalMoved = Math.hypot(ev.clientX - startClientX, ev.clientY - startClientY);
+      if (totalMoved > 18) {
+        const dx = ev.clientX - lastClientX;
+        const dy = ev.clientY - lastClientY;
+        const stepX = Math.abs(dx) >= 30 ? (dx > 0 ? -1 : 1) : 0;
+        const stepY = Math.abs(dy) >= 22 ? (dy > 0 ? -1 : 1) : 0;
+        if (stepX !== 0 || stepY !== 0) {
+          lastClientX = ev.clientX;
+          lastClientY = ev.clientY;
+          panCamera(stepX, stepY);
         }
       }
     });
 
     window.addEventListener("pointerup", (ev) => {
-      if (!isDragging) return;
-      isDragging = false;
-      if (movedDist <= 14 && state.battle) {
+      if (!pointerDown) return;
+      pointerDown = false;
+      if (totalMoved <= 14 && state.battle) {
         const rect = canvas.getBoundingClientRect();
         const px = ev.clientX - rect.left;
         const py = ev.clientY - rect.top;
-        const layout = getIsoCanvasLayout(canvas);
-        const hit = screenToWorldIso(px, py, state.battle, layout);
+        const m = getIsoMetrics(canvas);
+        const hit = isoToWorld(px, py, state.battle, m);
         if (hit) handleCellClick(hit.x, hit.y);
       }
     });
   }
-  return canvas;
+
+  return document.getElementById("iso-battle-canvas");
+}
+
+function ensureTacticalExtras() {
+  const tactical = document.getElementById("tactical");
+  if (!tactical) return;
+
+  const gridEl = document.getElementById("battle-grid");
+  const logEl = document.getElementById("battle-log");
+  if (gridEl && logEl && logEl.previousElementSibling !== gridEl) {
+    logEl.style.marginTop = "6px";
+    gridEl.insertAdjacentElement("afterend", logEl);
+  }
+
+  const oldExtraBar = document.getElementById("tactical-grenade-bar");
+  if (oldExtraBar && oldExtraBar.parentElement) {
+    oldExtraBar.parentElement.removeChild(oldExtraBar);
+  }
+}
+
+function renderFloatingUnitOrders(battle, selUnit, canvas, m) {
+  let pop = document.getElementById("floating-unit-orders");
+  if (!pop) {
+    pop = document.createElement("div");
+    pop.id = "floating-unit-orders";
+    pop.style.cssText = `
+      position:absolute;
+      z-index:25;
+      background:rgba(12,18,26,0.96);
+      border:1px solid #4ef2a1;
+      border-radius:8px;
+      padding:6px 8px;
+      box-shadow:0 8px 24px rgba(0,0,0,0.6);
+      display:none;
+      min-width:210px;
+      max-width:320px;
+    `;
+    const parent = canvas && canvas.parentElement ? canvas.parentElement : document.getElementById("tactical");
+    if (parent) {
+      if (getComputedStyle(parent).position === "static") {
+        parent.style.position = "relative";
+      }
+      parent.appendChild(pop);
+    }
+  }
+
+  if (!battle || battle.phase !== "player" || !selUnit || !canvas || !m) {
+    pop.style.display = "none";
+    return;
+  }
+
+  const camX = battle.camera ? battle.camera.x : 0;
+  const camY = battle.camera ? battle.camera.y : 0;
+  const vx = selUnit.x - camX;
+  const vy = selUnit.y - camY;
+
+  if (vx < 0 || vx >= ISO_VIEW_W || vy < 0 || vy >= ISO_VIEW_H) {
+    pop.style.display = "none";
+    return;
+  }
+
+  const parent = pop.parentElement;
+  if (!parent) {
+    pop.style.display = "none";
+    return;
+  }
+
+  const unitIso = worldToIso(selUnit.x, selUnit.y, battle, m);
+  const parentRect = parent.getBoundingClientRect();
+
+  const stanceLabel = selUnit.crouched ? "AGACHADO" : "EM PÉ";
+  pop.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:5px;font-size:0.73em;color:#4ef2a1;">
+      <b>${selUnit.name} · ${selUnit.ap} PA · ${stanceLabel}</b>
+      <button type="button" id="close-floating-orders" style="background:none;border:none;color:#fff;cursor:pointer;font-size:1em;padding:0 2px;">✕</button>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:4px;">
+      <button type="button" data-float-act="move" class="${battle.mode === "move" ? "primary" : "secondary"}" style="font-size:0.72em;padding:4px 7px;">MOVER (${getUnitMoveRange(selUnit)})</button>
+      <button type="button" data-float-act="crouch" class="${selUnit.crouched ? "primary" : "secondary"}" style="font-size:0.72em;padding:4px 7px;">${selUnit.crouched ? "LEVANTAR" : "AGACHAR"}</button>
+      <button type="button" data-float-act="fire" class="primary" style="font-size:0.72em;padding:4px 7px;">${
+        battle.selectedTargetId
+          ? (() => {
+              const t = battle.enemies.find((e) => e.id === battle.selectedTargetId && e.hp > 0);
+              return t ? `DISPARAR (${calculateHitChance(selUnit, t, battle)}% · ~${estimateUnitDamage(selUnit, t)}D)` : "DISPARAR";
+            })()
+          : "DISPARAR"
+      }</button>
+      <button type="button" data-float-act="frag" class="secondary" style="font-size:0.72em;padding:4px 7px;">FRAG (${selUnit.frags})</button>
+      <button type="button" data-float-act="smoke" class="secondary" style="font-size:0.72em;padding:4px 7px;">FUMO (${selUnit.smokes})</button>
+      <button type="button" data-float-act="overwatch" class="secondary" style="font-size:0.72em;padding:4px 7px;">VIGILÂNCIA</button>
+      <button type="button" data-float-act="hunker" class="secondary" style="font-size:0.72em;padding:4px 7px;">HUNKER</button>
+      <button type="button" data-float-act="reload" class="secondary" style="font-size:0.72em;padding:4px 7px;">RECARREGAR</button>
+      <button type="button" data-float-act="medkit" class="secondary" style="font-size:0.72em;padding:4px 7px;">CURAR (${selUnit.medkits})</button>
+    </div>
+  `;
+
+  pop.style.display = "block";
+  pop.style.bottom = "auto";
+  pop.style.right = "auto";
+  pop.style.maxWidth = "320px";
+  pop.style.left = "0px";
+  pop.style.top = "0px";
+  const popRect = pop.getBoundingClientRect();
+
+  let left = unitIso.sx - popRect.width / 2;
+  left = Math.max(6, Math.min(parentRect.width - popRect.width - 6, left));
+
+  let top = unitIso.sy - popRect.height - 28;
+  if (top < 6) {
+    top = unitIso.sy + 20;
+  }
+  top = Math.max(6, Math.min(parentRect.height - popRect.height - 6, top));
+
+  pop.style.left = `${Math.round(left)}px`;
+  pop.style.top = `${Math.round(top)}px`;
+
+  const closeBtn = pop.querySelector("#close-floating-orders");
+  if (closeBtn) {
+    closeBtn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      battle.selectedUnitId = null;
+      renderBattle();
+    });
+  }
+
+  pop.querySelectorAll("[data-float-act]").forEach((btn) => {
+    btn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const act = btn.getAttribute("data-float-act");
+      if (act === "move") toggleMoveModeSelectedUnit();
+      else if (act === "crouch") toggleCrouchSelectedUnit();
+      else if (act === "fire") fireAtTarget();
+      else if (act === "frag") {
+        if (selUnit.ap < 1 || selUnit.frags <= 0) {
+          addBattleLog("Sem PA ou sem granadas de fragmentação disponíveis.");
+          return;
+        }
+        battle.mode = battle.mode === "frag" ? "normal" : "frag";
+        addBattleLog(battle.mode === "frag" ? "Modo GRANADA FRAG ativo: toca num losango do mapa." : "Modo normal restaurado.");
+        renderBattle();
+      } else if (act === "smoke") {
+        if (selUnit.ap < 1 || selUnit.smokes <= 0) {
+          addBattleLog("Sem PA ou sem granadas de fumo disponíveis.");
+          return;
+        }
+        battle.mode = battle.mode === "smoke" ? "normal" : "smoke";
+        addBattleLog(battle.mode === "smoke" ? "Modo GRANADA FUMO ativo: toca num losango do mapa." : "Modo normal restaurado.");
+        renderBattle();
+      } else if (act === "overwatch") overwatchSelectedUnit();
+      else if (act === "hunker") hunkerSelectedUnit();
+      else if (act === "reload") reloadSelectedUnit();
+      else if (act === "medkit") useMedkitSelectedUnit();
+    });
+  });
+}
+
+function ensureEndTurnVisible(battle) {
+  const endTurnBtn = document.getElementById("end-turn");
+  const battleSide = document.querySelector("#tactical .battle-side");
+  if (!endTurnBtn || !battleSide) return;
+
+  if (endTurnBtn.parentElement !== battleSide) {
+    endTurnBtn.style.marginTop = "8px";
+    battleSide.appendChild(endTurnBtn);
+  }
+
+  const isPlayerTurn = Boolean(battle && battle.phase === "player");
+  endTurnBtn.style.display = "";
+  endTurnBtn.disabled = !isPlayerTurn;
+}
+
+function getUnitVisualBadge(entity, isEnemy) {
+  if (isEnemy) {
+    const archColors = {
+      scout: "#ff7b54",
+      stalker: "#e056fd",
+      swarm: "#ff9f1c",
+      psycher: "#9b5de5",
+      brute: "#ff4757",
+      overlord: "#ff2e63"
+    };
+    const col = archColors[entity.archetypeId] || "#ff5252";
+    const glyph =
+      entity.archetypeId === "brute" || entity.archetypeId === "overlord" ? "M12 3 L20 7 L18 16 L12 21 L6 16 L4 7 Z" :
+      entity.archetypeId === "stalker" ? "M12 3 L21 12 L12 21 L3 12 Z" :
+      entity.archetypeId === "psycher" ? "M12 4 A8 8 0 1 0 12 20 A8 8 0 1 0 12 4 M12 8 A4 4 0 1 1 12 16" :
+      "M12 4 L20 19 L12 15 L4 19 Z";
+    return `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" style="flex-shrink:0;filter:drop-shadow(0 0 3px ${col});"><path d="${glyph}" fill="none" stroke="${col}" stroke-width="2.2" stroke-linejoin="round"/><circle cx="12" cy="12" r="2" fill="${col}"/></svg>`;
+  }
+
+  const roleColors = {
+    "Fuzileiro": "#4ef2a1",
+    "Atirador de Elite": "#38bdf8",
+    "Médico": "#2dd4bf",
+    "Demolições": "#fb923c",
+    "Pesado": "#facc15",
+    "Comando": "#c084fc",
+    "Reconhecimento": "#a3e635",
+    "Engenheiro": "#60a5fa"
+  };
+  const col = roleColors[entity.role] || "#4ef2a1";
+  const statusTag = entity.crouched ? "AGA" : entity.overwatch ? "VIG" : entity.hunker ? "HNK" : entity.stunned ? "ATD" : "";
+
+  return `
+    <span style="display:inline-flex;align-items:center;gap:3px;line-height:1;">
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" style="flex-shrink:0;">
+        <circle cx="12" cy="7.5" r="3.5" fill="${col}"/>
+        <path d="M5.5 20 C5.5 15.8 8.4 13.5 12 13.5 C15.6 13.5 18.5 15.8 18.5 20" fill="none" stroke="${col}" stroke-width="2.3" stroke-linecap="round"/>
+      </svg>
+      ${statusTag ? `<span style="font-size:0.72em;padding:0 2px;border-radius:3px;background:rgba(0,0,0,0.45);color:${col};border:1px solid ${col};">${statusTag}</span>` : ""}
+    </span>
+  `;
 }
 
 function renderBattle() {
   const b = state.battle;
   if (!b) return;
+  ensureTacticalExtras();
 
   const titleEl = document.getElementById("battle-title");
   if (titleEl) titleEl.textContent = `${formatMissionNumber(b.mission.number)}. ${b.mission.title.toUpperCase()}`;
@@ -819,45 +1793,54 @@ function renderBattle() {
   const turnLabel = document.getElementById("turn-label");
   if (turnLabel) turnLabel.textContent = `TURNO ${b.turn} · ${b.phase === "player" ? "UNIDADE ZERO" : "ALIENÍGENAS"}`;
 
-  if (!b.camera) b.camera = { x: 0, y: 0 };
-  b.camera.x = Math.max(0, Math.min(GRID_W - ISO_VIEW_W, b.camera.x));
-  b.camera.y = Math.max(0, Math.min(GRID_H - ISO_VIEW_H, b.camera.y));
+  if (!b.camera) b.camera = { x: 0, y: 1 };
+  const maxCamX = Math.max(0, GRID_W - ISO_VIEW_W);
+  const maxCamY = Math.max(0, GRID_H - ISO_VIEW_H);
+  b.camera.x = Math.max(0, Math.min(maxCamX, b.camera.x));
+  b.camera.y = Math.max(0, Math.min(maxCamY, b.camera.y));
+
+  const camCoords = document.getElementById("camera-coords");
+  if (camCoords) {
+    camCoords.textContent = `ZONA ISO [${b.camera.x + 1}..${b.camera.x + ISO_VIEW_W}, ${b.camera.y + 1}..${b.camera.y + ISO_VIEW_H}] / ${GRID_W}x${GRID_H}`;
+  }
 
   const gridEl = document.getElementById("battle-grid");
-  const canvas = ensureIsoBattleCanvas(gridEl);
+  const canvas = ensureIsoCanvasStage(gridEl);
   const selUnit = getSelectedUnit();
   const selEnemy = getSelectedEnemy();
 
+  let isoMetrics = null;
   if (canvas) {
-    const layout = getIsoCanvasLayout(canvas);
+    const m = getIsoMetrics(canvas);
+    isoMetrics = m;
     const dpr = window.devicePixelRatio || 1;
-    canvas.style.height = layout.h + "px";
-    if (canvas.width !== Math.round(layout.w * dpr) || canvas.height !== Math.round(layout.h * dpr)) {
-      canvas.width = Math.round(layout.w * dpr);
-      canvas.height = Math.round(layout.h * dpr);
+    if (canvas.width !== Math.round(m.w * dpr) || canvas.height !== Math.round(m.h * dpr)) {
+      canvas.width = Math.round(m.w * dpr);
+      canvas.height = Math.round(m.h * dpr);
     }
 
     const ctx = canvas.getContext("2d");
     ctx.save();
     ctx.scale(dpr, dpr);
-    ctx.clearRect(0, 0, layout.w, layout.h);
+    ctx.clearRect(0, 0, m.w, m.h);
 
-    ctx.fillStyle = "rgba(78, 242, 161, 0.78)";
+    ctx.fillStyle = "rgba(78, 242, 161, 0.82)";
     ctx.font = "bold 9px monospace";
     ctx.textAlign = "left";
-    ctx.fillText(`MAPA ISOMÉTRICO 2:1 · SETOR [${b.camera.x + 1}..${b.camera.x + ISO_VIEW_W}, ${b.camera.y + 1}..${b.camera.y + ISO_VIEW_H}]`, 10, 15);
+    ctx.fillText(`XCOM ISO 2:1 · ARRASTA PARA NAVEGAR [${b.camera.x + 1}..${b.camera.x + ISO_VIEW_W}, ${b.camera.y + 1}..${b.camera.y + ISO_VIEW_H}]`, 10, 14);
 
-    drawIsoPlatformSkirt(ctx, b, layout);
+    drawIsoBoardSkirt(ctx, b, m);
 
     const maxMoveRange = getUnitMoveRange(selUnit);
 
+    // 1. Losangos do chão isométrico ordenados por profundidade (x + y)
     for (let sum = 0; sum <= ISO_VIEW_W + ISO_VIEW_H - 2; sum++) {
       for (let vy = 0; vy < ISO_VIEW_H; vy++) {
         const vx = sum - vy;
         if (vx < 0 || vx >= ISO_VIEW_W) continue;
         const gx = b.camera.x + vx;
         const gy = b.camera.y + vy;
-        const { sx, sy } = worldToIsoScreen(gx, gy, b, layout);
+        const { sx, sy } = worldToIso(gx, gy, b, m);
 
         const tileType = b.grid[gy][gx];
         const unitHere = b.units.find((u) => u.x === gx && u.y === gy && u.hp > 0);
@@ -867,6 +1850,7 @@ function renderBattle() {
         const distFromSel = selUnit ? Math.abs(selUnit.x - gx) + Math.abs(selUnit.y - gy) : 99;
         const canMoveHere =
           b.phase === "player" &&
+          (b.mode === "move" || b.mode === "normal") &&
           selUnit &&
           selUnit.ap >= 1 &&
           !unitHere &&
@@ -875,86 +1859,64 @@ function renderBattle() {
           distFromSel > 0 &&
           distFromSel <= maxMoveRange;
 
-        const isChecker = (gx + gy) % 2 === 0;
-        let fill = isChecker ? "rgba(42, 62, 86, 0.56)" : "rgba(28, 43, 62, 0.52)";
-        let stroke = "rgba(170, 205, 238, 0.32)";
+        const isAlt = (gx + gy) % 2 === 0;
+        let fill = isAlt ? "rgba(28, 48, 68, 0.65)" : "rgba(18, 32, 48, 0.60)";
+        let stroke = "rgba(125, 211, 252, 0.28)";
 
         if (canMoveHere) {
-          fill = "rgba(78, 242, 161, 0.22)";
+          fill = b.mode === "move" ? "rgba(78, 242, 161, 0.30)" : "rgba(78, 242, 161, 0.16)";
           stroke = "#4ef2a1";
         } else if (smokeHere) {
-          fill = "rgba(195, 215, 235, 0.32)";
-          stroke = "rgba(220, 235, 250, 0.55)";
+          fill = "rgba(203, 213, 225, 0.34)";
+          stroke = "rgba(241, 245, 249, 0.62)";
         }
 
-        drawIsoTileDiamond(ctx, sx, sy, layout.tileW, layout.tileH, fill, stroke, canMoveHere ? 1.5 : 1.1);
+        drawIsoDiamond(ctx, sx, sy, m.tileW, m.tileH, fill, stroke, canMoveHere ? 1.5 : 1);
+      }
+    }
 
-        const cov = (!unitHere && !enemyHere && tileType !== 3) ? getTileCoverAt(b, gx, gy) : 0;
-        if (cov > 0) {
-          ctx.fillStyle = cov === 2 ? "#7dd3fc" : "#fde047";
-          ctx.font = "bold 8px monospace";
-          ctx.textAlign = "center";
-          ctx.fillText(cov === 2 ? "COB+" : "COB", sx, sy + 3);
-        }
+    // 2. Linha de mira entre o soldado selecionado e o alvo selecionado
+    if (selUnit && selEnemy) {
+      const uPos = worldToIso(selUnit.x, selUnit.y, b, m);
+      const ePos = worldToIso(selEnemy.x, selEnemy.y, b, m);
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = "rgba(255, 209, 102, 0.72)";
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(uPos.sx, uPos.sy - 8);
+      ctx.lineTo(ePos.sx, ePos.sy - 8);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 3. Coberturas 3D, soldados e inimigos Xeno por profundidade
+    for (let sum = 0; sum <= ISO_VIEW_W + ISO_VIEW_H - 2; sum++) {
+      for (let vy = 0; vy < ISO_VIEW_H; vy++) {
+        const vx = sum - vy;
+        if (vx < 0 || vx >= ISO_VIEW_W) continue;
+        const gx = b.camera.x + vx;
+        const gy = b.camera.y + vy;
+        const { sx, sy } = worldToIso(gx, gy, b, m);
+
+        const tileType = b.grid[gy][gx];
+        const unitHere = b.units.find((u) => u.x === gx && u.y === gy && u.hp > 0);
+        const enemyHere = b.enemies.find((e) => e.x === gx && e.y === gy && e.hp > 0);
 
         if (tileType === 3) {
-          drawIsoVolumePrism(ctx, sx, sy, layout.tileW * 0.78, layout.tileH * 0.78, layout.extrudeH * 1.4, "#475569", "#1e293b", "#0f172a");
+          drawIsoCoverBlock(ctx, sx, sy, m.tileW, m.tileH, m.wallH * 1.45, true, false);
         } else if (tileType === 2) {
-          drawIsoVolumePrism(ctx, sx, sy, layout.tileW * 0.72, layout.tileH * 0.72, layout.extrudeH * 0.9, "#60a5fa", "#2563eb", "#1d4ed8");
+          drawIsoCoverBlock(ctx, sx, sy, m.tileW, m.tileH, m.wallH * 0.95, true, false);
         } else if (tileType === 1 || tileType === 4) {
-          const isDest = tileType === 4;
-          drawIsoVolumePrism(
-            ctx,
-            sx,
-            sy,
-            layout.tileW * 0.68,
-            layout.tileH * 0.68,
-            layout.extrudeH * 0.7,
-            isDest ? "#fb923c" : "#facc15",
-            isDest ? "#c2410c" : "#ca8a04",
-            isDest ? "#9a3412" : "#854d0e"
-          );
+          drawIsoCoverBlock(ctx, sx, sy, m.tileW, m.tileH, m.wallH * 0.72, false, tileType === 4);
         }
 
         if (unitHere) {
-          const isSel = selUnit && selUnit.id === unitHere.id;
-          drawIsoVolumePrism(
-            ctx,
-            sx,
-            sy,
-            layout.tileW * 0.62,
-            layout.tileH * 0.62,
-            layout.extrudeH * 1.35,
-            isSel ? "#6ee7b7" : "#38bdf8",
-            "#0284c7",
-            "#0369a1",
-            isSel ? "#ffffff" : "#bae6fd"
-          );
-          ctx.fillStyle = "#ffffff";
-          ctx.font = "bold 9px monospace";
-          ctx.textAlign = "center";
-          ctx.fillText(`${unitHere.name.split(" ")[0].slice(0, 5)} ${unitHere.hp}`, sx, sy - layout.extrudeH * 1.35 - layout.tileH * 0.45);
+          drawIsoSoldierSprite(ctx, sx, sy, m.tileW, m.tileH, unitHere, Boolean(selUnit && selUnit.id === unitHere.id));
         }
 
         if (enemyHere) {
-          const isTarget = selEnemy && selEnemy.id === enemyHere.id;
-          drawIsoVolumePrism(
-            ctx,
-            sx,
-            sy,
-            layout.tileW * 0.64,
-            layout.tileH * 0.64,
-            layout.extrudeH * 1.4,
-            isTarget ? "#ffd166" : "#ff5252",
-            "#b91c1c",
-            "#7f1d1d",
-            isTarget ? "#ffd166" : "#fecaca"
-          );
-          const hChance = selUnit ? calculateHitChance(selUnit, enemyHere, b) : null;
-          ctx.fillStyle = isTarget ? "#ffd166" : "#fca5a5";
-          ctx.font = "bold 9px monospace";
-          ctx.textAlign = "center";
-          ctx.fillText(hChance !== null ? `${enemyHere.archetypeId.slice(0, 4).toUpperCase()} ${hChance}%` : `${enemyHere.archetypeId.slice(0, 4).toUpperCase()} ${enemyHere.hp}`, sx, sy - layout.extrudeH * 1.4 - layout.tileH * 0.45);
+          drawIsoAlienSprite(ctx, sx, sy, m.tileW, m.tileH, enemyHere, Boolean(selEnemy && selEnemy.id === enemyHere.id));
         }
       }
     }
@@ -962,15 +1924,25 @@ function renderBattle() {
     ctx.restore();
   }
 
+  renderFloatingUnitOrders(b, selUnit, canvas, isoMetrics);
+
   const setText = (id, txt) => {
     const el = document.getElementById(id);
     if (el) el.textContent = txt;
   };
 
+  const ordersPanel = document.querySelector("#tactical .battle-side .side-panel:nth-of-type(3)");
+  if (ordersPanel) {
+    ordersPanel.style.display = "none";
+  }
+  ensureEndTurnVisible(b);
+
   if (selUnit) {
-    setText("selected-unit", `${selUnit.name} (${selUnit.role})`);
+    const maxMove = getUnitMoveRange(selUnit);
+    const postureName = selUnit.crouched ? "AGACHADO (CAUTELOSO)" : "DE PÉ (CORRER)";
+    setText("selected-unit", `${selUnit.name} (${selUnit.role}) · ${postureName}`);
     setText("unit-hp", `${selUnit.hp}/${selUnit.maxHp} HP`);
-    setText("unit-ap", `${selUnit.ap}/${selUnit.maxAp} PA`);
+    setText("unit-ap", `${selUnit.ap}/${selUnit.maxAp} PA · MOV ${maxMove}`);
     setText("unit-ammo", `${selUnit.ammo}/${selUnit.maxAmmo} MUN`);
   } else {
     setText("selected-unit", "SEM OPERACIONAL");
@@ -981,11 +1953,15 @@ function renderBattle() {
 
   if (selUnit && selEnemy) {
     const chance = calculateHitChance(selUnit, selEnemy, b);
+    const cover = getTileCoverAt(b, selEnemy.x, selEnemy.y);
+    const coverText = cover === 2 ? "COB. PESADA (-40%)" : cover === 1 ? "MEIA COB. (-25%)" : "SEM COB. (0%)";
     const estDmg = estimateUnitDamage(selUnit, selEnemy);
-    setText("target-info", `${selEnemy.name} (${selEnemy.hp} HP)`);
+    setText("target-info", `${selEnemy.name} (${selEnemy.hp} HP · ${coverText})`);
     setText("hit-chance", `CHANCE: ${chance}% · DANO EST.: ~${estDmg}`);
   } else if (selEnemy) {
-    setText("target-info", `${selEnemy.name} (${selEnemy.hp} HP)`);
+    const cover = getTileCoverAt(b, selEnemy.x, selEnemy.y);
+    const coverText = cover === 2 ? "COB. PESADA" : cover === 1 ? "MEIA COB." : "SEM COB.";
+    setText("target-info", `${selEnemy.name} (${selEnemy.hp} HP · ${coverText})`);
     setText("hit-chance", "CHANCE: --% · DANO EST.: --");
   } else {
     setText("target-info", "NENHUM ALVO");
@@ -1010,38 +1986,49 @@ function handleCellClick(x, y) {
     throwFragGrenade(selUnit, x, y);
     return;
   }
+
   if (b.mode === "smoke" && selUnit) {
     throwSmokeGrenade(selUnit, x, y);
     return;
   }
+
   if (enemyHere) {
     b.selectedTargetId = enemyHere.id;
-    addBattleLog(`Alvo selecionado: ${enemyHere.name} (${enemyHere.hp} HP).`);
+    addBattleLog(`Alvo selecionado: ${enemyHere.name} (${enemyHere.archetypeId.toUpperCase()}).`);
     renderBattle();
     return;
   }
+
   if (unitHere) {
-    b.selectedUnitId = unitHere.id;
-    b.mode = "normal";
-    unitHere.overwatch = false;
-    addBattleLog(`Operacional selecionado: ${unitHere.name}.`);
+    if (b.selectedUnitId === unitHere.id) {
+      b.selectedUnitId = null;
+      b.mode = "normal";
+      addBattleLog(`Ordens de ${unitHere.name} recolhidas.`);
+    } else {
+      b.selectedUnitId = unitHere.id;
+      b.mode = "normal";
+      unitHere.overwatch = false;
+      centerCameraOnUnit(unitHere);
+      addBattleLog(`Operacional selecionado: ${unitHere.name} (${unitHere.crouched ? "Agachado/Cauteloso: 2" : "Em pé/Correr: 4"}).`);
+    }
     renderBattle();
     return;
   }
+
   if (selUnit && selUnit.ap >= 1 && b.grid[y][x] !== 3) {
     const dist = Math.abs(selUnit.x - x) + Math.abs(selUnit.y - y);
     const maxStep = getUnitMoveRange(selUnit);
     if (dist > 0 && dist <= maxStep) {
+      const moveType = selUnit.crouched ? "avançou cautelosamente" : "correu";
       selUnit.x = x;
       selUnit.y = y;
       selUnit.ap -= 1;
       selUnit.hunker = false;
       selUnit.stunned = false;
-      b.mode = "normal";
-      addBattleLog(`${selUnit.name} moveu-se para (${x + 1},${y + 1}).`);
+      if (b.mode === "move") b.mode = "normal";
+      centerCameraOnUnit(selUnit);
+      addBattleLog(`${selUnit.name} ${moveType} para (${x + 1},${y + 1}).`);
       renderBattle();
-    } else {
-      addBattleLog("Fora do alcance de movimento deste turno.");
     }
   }
 }
@@ -1049,38 +2036,57 @@ function handleCellClick(x, y) {
 function throwFragGrenade(unit, tx, ty) {
   const b = state.battle;
   if (!b || !unit || unit.ap < 1 || unit.frags <= 0) return;
+
   unit.ap -= 1;
   unit.frags -= 1;
   b.mode = "normal";
+
+  const radius = 1;
   const baseDamage = 32 + getBuildingLevel("b-armory") * 4;
   let hits = 0;
 
-  for (let dy = -1; dy <= 1; dy++) {
-    for (let dx = -1; dx <= 1; dx++) {
+  for (let dy = -radius; dy <= radius; dy++) {
+    for (let dx = -radius; dx <= radius; dx++) {
       const cx = tx + dx;
       const cy = ty + dy;
       if (cx < 0 || cx >= GRID_W || cy < 0 || cy >= GRID_H) continue;
-      if (b.grid[cy][cx] === 1 || b.grid[cy][cx] === 4) b.grid[cy][cx] = 0;
+
+      if (b.grid[cy][cx] === 1 || b.grid[cy][cx] === 4) {
+        b.grid[cy][cx] = 0;
+      }
+
       const en = b.enemies.find((e) => e.x === cx && e.y === cy && e.hp > 0);
       if (en) {
         const dmg = Math.max(10, baseDamage - Math.floor((en.armor || 0) * 0.35));
         en.hp = Math.max(0, en.hp - dmg);
         hits++;
       }
+
+      const ally = b.units.find((u) => u.x === cx && u.y === cy && u.hp > 0 && u.id !== unit.id);
+      if (ally) {
+        const allyDmg = Math.max(4, Math.floor(baseDamage * 0.4));
+        ally.hp = Math.max(0, ally.hp - allyDmg);
+      }
     }
   }
-  addBattleLog(`${unit.name} lançou granada FRAG em (${tx + 1},${ty + 1}) — ${hits} inimigo(s) atingido(s).`);
+
+  addBattleLog(`${unit.name} lançou granada de fragmentação em (${tx + 1},${ty + 1}) — ${hits} inimigo(s) atingido(s).`);
   renderBattle();
 }
 
 function throwSmokeGrenade(unit, tx, ty) {
   const b = state.battle;
   if (!b || !unit || unit.ap < 1 || unit.smokes <= 0) return;
+
   unit.ap -= 1;
   unit.smokes -= 1;
   b.mode = "normal";
+
   b.smokes.push({ x: tx, y: ty, turns: 2 });
-  addBattleLog(`${unit.name} lançou granada de FUMO em (${tx + 1},${ty + 1}).`);
+  if (tx + 1 < GRID_W) b.smokes.push({ x: tx + 1, y: ty, turns: 2 });
+  if (tx - 1 >= 0) b.smokes.push({ x: tx - 1, y: ty, turns: 2 });
+
+  addBattleLog(`${unit.name} lançou cortina de fumo em (${tx + 1},${ty + 1}).`);
   renderBattle();
 }
 
@@ -1094,11 +2100,11 @@ function fireAtTarget() {
     return;
   }
   if (unit.ap < 1) {
-    addBattleLog(`${unit.name} sem PA.`);
+    addBattleLog(`${unit.name} não tem Pontos de Ação suficientes.`);
     return;
   }
   if (unit.ammo <= 0) {
-    addBattleLog(`${unit.name} sem munições.`);
+    addBattleLog(`${unit.name} está sem munições! Usa RECARREGAR.`);
     return;
   }
 
@@ -1107,18 +2113,25 @@ function fireAtTarget() {
   unit.hunker = false;
 
   const chance = calculateHitChance(unit, target, b);
-  if (Math.random() * 100 <= chance) {
-    const finalDmg = estimateUnitDamage(unit, target);
+  const roll = Math.random() * 100;
+
+  if (roll <= chance) {
+    const armoryBonus = getBuildingLevel("b-armory") * 4;
+    const baseDmg = unit.role === "Atirador de Elite" ? 42 : unit.role === "Pesado" ? 36 : 28;
+    const rawDmg = baseDmg + armoryBonus;
+    const armorMitigation = Math.floor((target.armor || 0) * 0.45);
+    const finalDmg = Math.max(8, rawDmg - armorMitigation);
     target.hp = Math.max(0, target.hp - finalDmg);
     addBattleLog(`${unit.name} acertou em ${target.name} (${chance}%) — ${finalDmg} de dano!`);
   } else {
-    addBattleLog(`${unit.name} falhou contra ${target.name} (${chance}%).`);
+    addBattleLog(`${unit.name} falhou o disparo contra ${target.name} (${chance}%).`);
   }
 
   if (target.hp <= 0) {
     const nextEnemy = b.enemies.find((e) => e.hp > 0);
     b.selectedTargetId = nextEnemy ? nextEnemy.id : null;
   }
+
   renderBattle();
 }
 
@@ -1126,10 +2139,13 @@ function reloadSelectedUnit() {
   const b = state.battle;
   if (!b || b.phase !== "player") return;
   const unit = getSelectedUnit();
-  if (!unit || unit.ap < 1) return;
+  if (!unit || unit.ap < 1) {
+    addBattleLog("Sem PA para recarregar.");
+    return;
+  }
   unit.ap -= 1;
   unit.ammo = unit.maxAmmo;
-  addBattleLog(`${unit.name} recarregou (${unit.ammo}/${unit.maxAmmo}).`);
+  addBattleLog(`${unit.name} recarregou a arma (${unit.ammo}/${unit.maxAmmo}).`);
   renderBattle();
 }
 
@@ -1137,10 +2153,13 @@ function overwatchSelectedUnit() {
   const b = state.battle;
   if (!b || b.phase !== "player") return;
   const unit = getSelectedUnit();
-  if (!unit || unit.ap < 1) return;
+  if (!unit || unit.ap < 1) {
+    addBattleLog("Sem PA para entrar em vigilância.");
+    return;
+  }
   unit.ap -= 1;
   unit.overwatch = true;
-  addBattleLog(`${unit.name} em VIGILÂNCIA.`);
+  addBattleLog(`${unit.name} entrou em VIGILÂNCIA.`);
   renderBattle();
 }
 
@@ -1148,10 +2167,13 @@ function hunkerSelectedUnit() {
   const b = state.battle;
   if (!b || b.phase !== "player") return;
   const unit = getSelectedUnit();
-  if (!unit || unit.ap < 1) return;
+  if (!unit || unit.ap < 1) {
+    addBattleLog("Sem PA para HUNKER DOWN.");
+    return;
+  }
   unit.ap -= 1;
   unit.hunker = true;
-  addBattleLog(`${unit.name} em HUNKER DOWN.`);
+  addBattleLog(`${unit.name} assumiu posição defensiva (HUNKER DOWN).`);
   renderBattle();
 }
 
@@ -1159,12 +2181,24 @@ function useMedkitSelectedUnit() {
   const b = state.battle;
   if (!b || b.phase !== "player") return;
   const unit = getSelectedUnit();
-  if (!unit || unit.ap < 1 || unit.medkits <= 0 || unit.hp >= unit.maxHp) return;
+  if (!unit || unit.ap < 1) {
+    addBattleLog("Sem PA para usar Kit Médico.");
+    return;
+  }
+  if (unit.medkits <= 0) {
+    addBattleLog(`${unit.name} não tem Kits Médicos.`);
+    return;
+  }
+  if (unit.hp >= unit.maxHp) {
+    addBattleLog(`${unit.name} já está com a vida máxima.`);
+    return;
+  }
+
   unit.ap -= 1;
   unit.medkits -= 1;
   const heal = unit.role === "Médico" ? 45 : 30;
   unit.hp = Math.min(unit.maxHp, unit.hp + heal);
-  addBattleLog(`${unit.name} recuperou ${heal} HP.`);
+  addBattleLog(`${unit.name} recuperou ${heal} HP com Kit Médico (${unit.hp}/${unit.maxHp}).`);
   renderBattle();
 }
 
@@ -1181,15 +2215,27 @@ function endPlayerTurn() {
   aliveEnemies.forEach((en) => {
     const aliveUnits = b.units.filter((u) => u.hp > 0);
     if (!aliveUnits.length) return;
+
     aliveUnits.sort((a, c) => (Math.abs(a.x - en.x) + Math.abs(a.y - en.y)) - (Math.abs(c.x - en.x) + Math.abs(c.y - en.y)));
     const target = aliveUnits[0];
     const dist = Math.abs(en.x - target.x) + Math.abs(en.y - target.y);
 
     if (dist > 2) {
       const stepX = en.x + Math.sign(target.x - en.x);
-      if (stepX >= 0 && stepX < GRID_W && b.grid[en.y][stepX] !== 3 && !b.units.some((u) => u.x === stepX && u.y === en.y && u.hp > 0)) {
+      const stepY = en.y;
+      if (stepX >= 0 && stepX < GRID_W && b.grid[stepY][stepX] !== 3 && !b.units.some((u) => u.x === stepX && u.y === stepY && u.hp > 0)) {
         en.x = stepX;
       }
+    }
+
+    const watcher = aliveUnits.find((u) => u.overwatch && u.ammo > 0);
+    if (watcher) {
+      watcher.overwatch = false;
+      watcher.ammo -= 1;
+      const owDmg = 20;
+      en.hp = Math.max(0, en.hp - owDmg);
+      addBattleLog(`${watcher.name} disparou em VIGILÂNCIA contra ${en.name} (-${owDmg} HP)!`);
+      if (en.hp <= 0) return;
     }
 
     const cover = getTileCoverAt(b, target.x, target.y);
@@ -1207,11 +2253,14 @@ function endPlayerTurn() {
       if (en.archetypeId === "psycher") target.stunned = true;
       addBattleLog(`${en.name} atingiu ${target.name} por ${dmg} HP!`);
     } else {
-      addBattleLog(`${en.name} falhou contra ${target.name}.`);
+      addBattleLog(`${en.name} disparou contra ${target.name}, mas falhou.`);
     }
   });
 
-  b.smokes = (b.smokes || []).map((s) => ({ ...s, turns: s.turns - 1 })).filter((s) => s.turns > 0);
+  b.smokes = (b.smokes || [])
+    .map((s) => ({ ...s, turns: s.turns - 1 }))
+    .filter((s) => s.turns > 0);
+
   if (checkBattleOutcome()) return;
 
   b.turn += 1;
@@ -1222,15 +2271,18 @@ function endPlayerTurn() {
       u.overwatch = false;
     }
   });
+
   const firstAlive = b.units.find((u) => u.hp > 0);
   if (firstAlive) b.selectedUnitId = firstAlive.id;
-  addBattleLog(`Turno ${b.turn} — Ordens da Unidade ZERO.`);
+
+  addBattleLog(`Turno ${b.turn} iniciado — Ordens da Unidade ZERO.`);
   renderBattle();
 }
 
 function checkBattleOutcome() {
   const b = state.battle;
   if (!b) return false;
+
   const anyEnemyAlive = b.enemies.some((e) => e.hp > 0);
   const anyUnitAlive = b.units.some((u) => u.hp > 0);
 
@@ -1238,14 +2290,19 @@ function checkBattleOutcome() {
     const mission = b.mission;
     const missionIndex = b.missionIndex;
     state.battle = null;
+
     state.credits += mission.rewards.credits || 0;
     state.materials += mission.rewards.materials || 0;
     state.alien += mission.rewards.alien || 0;
     state.metrics.research = Math.min(100, state.metrics.research + (mission.rewards.research || 0));
-    if (!state.completedMissions.includes(mission.id)) state.completedMissions.push(mission.id);
+
+    if (!state.completedMissions.includes(mission.id)) {
+      state.completedMissions.push(mission.id);
+    }
     if (missionIndex + 1 > state.currentMissionIndex && missionIndex + 1 < CAMPAIGN_MISSIONS.length) {
       state.currentMissionIndex = missionIndex + 1;
     }
+
     b.units.forEach((bu) => {
       const ro = state.roster.find((r) => r.id === bu.id);
       if (ro) {
@@ -1258,6 +2315,8 @@ function checkBattleOutcome() {
         }
       }
     });
+
+    setTacticalViewportLock(false);
     saveState();
     renderCommand();
     presentMissionChoiceModal(mission, missionIndex);
@@ -1273,32 +2332,48 @@ function checkBattleOutcome() {
         ro.hp = Math.max(20, Math.round(ro.maxHp * 0.4));
       }
     });
+    setTacticalViewportLock(false);
     saveState();
     renderCommand();
-    openModal(`<h3>OPERAÇÃO FALHADA</h3><p>A equipa recuou sob fogo pesado. A ameaça aumentou (+12%).</p><button class="primary" onclick="closeModal(); goToScreen('command');">REGRESSAR AO COMANDO</button>`);
+    openModal(`
+      <h3>OPERAÇÃO FALHADA</h3>
+      <p>A equipa recuou sob fogo pesado. A ameaça alienígena aumentou (+12%) e os operacionais necessitam de recuperação.</p>
+      <button class="primary" onclick="closeModal(); goToScreen('command');">REGRESSAR AO COMANDO</button>
+    `);
     return true;
   }
+
   return false;
 }
 
 function presentMissionChoiceModal(mission, missionIndex) {
   const ch = mission.choice;
   const numLabel = formatMissionNumber(mission.number);
+
   if (!ch) {
-    openModal(`<h3>MISSÃO CONCLUÍDA — ${mission.title.toUpperCase()}</h3><button class="primary" onclick="closeModal(); goToScreen('missions');">CONTINUAR</button>`);
+    openModal(`
+      <h3>MISSÃO CONCLUÍDA — ${mission.title.toUpperCase()}</h3>
+      <p>Recompensas recebidas: +${mission.rewards.credits} Créditos, +${mission.rewards.materials} Materiais.</p>
+      <button class="primary" onclick="closeModal(); goToScreen('missions');">CONTINUAR</button>
+    `);
     return;
   }
+
   const isFinalMission = missionIndex === CAMPAIGN_MISSIONS.length - 1 || Boolean(ch.optionA.finalTag);
-  const buildOptBtn = (opt) => {
+
+  const buildOptBtn = (key, opt) => {
     const encoded = encodeURIComponent(JSON.stringify(opt));
     return `<button class="primary full" style="margin-top:8px;" onclick="applyMissionChoice('${mission.id}', ${isFinalMission}, '${encoded}')">${opt.label}</button>`;
   };
-  let optsHtml = buildOptBtn(ch.optionA) + buildOptBtn(ch.optionB);
-  if (ch.optionC) optsHtml += buildOptBtn(ch.optionC);
+
+  let optsHtml = buildOptBtn("A", ch.optionA) + buildOptBtn("B", ch.optionB);
+  if (ch.optionC) {
+    optsHtml += buildOptBtn("C", ch.optionC);
+  }
 
   openModal(`
     <h3>VITÓRIA — ${numLabel}. ${mission.title.toUpperCase()}</h3>
-    <p>Recompensas: +${mission.rewards.credits} CR · +${mission.rewards.materials} MAT · +${mission.rewards.alien || 0} XENO</p>
+    <p>Recompensas: +${mission.rewards.credits} Créditos · +${mission.rewards.materials} Materiais · +${mission.rewards.alien || 0} Tec. Alienígena</p>
     <hr style="border-color:rgba(255,255,255,0.12);margin:10px 0;">
     <p><b>DECISÃO ESTRATÉGICA:</b> ${ch.prompt}</p>
     ${optsHtml}
@@ -1310,6 +2385,7 @@ function applyMissionChoice(missionId, isFinalMission, encodedOpt) {
   try {
     opt = JSON.parse(decodeURIComponent(encodedOpt));
   } catch (_) {}
+
   if (opt && opt.effects) {
     const e = opt.effects;
     state.metrics.trust = Math.max(0, Math.min(100, state.metrics.trust + (e.trust || 0)));
@@ -1320,14 +2396,23 @@ function applyMissionChoice(missionId, isFinalMission, encodedOpt) {
     if (e.materials) state.materials += e.materials;
     if (e.alien) state.alien += e.alien;
   }
+
   if (isFinalMission) {
     const ending = resolveCampaignEnding(state.metrics, opt ? opt.finalTag : null);
     state.lastEnding = ending;
     saveState();
     renderCommand();
-    openModal(`<h3>FINAL DA CAMPANHA — ${ending.title.toUpperCase()}</h3><p>${ending.summary}</p><button class="primary full" style="margin-top:10px;" onclick="closeModal(); goToScreen('command');">VOLTAR AO COMANDO</button>`);
+    openModal(`
+      <h3>FINAL DA CAMPANHA — ${ending.title.toUpperCase()}</h3>
+      <p>${ending.summary}</p>
+      <p style="font-size:0.85em;opacity:0.85;">
+        Indicadores finais — Confiança: ${state.metrics.trust} · Recursos: ${state.metrics.resources} · Investigação: ${state.metrics.research} · Ameaça: ${state.metrics.threat}
+      </p>
+      <button class="primary full" style="margin-top:10px;" onclick="closeModal(); goToScreen('command');">VOLTAR AO COMANDO</button>
+    `);
     return;
   }
+
   saveState();
   renderCommand();
   renderCampaignMissions();
@@ -1355,7 +2440,9 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   const closeModalBtn = document.getElementById("close-modal");
-  if (closeModalBtn) closeModalBtn.addEventListener("click", closeModal);
+  if (closeModalBtn) {
+    closeModalBtn.addEventListener("click", closeModal);
+  }
 
   const modalEl = document.getElementById("modal");
   if (modalEl) {
@@ -1390,6 +2477,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
       state.battle = null;
+      setTacticalViewportLock(false);
       state.metrics.threat = Math.min(100, state.metrics.threat + 6);
       saveState();
       goToScreen("command");
