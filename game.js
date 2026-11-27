@@ -644,10 +644,13 @@ function setTacticalViewportLock(active) {
       #tactical.active .battle-side {
         display: grid !important;
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
-        gap: 7px !important;
-        padding: 8px 10px 10px 10px !important;
-        background: rgba(6, 11, 17, 0.98) !important;
-        border-top: 1px solid rgba(78, 242, 161, 0.28) !important;
+        gap: 6px !important;
+        padding: 8px 10px 12px 10px !important;
+        background: linear-gradient(180deg, rgba(10, 18, 28, 0.94) 0%, rgba(5, 10, 16, 0.99) 100%) !important;
+        border-top: 1px solid rgba(78, 242, 161, 0.35) !important;
+        border-top-left-radius: 16px !important;
+        border-top-right-radius: 16px !important;
+        box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.65) !important;
         flex-shrink: 0 !important;
         width: 100% !important;
         max-width: 100% !important;
@@ -1228,7 +1231,7 @@ function startMission(mission, missionIndex = 0) {
   const medbayBonusKits = getBuildingLevel("b-medbay");
   const startPositions = missionIndex === 0
     ? [
-        [0, 5], [0, 6], [1, 2], [1, 9], [0, 4]
+        [0, 4], [1, 3], [0, 6], [2, 2], [1, 5]
       ]
     : [
         [0, 2], [0, 4], [0, 6], [0, 8], [1, 5]
@@ -1565,16 +1568,16 @@ function getIsoMetrics(canvas, ignoreBattlePan = false) {
   const zoom = getBattleZoom(b);
 
   const span = GRID_W + GRID_H;
-  const maxTileWByWidth = Math.floor(((w - 8) * 2.15) / span);
-  const maxTileWByHeight = Math.floor(((h - 22) * 4.35) / span);
-  const baseTileW = Math.max(26, Math.min(82, Math.min(maxTileWByWidth, maxTileWByHeight)));
-  const tileW = Math.max(16, baseTileW * zoom * 1.12);
+  const maxTileWByWidth = Math.floor(((w - 32) * 1.72) / span);
+  const maxTileWByHeight = Math.floor(((h - 150) * 3.15) / span);
+  const baseTileW = Math.max(20, Math.min(68, Math.min(maxTileWByWidth, maxTileWByHeight)));
+  const tileW = Math.max(16, baseTileW * zoom);
   const tileH = Math.max(8, tileW * 0.5);
-  const wallH = Math.max(5, tileH * 0.6);
+  const wallH = Math.max(5, tileH * 0.55);
 
   const boardPixelH = span * tileH * 0.5;
   const baseOriginX = w * 0.5 + (GRID_H - GRID_W) * (tileW * 0.25);
-  const baseOriginY = Math.max(18, Math.round((h - boardPixelH) * 0.46));
+  const baseOriginY = Math.max(52, Math.round((h - 108 - boardPixelH) * 0.45) + 16);
 
   const panX = (!ignoreBattlePan && b && typeof b.panX === "number") ? b.panX : 0;
   const panY = (!ignoreBattlePan && b && typeof b.panY === "number") ? b.panY : 0;
