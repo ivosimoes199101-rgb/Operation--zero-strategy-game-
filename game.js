@@ -574,116 +574,43 @@ function setTacticalViewportLock(active) {
         overscroll-behavior: none !important;
         display: flex !important;
         flex-direction: column !important;
-        justify-content: space-between !important;
         box-sizing: border-box !important;
-        padding: 6px 8px 8px 8px !important;
-        background: #070d14 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        background: #060b11 !important;
         z-index: 60 !important;
       }
-      #tactical.active .battle-top {
-        flex-shrink: 0 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: space-between !important;
-        padding: 0 0 2px 0 !important;
-        margin: 0 !important;
-        gap: 6px !important;
-      }
-      #tactical.active .battle-top .tag,
-      #tactical.active .battle-top .status-pill {
+      #tactical.active .battle-top,
+      #tactical.active .battle-info,
+      #tactical.active #battle-log,
+      #tactical.active .battle-side {
         display: none !important;
       }
-      #tactical.active .battle-top h2,
-      #tactical.active #battle-title {
-        font-size: 0.85em !important;
-        line-height: 1.15 !important;
-        margin: 0 !important;
-        letter-spacing: 0.5px !important;
-      }
-      #tactical.active .battle-info {
-        flex-shrink: 0 !important;
-        display: flex !important;
-        justify-content: space-between !important;
-        align-items: center !important;
-        gap: 6px !important;
-        font-size: 0.64em !important;
-        line-height: 1.15 !important;
-        padding: 2px 2px 4px 2px !important;
-        margin: 0 !important;
-      }
-      #tactical.active .battle-info span:first-child {
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-      }
-      #tactical.active .battle-info #turn-label {
-        flex-shrink: 0 !important;
-        color: #4ef2a1 !important;
-        font-weight: bold !important;
-      }
       #tactical.active .battle-main {
-        flex: 1 1 auto !important;
+        flex: 1 1 100% !important;
+        width: 100% !important;
+        height: 100% !important;
         min-height: 0 !important;
+        max-height: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
         display: flex !important;
         flex-direction: column !important;
-        justify-content: stretch !important;
         overflow: hidden !important;
         position: relative !important;
       }
       #tactical.active #oz-iso-stage {
-        flex: 1 1 auto !important;
-        min-height: 0 !important;
+        flex: 1 1 100% !important;
+        width: 100% !important;
         height: 100% !important;
+        min-height: 0 !important;
+        border: none !important;
+        border-radius: 0 !important;
       }
       #tactical.active #battle-grid {
         touch-action: none !important;
         user-select: none !important;
         -webkit-user-select: none !important;
-      }
-      #tactical.active #battle-log {
-        flex-shrink: 0 !important;
-        max-height: 28px !important;
-        overflow-y: auto !important;
-        font-size: 0.68em !important;
-        line-height: 1.2 !important;
-        padding: 3px 6px !important;
-        margin-top: 4px !important;
-      }
-      #tactical.active .battle-side {
-        flex-shrink: 0 !important;
-        display: grid !important;
-        grid-template-columns: 1fr 1fr !important;
-        gap: 4px !important;
-        margin-top: 4px !important;
-      }
-      #tactical.active .battle-side .side-panel:nth-of-type(1),
-      #tactical.active .battle-side .side-panel:nth-of-type(2) {
-        min-width: 0 !important;
-        font-size: 0.64em !important;
-        line-height: 1.2 !important;
-        padding: 4px 6px !important;
-        margin: 0 !important;
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-      }
-      #tactical.active #oz-bottom-actions {
-        grid-column: 1 / -1 !important;
-        display: flex !important;
-        gap: 6px !important;
-        margin-top: 2px !important;
-      }
-      #tactical.active #oz-bottom-actions #end-turn {
-        flex: 2 1 0 !important;
-        margin: 0 !important;
-        padding: 7px 10px !important;
-        font-size: 0.76em !important;
-      }
-      #tactical.active #oz-bottom-actions #retreat {
-        flex: 1 1 0 !important;
-        margin: 0 !important;
-        padding: 7px 8px !important;
-        font-size: 0.72em !important;
       }
     `;
     document.head.appendChild(styleEl);
@@ -1365,22 +1292,24 @@ function addBattleLog(msg) {
   state.battle.log = msg;
   const logEl = document.getElementById("battle-log");
   if (logEl) logEl.textContent = msg;
+  const liveLogEl = document.getElementById("iso-live-log");
+  if (liveLogEl) liveLogEl.textContent = msg;
 }
 
 // --- GEOMETRIA ISOMÉTRICA XCOM (2:1) ---
 function getIsoMetrics(canvas) {
   const rect = canvas.getBoundingClientRect();
-  const w = Math.max(300, rect.width || canvas.parentElement?.clientWidth || 360);
-  const h = Math.max(240, rect.height || 360);
+  const w = Math.max(320, rect.width || canvas.parentElement?.clientWidth || window.innerWidth || 360);
+  const h = Math.max(420, rect.height || canvas.parentElement?.clientHeight || window.innerHeight || 640);
 
-  const maxTileWByWidth = Math.floor((w - 16) / ISO_VIEW_W);
-  const maxTileWByHeight = Math.floor(((h - 44) / ISO_VIEW_H) * 2);
-  const tileW = Math.max(44, Math.min(76, Math.min(maxTileWByWidth, maxTileWByHeight)));
+  const maxTileWByWidth = Math.floor((w + 24) / ISO_VIEW_W);
+  const maxTileWByHeight = Math.floor(((h * 0.72) / ISO_VIEW_H) * 2);
+  const tileW = Math.max(54, Math.min(96, Math.max(maxTileWByWidth, Math.min(maxTileWByWidth, maxTileWByHeight))));
   const tileH = Math.round(tileW * 0.5);
-  const wallH = Math.max(8, Math.round(tileH * 0.45));
+  const wallH = Math.max(10, Math.round(tileH * 0.52));
   const originX = w * 0.5;
   const boardPixelH = ISO_VIEW_W * tileH;
-  const originY = Math.max(28, Math.round((h - boardPixelH) * 0.34));
+  const originY = Math.max(68, Math.round((h - boardPixelH) * 0.38));
 
   return { w, h, tileW, tileH, wallH, originX, originY };
 }
@@ -2071,49 +2000,136 @@ function renderBattle() {
   const canvas = ensureIsoCanvasStage(gridEl);
 
   if (canvas && canvas.parentElement) {
-    let squadBar = document.getElementById("iso-squad-strip");
-    if (!squadBar) {
-      squadBar = document.createElement("div");
-      squadBar.id = "iso-squad-strip";
-      squadBar.style.cssText = `
+    const stageParent = canvas.parentElement;
+
+    let topHud = document.getElementById("iso-top-hud");
+    if (!topHud) {
+      topHud = document.createElement("div");
+      topHud.id = "iso-top-hud";
+      topHud.style.cssText = `
         position:absolute;
-        top:6px;
+        top:8px;
+        left:8px;
         right:8px;
-        z-index:15;
+        z-index:16;
         display:flex;
-        flex-wrap:wrap;
-        gap:4px;
-        max-width:64%;
-        justify-content:flex-end;
+        align-items:flex-start;
+        justify-content:space-between;
+        gap:8px;
+        pointer-events:none;
       `;
-      canvas.parentElement.appendChild(squadBar);
+      stageParent.appendChild(topHud);
     }
-    squadBar.innerHTML = "";
-    b.units.filter((u) => u.hp > 0).forEach((u) => {
-      const isAct = b.selectedUnitId === u.id;
-      const chip = document.createElement("button");
-      chip.type = "button";
-      chip.textContent = `${u.name.split(" ")[0]} · ${u.ap}PA`;
-      chip.style.cssText = `
-        font-size:0.65em;
-        padding:2px 6px;
-        border-radius:999px;
-        border:1px solid ${isAct ? "#4ef2a1" : u.ap > 0 ? "rgba(125,211,252,0.45)" : "rgba(148,163,184,0.25)"};
-        background:${isAct ? "rgba(78,242,161,0.24)" : "rgba(9,17,26,0.84)"};
-        color:${isAct ? "#ecfdf5" : "#cbd5e1"};
-        cursor:pointer;
-      `;
-      chip.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        if (b.phase !== "player") return;
-        b.selectedUnitId = isAct ? null : u.id;
-        b.mode = "normal";
-        if (!isAct) centerCameraOnUnit(u);
-        addBattleLog(isAct ? `Ordens de ${u.name} recolhidas.` : `Operacional selecionado: ${u.name}.`);
-        renderBattle();
+
+    const selUForHud = getSelectedUnit();
+    const selEForHud = getSelectedEnemy();
+    const tgtText = selEForHud
+      ? `${selEForHud.name} (${selEForHud.hp}HP${selUForHud ? ` · ${calculateHitChance(selUForHud, selEForHud, b)}%` : ""})`
+      : "SEM ALVO";
+
+    topHud.innerHTML = `
+      <div style="pointer-events:auto;background:rgba(7,14,22,0.78);backdrop-filter:blur(6px);border:1px solid rgba(78,242,161,0.35);border-radius:10px;padding:6px 9px;max-width:44%;">
+        <div style="font-size:0.68em;font-weight:bold;letter-spacing:0.6px;color:#4ef2a1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+          ${formatMissionNumber(b.mission.number)}. ${b.mission.title.toUpperCase()} · T${b.turn}
+        </div>
+        <div style="font-size:0.62em;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">
+          ${selUForHud ? `${selUForHud.name.split(" ")[0]}: ${selUForHud.hp}HP · ${selUForHud.ap}PA · ${selUForHud.ammo}M` : `ALVO: ${tgtText}`}
+        </div>
+      </div>
+      <div id="iso-squad-strip" style="pointer-events:auto;display:flex;flex-wrap:wrap;gap:4px;max-width:54%;justify-content:flex-end;"></div>
+    `;
+
+    const squadBar = document.getElementById("iso-squad-strip");
+    if (squadBar) {
+      b.units.filter((u) => u.hp > 0).forEach((u) => {
+        const isAct = b.selectedUnitId === u.id;
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.textContent = `${u.name.split(" ")[0]} · ${u.ap}PA`;
+        chip.style.cssText = `
+          font-size:0.64em;
+          font-weight:bold;
+          padding:4px 7px;
+          border-radius:999px;
+          border:1px solid ${isAct ? "#4ef2a1" : u.ap > 0 ? "rgba(125,211,252,0.55)" : "rgba(148,163,184,0.25)"};
+          background:${isAct ? "rgba(78,242,161,0.28)" : "rgba(7,14,22,0.82)"};
+          color:${isAct ? "#ecfdf5" : "#e2e8f0"};
+          cursor:pointer;
+        `;
+        chip.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          if (b.phase !== "player") return;
+          b.selectedUnitId = isAct ? null : u.id;
+          b.mode = "normal";
+          b.ordersMinimized = false;
+          if (!isAct) centerCameraOnUnit(u);
+          addBattleLog(isAct ? `Ordens de ${u.name} recolhidas.` : `Operacional selecionado: ${u.name}.`);
+          renderBattle();
+        });
+        squadBar.appendChild(chip);
       });
-      squadBar.appendChild(chip);
-    });
+    }
+
+    let bottomHud = document.getElementById("iso-bottom-hud");
+    if (!bottomHud) {
+      bottomHud = document.createElement("div");
+      bottomHud.id = "iso-bottom-hud";
+      bottomHud.style.cssText = `
+        position:absolute;
+        bottom:8px;
+        left:8px;
+        right:8px;
+        z-index:16;
+        display:flex;
+        align-items:flex-end;
+        justify-content:space-between;
+        gap:8px;
+        pointer-events:none;
+      `;
+      stageParent.appendChild(bottomHud);
+    }
+
+    bottomHud.innerHTML = `
+      <div style="pointer-events:auto;flex:1 1 auto;min-width:0;background:rgba(7,14,22,0.80);backdrop-filter:blur(6px);border:1px solid rgba(148,163,184,0.28);border-radius:10px;padding:6px 9px;">
+        <div style="font-size:0.62em;color:#fde047;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+          ALVO: ${tgtText}
+        </div>
+        <div id="iso-live-log" style="font-size:0.66em;color:#f1f5f9;line-height:1.25;margin-top:2px;max-height:28px;overflow:hidden;">
+          ${b.log || ""}
+        </div>
+      </div>
+      <div style="pointer-events:auto;display:flex;flex-direction:column;gap:5px;flex-shrink:0;">
+        <button type="button" id="iso-end-turn-btn" ${b.phase !== "player" ? "disabled" : ""} style="background:#84cc16;color:#071108;border:none;border-radius:9px;padding:8px 12px;font-size:0.72em;font-weight:800;letter-spacing:0.5px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,0.45);">
+          TERMINAR TURNO
+        </button>
+        <button type="button" id="iso-retreat-btn" style="background:rgba(15,23,42,0.88);color:#e2e8f0;border:1px solid rgba(148,163,184,0.35);border-radius:9px;padding:5px 10px;font-size:0.64em;font-weight:700;cursor:pointer;">
+          ABORTAR
+        </button>
+      </div>
+    `;
+
+    const isoEndBtn = document.getElementById("iso-end-turn-btn");
+    if (isoEndBtn) {
+      isoEndBtn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        endPlayerTurn();
+      });
+    }
+    const isoRetreatBtn = document.getElementById("iso-retreat-btn");
+    if (isoRetreatBtn) {
+      isoRetreatBtn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        if (!state.battle) {
+          goToScreen("command");
+          return;
+        }
+        state.battle = null;
+        setTacticalViewportLock(false);
+        state.metrics.threat = Math.min(100, state.metrics.threat + 6);
+        saveState();
+        goToScreen("command");
+      });
+    }
   }
   const selUnit = getSelectedUnit();
   const selEnemy = getSelectedEnemy();
