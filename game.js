@@ -574,6 +574,54 @@ function setTacticalViewportLock(active) {
     styleEl = document.createElement("style");
     styleEl.id = "tactical-fixed-viewport-style";
     styleEl.textContent = `
+      /* === ADAPTAÇÃO RESPONSIVA 100% ECRÃ (TELEMÓVEIS + DESKTOP) === */
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        min-height: 100dvh !important;
+        overflow-x: hidden !important;
+        box-sizing: border-box !important;
+        background: #060b11 !important;
+        -webkit-text-size-adjust: 100%;
+      }
+      *, *::before, *::after {
+        box-sizing: border-box !important;
+      }
+      .container, .wrap, .app, .page, main {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding-left: max(12px, env(safe-area-inset-left)) !important;
+        padding-right: max(12px, env(safe-area-inset-right)) !important;
+      }
+      .screen.active {
+        width: 100% !important;
+        min-height: calc(100dvh - 54px) !important;
+      }
+      #oz-fullscreen-toggle-btn {
+        position: fixed;
+        bottom: max(12px, env(safe-area-inset-bottom));
+        right: max(12px, env(safe-area-inset-right));
+        z-index: 9998;
+        background: rgba(11, 20, 31, 0.92);
+        color: #4ef2a1;
+        border: 1px solid rgba(78, 242, 161, 0.55);
+        border-radius: 999px;
+        padding: 8px 13px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: clamp(0.72rem, 2.4vw, 0.82rem);
+        font-weight: 800;
+        letter-spacing: 0.5px;
+        cursor: pointer;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.65);
+        backdrop-filter: blur(6px);
+      }
+      body.tactical-locked #oz-fullscreen-toggle-btn {
+        display: none !important;
+      }
+
+      /* === MODO TÁTICO FULL-VIEWPORT (SEM ESPAÇOS PRETOS NEM SCROLL) === */
       html.tactical-locked, body.tactical-locked {
         overflow: hidden !important;
         overscroll-behavior: none !important;
@@ -581,6 +629,8 @@ function setTacticalViewportLock(active) {
         width: 100vw !important;
         margin: 0 !important;
         padding: 0 !important;
+        position: fixed !important;
+        inset: 0 !important;
       }
       body.tactical-locked > header,
       body.tactical-locked .topbar,
@@ -593,10 +643,6 @@ function setTacticalViewportLock(active) {
       body.tactical-locked #tactical.active,
       #tactical.active {
         position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        right: 0 !important;
-        bottom: 0 !important;
         inset: 0 !important;
         width: 100vw !important;
         height: 100vh !important;
@@ -607,7 +653,7 @@ function setTacticalViewportLock(active) {
         overscroll-behavior: none !important;
         display: flex !important;
         flex-direction: column !important;
-        box-sizing: border-box !important;
+        justify-content: stretch !important;
         padding: 0 !important;
         margin: 0 !important;
         background: #060b11 !important;
@@ -626,26 +672,52 @@ function setTacticalViewportLock(active) {
         position: static !important;
         max-width: none !important;
         width: 100% !important;
+        height: 100% !important;
         padding: 0 !important;
         margin: 0 !important;
       }
       #tactical.active .battle-top,
-      #tactical.active .battle-info {
-        display: none !important;
-      }
-      body.tactical-locked > *:not(#tactical):not(#modal) {
-        display: none !important;
-      }
+      #tactical.active .battle-info,
       #tactical.active .section-head,
       #tactical.active .battle-header,
       #tactical.active .tactical-header {
         display: none !important;
       }
+      body.tactical-locked > *:not(#tactical):not(#modal) {
+        display: none !important;
+      }
+      #tactical.active .battle-main {
+        flex: 1 1 auto !important;
+        width: 100% !important;
+        height: 100% !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden !important;
+        position: relative !important;
+      }
+      #tactical.active #oz-iso-stage {
+        flex: 1 1 100% !important;
+        width: 100% !important;
+        height: 100% !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        border-radius: 0 !important;
+      }
+      #tactical.active #iso-battle-canvas {
+        width: 100% !important;
+        height: 100% !important;
+        display: block !important;
+      }
       #tactical.active .battle-side {
         display: grid !important;
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
-        gap: 5px !important;
-        padding: 6px 8px 8px 8px !important;
+        gap: clamp(4px, 1vw, 8px) !important;
+        padding: 6px max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)) !important;
         background: linear-gradient(180deg, rgba(10, 18, 28, 0.96) 0%, rgba(5, 10, 16, 1) 100%) !important;
         border-top: 1px solid rgba(78, 242, 161, 0.38) !important;
         border-top-left-radius: 12px !important;
@@ -654,7 +726,6 @@ function setTacticalViewportLock(active) {
         flex: 0 0 auto !important;
         width: 100% !important;
         max-width: 100% !important;
-        box-sizing: border-box !important;
         overflow: hidden !important;
         z-index: 20 !important;
       }
@@ -665,14 +736,14 @@ function setTacticalViewportLock(active) {
         border: 1px solid rgba(148, 163, 184, 0.26) !important;
         border-left: 4px solid #4ef2a1 !important;
         border-radius: 7px !important;
-        padding: 7px 10px !important;
+        padding: 6px 10px !important;
         margin: 0 !important;
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
-        font-size: clamp(0.76rem, 2.8vw, 0.88rem) !important;
-        line-height: 1.32 !important;
+        font-size: clamp(0.74rem, 2.4vw, 0.86rem) !important;
+        line-height: 1.28 !important;
         color: #e2e8f0 !important;
-        min-height: 2.5em !important;
-        max-height: 4.2em !important;
+        min-height: 2.2em !important;
+        max-height: 3.6em !important;
         overflow-y: auto !important;
         word-break: break-word !important;
       }
@@ -680,35 +751,34 @@ function setTacticalViewportLock(active) {
         background: rgba(11, 18, 27, 0.97) !important;
         border: 1px solid rgba(148, 163, 184, 0.26) !important;
         border-radius: 7px !important;
-        padding: 8px 9px !important;
+        padding: 6px 9px !important;
         margin: 0 !important;
         min-width: 0 !important;
         max-width: 100% !important;
         overflow: hidden !important;
-        box-sizing: border-box !important;
         font-size: 0 !important;
-        line-height: 1.25 !important;
+        line-height: 1.22 !important;
       }
       #tactical.active .battle-side .side-panel:nth-of-type(3) {
         display: none !important;
       }
       #tactical.active #selected-unit,
       #tactical.active #target-info {
-        font-size: clamp(0.78rem, 2.9vw, 0.92rem) !important;
+        font-size: clamp(0.75rem, 2.5vw, 0.9rem) !important;
         font-weight: 800 !important;
-        line-height: 1.22 !important;
+        line-height: 1.2 !important;
         white-space: nowrap !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
         display: block !important;
-        margin-bottom: 4px !important;
+        margin-bottom: 3px !important;
       }
       #tactical.active #unit-hp,
       #tactical.active #unit-ap,
       #tactical.active #unit-ammo,
       #tactical.active #hit-chance {
-        font-size: clamp(0.7rem, 2.5vw, 0.8rem) !important;
-        line-height: 1.25 !important;
+        font-size: clamp(0.68rem, 2.2vw, 0.8rem) !important;
+        line-height: 1.22 !important;
         white-space: nowrap !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
@@ -732,48 +802,48 @@ function setTacticalViewportLock(active) {
         color: #071108 !important;
         border: none !important;
         border-radius: 7px !important;
-        padding: 11px 12px !important;
-        font-size: clamp(0.82rem, 3vw, 0.96rem) !important;
+        padding: clamp(9px, 2.2vh, 12px) 12px !important;
+        font-size: clamp(0.8rem, 2.6vw, 0.95rem) !important;
         font-weight: 800 !important;
         letter-spacing: 0.5px !important;
         white-space: nowrap !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
+        cursor: pointer !important;
       }
       #tactical.active #retreat {
         background: #17202a !important;
         color: #e2e8f0 !important;
         border: 1px solid rgba(148, 163, 184, 0.32) !important;
         border-radius: 7px !important;
-        padding: 11px 10px !important;
-        font-size: clamp(0.78rem, 2.8vw, 0.9rem) !important;
+        padding: clamp(9px, 2.2vh, 12px) 10px !important;
+        font-size: clamp(0.76rem, 2.4vw, 0.88rem) !important;
         font-weight: 700 !important;
         line-height: 1.15 !important;
         letter-spacing: 0.4px !important;
-      }
-      #tactical.active .battle-main {
-        flex: 1 1 auto !important;
-        width: 100% !important;
-        min-height: 0 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        display: flex !important;
-        flex-direction: column !important;
-        overflow: hidden !important;
-        position: relative !important;
-      }
-      #tactical.active #oz-iso-stage {
-        flex: 1 1 100% !important;
-        width: 100% !important;
-        height: 100% !important;
-        min-height: 0 !important;
-        border: none !important;
-        border-radius: 0 !important;
+        cursor: pointer !important;
       }
       #tactical.active #battle-grid {
         touch-action: none !important;
         user-select: none !important;
         -webkit-user-select: none !important;
+      }
+
+      /* === LAYOUT DESKTOP / ECRÃS LARGOS (>= 900px) === */
+      @media (min-width: 900px) {
+        #tactical.active .battle-side {
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(240px, 0.95fr) !important;
+          align-items: center !important;
+          padding: 8px 16px 10px 16px !important;
+        }
+        #tactical.active #battle-log {
+          grid-column: 1 / -1 !important;
+          max-height: 2.8em !important;
+        }
+        #tactical.active #oz-bottom-actions {
+          grid-column: auto !important;
+          margin-top: 0 !important;
+        }
       }
     `;
     document.head.appendChild(styleEl);
@@ -1559,23 +1629,26 @@ function resetBattleView() {
 
 function getIsoMetrics(canvas, ignoreBattlePan = false) {
   const rect = canvas.getBoundingClientRect();
-  const w = Math.max(320, rect.width || canvas.parentElement?.clientWidth || window.innerWidth || 360);
-  const h = Math.max(260, rect.height || canvas.parentElement?.clientHeight || window.innerHeight || 420);
+  const w = Math.max(280, rect.width || canvas.parentElement?.clientWidth || window.innerWidth || 360);
+  const h = Math.max(220, rect.height || canvas.parentElement?.clientHeight || window.innerHeight || 420);
 
   const b = state.battle;
   const zoom = getBattleZoom(b);
 
   const span = GRID_W + GRID_H;
-  const maxTileWByWidth = Math.floor(((w - 20) * 1.92) / span);
-  const maxTileWByHeight = Math.floor(((h - 90) * 3.65) / span);
-  const baseTileW = Math.max(24, Math.min(78, Math.min(maxTileWByWidth, maxTileWByHeight)));
+  const isLandscape = w > h;
+  const maxTileWByWidth = Math.floor(((w - 16) * 1.96) / span);
+  const maxTileWByHeight = Math.floor(((h - (isLandscape ? 64 : 78)) * 3.85) / span);
+  const upperCap = isLandscape ? 110 : 88;
+  const baseTileW = Math.max(22, Math.min(upperCap, Math.min(maxTileWByWidth, maxTileWByHeight)));
   const tileW = Math.max(18, baseTileW * zoom);
   const tileH = Math.max(9, tileW * 0.5);
   const wallH = Math.max(5, tileH * 0.58);
 
   const boardPixelH = span * tileH * 0.5;
   const baseOriginX = w * 0.5 + (GRID_H - GRID_W) * (tileW * 0.25);
-  const baseOriginY = Math.max(54, Math.round((h - boardPixelH) * 0.48) + 6);
+  const topOffset = isLandscape ? 42 : 48;
+  const baseOriginY = Math.max(topOffset, Math.round((h - boardPixelH) * 0.5) + 4);
 
   const panX = (!ignoreBattlePan && b && typeof b.panX === "number") ? b.panX : 0;
   const panY = (!ignoreBattlePan && b && typeof b.panY === "number") ? b.panY : 0;
@@ -2409,6 +2482,7 @@ function _renderBattleInner(b) {
           <button type="button" id="iso-pan-up" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.3);border-radius:5px;padding:2px 5px;font-size:0.64em;cursor:pointer;">▲</button>
           <button type="button" id="iso-pan-down" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.3);border-radius:5px;padding:2px 5px;font-size:0.64em;cursor:pointer;">▼</button>
           <button type="button" id="iso-pan-right" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.3);border-radius:5px;padding:2px 5px;font-size:0.64em;cursor:pointer;">▶</button>
+          <button type="button" id="iso-fullscreen-btn" title="Alternar Ecrã Inteiro" style="background:rgba(15,23,42,0.92);color:#4ef2a1;border:1px solid rgba(78,242,161,0.45);border-radius:5px;padding:2px 6px;font-size:0.64em;font-weight:bold;cursor:pointer;">⛶</button>
         </div>
       </div>
       <div id="iso-squad-strip" style="pointer-events:auto;display:flex;flex-wrap:wrap;gap:5px;max-width:50%;justify-content:flex-end;"></div>
@@ -2437,6 +2511,8 @@ function _renderBattleInner(b) {
     if (panRightBtn) panRightBtn.addEventListener("click", (ev) => { ev.stopPropagation(); nudgePan(-48, 0); });
     if (panUpBtn) panUpBtn.addEventListener("click", (ev) => { ev.stopPropagation(); nudgePan(0, 40); });
     if (panDownBtn) panDownBtn.addEventListener("click", (ev) => { ev.stopPropagation(); nudgePan(0, -40); });
+    const fsIsoBtn = topHud.querySelector("#iso-fullscreen-btn");
+    if (fsIsoBtn) fsIsoBtn.addEventListener("click", (ev) => { ev.stopPropagation(); toggleGameFullscreen(); });
 
     const squadBar = document.getElementById("iso-squad-strip");
     if (squadBar) {
@@ -3338,7 +3414,64 @@ function applyMissionChoice(missionId, isFinalMission, encodedOpt) {
 // 7. INICIALIZAÇÃO DE EVENTOS
 // ---------------------------------------------------------------------------
 
+
+function toggleGameFullscreen() {
+  const docEl = document.documentElement;
+  const isFs = Boolean(
+    document.fullscreenElement ||
+    document.webkitFullscreenElement ||
+    document.msFullscreenElement
+  );
+  try {
+    if (!isFs) {
+      if (docEl.requestFullscreen) {
+        docEl.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
+      } else if (docEl.webkitRequestFullscreen) {
+        docEl.webkitRequestFullscreen();
+      } else if (docEl.msRequestFullscreen) {
+        docEl.msRequestFullscreen();
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      } else if (document.msExitFullscreen) {
+        document.msExitFullscreen();
+      }
+    }
+  } catch (_) {}
+}
+
+function ensureGlobalResponsiveShell() {
+  setTacticalViewportLock(Boolean(state.battle && document.getElementById("tactical")?.classList.contains("active")));
+  if (!document.getElementById("oz-fullscreen-toggle-btn") && document.body) {
+    const fsBtn = document.createElement("button");
+    fsBtn.id = "oz-fullscreen-toggle-btn";
+    fsBtn.type = "button";
+    fsBtn.textContent = "⛶ ECRÃ INTEIRO";
+    fsBtn.addEventListener("click", toggleGameFullscreen);
+    document.body.appendChild(fsBtn);
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
+  ensureGlobalResponsiveShell();
+  let resizeTimer = null;
+  const handleViewportChange = () => {
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (state.battle) {
+        const canvas = document.getElementById("iso-battle-canvas");
+        if (canvas) clampBattlePan(state.battle, getIsoMetrics(canvas, true));
+        renderBattle();
+      }
+    }, 60);
+  };
+  window.addEventListener("resize", handleViewportChange);
+  window.addEventListener("orientationchange", handleViewportChange);
+  document.addEventListener("fullscreenchange", handleViewportChange);
+  document.addEventListener("webkitfullscreenchange", handleViewportChange);
   syncUnitStatsWithBase();
   renderCommand();
   renderSquad();
