@@ -574,18 +574,35 @@ function setTacticalViewportLock(active) {
         padding: 8px 10px !important;
         z-index: 20 !important;
       }
-      #tactical.active .battle-top,
+      #tactical.active .battle-top {
+        flex-shrink: 0 !important;
+        padding: 2px 0 !important;
+        gap: 4px !important;
+      }
+      #tactical.active .battle-top h2,
+      #tactical.active .battle-top #turn-label {
+        font-size: 0.82em !important;
+        margin: 0 !important;
+      }
       #tactical.active .battle-info {
         flex-shrink: 0 !important;
+        font-size: 0.68em !important;
+        padding: 2px 4px !important;
+        margin: 0 !important;
       }
       #tactical.active .battle-main {
         flex: 1 1 auto !important;
         min-height: 0 !important;
         display: flex !important;
         flex-direction: column !important;
-        justify-content: center !important;
+        justify-content: stretch !important;
         overflow: hidden !important;
         position: relative !important;
+      }
+      #tactical.active #oz-iso-stage {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        height: 100% !important;
       }
       #tactical.active #battle-grid {
         touch-action: none !important;
@@ -594,32 +611,41 @@ function setTacticalViewportLock(active) {
       }
       #tactical.active #battle-log {
         flex-shrink: 0 !important;
-        max-height: 54px !important;
+        max-height: 30px !important;
         overflow-y: auto !important;
-        font-size: 0.78em !important;
+        font-size: 0.7em !important;
+        line-height: 1.2 !important;
+        padding: 3px 6px !important;
+        margin-top: 4px !important;
       }
       #tactical.active .battle-side {
         flex-shrink: 0 !important;
         display: flex !important;
         flex-direction: row !important;
-        flex-wrap: wrap !important;
+        flex-wrap: nowrap !important;
         align-items: center !important;
         justify-content: space-between !important;
-        gap: 6px !important;
-        margin-top: 6px !important;
+        gap: 4px !important;
+        margin-top: 4px !important;
       }
       #tactical.active .battle-side .side-panel:nth-of-type(1),
       #tactical.active .battle-side .side-panel:nth-of-type(2) {
-        flex: 1 1 45% !important;
-        font-size: 0.72em !important;
-        padding: 5px 7px !important;
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+        font-size: 0.65em !important;
+        line-height: 1.15 !important;
+        padding: 3px 5px !important;
         margin: 0 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
       }
       #tactical.active #end-turn {
-        flex: 1 1 100% !important;
-        margin-top: 2px !important;
-        padding: 7px 10px !important;
-        font-size: 0.82em !important;
+        flex: 0 0 auto !important;
+        margin-top: 0 !important;
+        padding: 5px 8px !important;
+        font-size: 0.72em !important;
+        white-space: nowrap !important;
       }
     `;
     document.head.appendChild(styleEl);
@@ -1071,6 +1097,7 @@ function startMission(mission, missionIndex = 0) {
     camera: { x: 2, y: 1 },
     grid: createMissionMap(missionIndex),
     smokes: [],
+    hoverTile: null,
     units,
     enemies,
     selectedUnitId: null,
@@ -1222,16 +1249,16 @@ function addBattleLog(msg) {
 function getIsoMetrics(canvas) {
   const rect = canvas.getBoundingClientRect();
   const w = Math.max(300, rect.width || canvas.parentElement?.clientWidth || 360);
-  const h = Math.max(220, rect.height || 300);
+  const h = Math.max(240, rect.height || 360);
 
-  const maxTileWByWidth = Math.floor((w - 24) / ISO_VIEW_W);
-  const maxTileWByHeight = Math.floor(((h - 62) / ISO_VIEW_H) * 2);
-  const tileW = Math.max(40, Math.min(68, Math.min(maxTileWByWidth, maxTileWByHeight)));
+  const maxTileWByWidth = Math.floor((w - 16) / ISO_VIEW_W);
+  const maxTileWByHeight = Math.floor(((h - 44) / ISO_VIEW_H) * 2);
+  const tileW = Math.max(44, Math.min(76, Math.min(maxTileWByWidth, maxTileWByHeight)));
   const tileH = Math.round(tileW * 0.5);
-  const wallH = Math.max(8, Math.round(tileH * 0.44));
+  const wallH = Math.max(8, Math.round(tileH * 0.45));
   const originX = w * 0.5;
   const boardPixelH = ISO_VIEW_W * tileH;
-  const originY = Math.max(42, Math.round((h - boardPixelH) * 0.36));
+  const originY = Math.max(28, Math.round((h - boardPixelH) * 0.34));
 
   return { w, h, tileW, tileH, wallH, originX, originY };
 }
@@ -1546,6 +1573,33 @@ function ensureIsoCanvasStage(gridEl) {
       startClientY = ev.clientY;
       lastClientX = ev.clientX;
       lastClientY = ev.clientY;
+    });
+
+    canvas.addEventListener("pointermove", (ev) => {
+      if (!state.battle) return;
+      if (state.battle.mode === "frag" || state.battle.mode === "smoke") {
+        const rect = canvas.getBoundingClientRect();
+        const px = ev.clientX - rect.left;
+        const py = ev.clientY - rect.top;
+        const m = getIsoMetrics(canvas);
+        const hit = isoToWorld(px, py, state.battle, m);
+        const prev = state.battle.hoverTile;
+        const same = (!prev && !hit) || (prev && hit && prev.x === hit.x && prev.y === hit.y);
+        if (!same) {
+          state.battle.hoverTile = hit;
+          renderBattle();
+        }
+      } else if (state.battle.hoverTile) {
+        state.battle.hoverTile = null;
+        renderBattle();
+      }
+    });
+
+    canvas.addEventListener("pointerleave", () => {
+      if (state.battle && state.battle.hoverTile) {
+        state.battle.hoverTile = null;
+        renderBattle();
+      }
     });
 
     window.addEventListener("pointermove", (ev) => {
@@ -2005,6 +2059,40 @@ function renderBattle() {
             ctx.fillText(cCov === 2 ? "▲" : "▪", sx, sy + 2.5);
           }
         }
+
+        if (b.hoverTile && (b.mode === "frag" || b.mode === "smoke")) {
+          const hx = b.hoverTile.x;
+          const hy = b.hoverTile.y;
+          if (b.mode === "frag") {
+            if (Math.abs(gx - hx) <= 1 && Math.abs(gy - hy) <= 1) {
+              const isCenter = gx === hx && gy === hy;
+              drawIsoDiamond(
+                ctx,
+                sx,
+                sy,
+                m.tileW,
+                m.tileH,
+                isCenter ? "rgba(239, 68, 68, 0.42)" : "rgba(251, 146, 60, 0.28)",
+                isCenter ? "#ff4d4d" : "#fb923c",
+                isCenter ? 1.8 : 1.3
+              );
+            }
+          } else if (b.mode === "smoke") {
+            if (gy === hy && Math.abs(gx - hx) <= 1) {
+              const isCenter = gx === hx;
+              drawIsoDiamond(
+                ctx,
+                sx,
+                sy,
+                m.tileW,
+                m.tileH,
+                isCenter ? "rgba(226, 232, 240, 0.44)" : "rgba(148, 163, 184, 0.28)",
+                "#f8fafc",
+                isCenter ? 1.8 : 1.3
+              );
+            }
+          }
+        }
       }
     }
 
@@ -2141,6 +2229,7 @@ function renderBattle() {
         cBtn.addEventListener("click", (ev) => {
           ev.stopPropagation();
           b.mode = "normal";
+          b.hoverTile = null;
           b.ordersMinimized = false;
           renderBattle();
         });
@@ -2281,6 +2370,7 @@ function throwFragGrenade(unit, tx, ty) {
   unit.ap -= 1;
   unit.frags -= 1;
   b.mode = "normal";
+  b.hoverTile = null;
   b.ordersMinimized = false;
 
   const radius = 1;
@@ -2323,6 +2413,7 @@ function throwSmokeGrenade(unit, tx, ty) {
   unit.ap -= 1;
   unit.smokes -= 1;
   b.mode = "normal";
+  b.hoverTile = null;
   b.ordersMinimized = false;
 
   b.smokes.push({ x: tx, y: ty, turns: 2 });
