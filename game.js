@@ -564,11 +564,21 @@ function setTacticalViewportLock(active) {
       body.tactical-locked .app-header {
         display: none !important;
       }
+      html.tactical-locked #tactical,
+      html.tactical-locked #tactical.active,
+      body.tactical-locked #tactical,
+      body.tactical-locked #tactical.active,
       #tactical.active {
         position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
         inset: 0 !important;
         width: 100vw !important;
+        height: 100vh !important;
         height: 100dvh !important;
+        max-width: 100vw !important;
         max-height: 100dvh !important;
         overflow: hidden !important;
         overscroll-behavior: none !important;
@@ -578,7 +588,23 @@ function setTacticalViewportLock(active) {
         padding: 0 !important;
         margin: 0 !important;
         background: #060b11 !important;
-        z-index: 60 !important;
+        z-index: 9999 !important;
+      }
+      html.tactical-locked .container,
+      html.tactical-locked .wrap,
+      html.tactical-locked .app,
+      html.tactical-locked .page,
+      html.tactical-locked main,
+      body.tactical-locked .container,
+      body.tactical-locked .wrap,
+      body.tactical-locked .app,
+      body.tactical-locked .page,
+      body.tactical-locked main {
+        position: static !important;
+        max-width: none !important;
+        width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
       }
       #tactical.active .battle-top,
       #tactical.active .battle-info,
@@ -617,6 +643,28 @@ function setTacticalViewportLock(active) {
   }
   document.documentElement.classList.toggle("tactical-locked", Boolean(active));
   document.body.classList.toggle("tactical-locked", Boolean(active));
+  const tac = document.getElementById("tactical");
+  if (tac) {
+    if (active) {
+      tac.style.setProperty("position", "fixed", "important");
+      tac.style.setProperty("inset", "0", "important");
+      tac.style.setProperty("width", "100vw", "important");
+      tac.style.setProperty("height", "100dvh", "important");
+      tac.style.setProperty("max-height", "100dvh", "important");
+      tac.style.setProperty("margin", "0", "important");
+      tac.style.setProperty("padding", "0", "important");
+      tac.style.setProperty("z-index", "9999", "important");
+    } else {
+      tac.style.removeProperty("position");
+      tac.style.removeProperty("inset");
+      tac.style.removeProperty("width");
+      tac.style.removeProperty("height");
+      tac.style.removeProperty("max-height");
+      tac.style.removeProperty("margin");
+      tac.style.removeProperty("padding");
+      tac.style.removeProperty("z-index");
+    }
+  }
 }
 
 function goToScreen(screenId) {
@@ -631,7 +679,10 @@ function goToScreen(screenId) {
   if (screenId === "base") renderBase();
   if (screenId === "missions") renderCampaignMissions();
   if (screenId === "brief") renderIntelligence();
-  if (screenId === "tactical" && state.battle) renderBattle();
+  if (screenId === "tactical") {
+    try { window.scrollTo(0, 0); } catch (_) {}
+    if (state.battle) renderBattle();
+  }
 }
 
 function openModal(html) {
