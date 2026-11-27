@@ -545,7 +545,30 @@ function saveState() {
 // 3. NAVEGAÇÃO ENTRE ECRÃS & MODAL
 // ---------------------------------------------------------------------------
 
+function syncTacticalHostParent(active) {
+  const tac = document.getElementById("tactical");
+  if (!tac) return;
+  if (active) {
+    if (!tac.__ozOriginalParent && tac.parentElement) {
+      tac.__ozOriginalParent = tac.parentElement;
+      tac.__ozOriginalNextSibling = tac.nextSibling;
+    }
+    if (tac.parentElement !== document.body) {
+      document.body.appendChild(tac);
+    }
+  } else if (tac.__ozOriginalParent) {
+    try {
+      if (tac.__ozOriginalNextSibling && tac.__ozOriginalNextSibling.parentElement === tac.__ozOriginalParent) {
+        tac.__ozOriginalParent.insertBefore(tac, tac.__ozOriginalNextSibling);
+      } else {
+        tac.__ozOriginalParent.appendChild(tac);
+      }
+    } catch (_) {}
+  }
+}
+
 function setTacticalViewportLock(active) {
+  syncTacticalHostParent(active);
   let styleEl = document.getElementById("tactical-fixed-viewport-style");
   if (!styleEl) {
     styleEl = document.createElement("style");
@@ -1717,7 +1740,21 @@ function drawIsoSoldierSprite(ctx, sx, sy, w, h, unit, isSelected) {
   ctx.strokeStyle = isSelected ? "#4ef2a1" : "#60a5fa";
   ctx.lineWidth = 1.2;
   ctx.beginPath();
-  ctx.roundRect(sx - 5.5, shoulderY, 11, bodyH * 0.52, 2.5);
+  const rx = sx - 5.5;
+  const ry = shoulderY;
+  const rw = 11;
+  const rh = bodyH * 0.52;
+  const rad = Math.min(2.5, rw * 0.5, rh * 0.5);
+  ctx.moveTo(rx + rad, ry);
+  ctx.lineTo(rx + rw - rad, ry);
+  ctx.quadraticCurveTo(rx + rw, ry, rx + rw, ry + rad);
+  ctx.lineTo(rx + rw, ry + rh - rad);
+  ctx.quadraticCurveTo(rx + rw, ry + rh, rx + rw - rad, ry + rh);
+  ctx.lineTo(rx + rad, ry + rh);
+  ctx.quadraticCurveTo(rx, ry + rh, rx, ry + rh - rad);
+  ctx.lineTo(rx, ry + rad);
+  ctx.quadraticCurveTo(rx, ry, rx + rad, ry);
+  ctx.closePath();
   ctx.fill();
   ctx.stroke();
 
@@ -2292,6 +2329,14 @@ function getUnitVisualBadge(entity, isEnemy) {
 function renderBattle() {
   const b = state.battle;
   if (!b) return;
+  try {
+    _renderBattleInner(b);
+  } catch (err) {
+    addBattleLog("Aviso de renderização tática: " + (err && err.message ? err.message : "erro"));
+  }
+}
+
+function _renderBattleInner(b) {
   ensureTacticalExtras();
 
   const titleEl = document.getElementById("battle-title");
