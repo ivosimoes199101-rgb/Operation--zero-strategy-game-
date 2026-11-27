@@ -1372,25 +1372,47 @@ function renderBattle() {
 
   const gridEl = document.getElementById("battle-grid");
   if (gridEl) {
-    let camBar = document.getElementById("tactical-camera-bar");
-    if (!camBar) {
-      camBar = document.createElement("div");
-      camBar.id = "tactical-camera-bar";
-      camBar.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px;flex-wrap:wrap;font-size:0.78em;";
-      camBar.innerHTML = `
-        <span id="camera-coords" style="opacity:0.85;">CÂMERA: 1-6, 1-6 / 10x8</span>
-        <div style="display:flex;gap:4px;">
-          <button type="button" id="cam-left" class="secondary" style="padding:3px 8px;">◀</button>
-          <button type="button" id="cam-up" class="secondary" style="padding:3px 8px;">▲</button>
-          <button type="button" id="cam-down" class="secondary" style="padding:3px 8px;">▼</button>
-          <button type="button" id="cam-right" class="secondary" style="padding:3px 8px;">▶</button>
-        </div>
-      `;
-      gridEl.parentElement.insertBefore(camBar, gridEl);
-      document.getElementById("cam-left").addEventListener("click", () => panCamera(-2, 0));
-      document.getElementById("cam-right").addEventListener("click", () => panCamera(2, 0));
-      document.getElementById("cam-up").addEventListener("click", () => panCamera(0, -2));
-      document.getElementById("cam-down").addEventListener("click", () => panCamera(0, 2));
+    const existingCamBar = document.getElementById("tactical-camera-bar");
+    if (existingCamBar && existingCamBar.parentElement) {
+      existingCamBar.parentElement.removeChild(existingCamBar);
+    }
+
+    if (!gridEl.dataset.touchPanBound) {
+      gridEl.dataset.touchPanBound = "1";
+      gridEl.style.touchAction = "pan-y";
+      let touchStartX = 0;
+      let touchStartY = 0;
+      let touchMoved = false;
+
+      gridEl.addEventListener("touchstart", (ev) => {
+        if (!ev.touches || ev.touches.length !== 1) return;
+        touchStartX = ev.touches[0].clientX;
+        touchStartY = ev.touches[0].clientY;
+        touchMoved = false;
+      }, { passive: true });
+
+      gridEl.addEventListener("touchmove", (ev) => {
+        if (!ev.touches || ev.touches.length !== 1) return;
+        const dx = ev.touches[0].clientX - touchStartX;
+        const dy = ev.touches[0].clientY - touchStartY;
+        if (Math.abs(dx) > 28 || Math.abs(dy) > 28) {
+          touchMoved = true;
+          gridEl.dataset.suppressNextClick = "1";
+          const stepX = Math.abs(dx) >= 28 ? (dx > 0 ? -1 : 1) : 0;
+          const stepY = Math.abs(dy) >= 28 ? (dy > 0 ? -1 : 1) : 0;
+          touchStartX = ev.touches[0].clientX;
+          touchStartY = ev.touches[0].clientY;
+          panCamera(stepX, stepY);
+        }
+      }, { passive: true });
+
+      gridEl.addEventListener("click", (ev) => {
+        if (gridEl.dataset.suppressNextClick === "1") {
+          gridEl.dataset.suppressNextClick = "0";
+          ev.stopPropagation();
+          ev.preventDefault();
+        }
+      }, true);
     }
     const camCoords = document.getElementById("camera-coords");
     if (camCoords) {
