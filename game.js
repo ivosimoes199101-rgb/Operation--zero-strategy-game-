@@ -545,11 +545,95 @@ function saveState() {
 // 3. NAVEGAÇÃO ENTRE ECRÃS & MODAL
 // ---------------------------------------------------------------------------
 
+function setTacticalViewportLock(active) {
+  let styleEl = document.getElementById("tactical-fixed-viewport-style");
+  if (!styleEl) {
+    styleEl = document.createElement("style");
+    styleEl.id = "tactical-fixed-viewport-style";
+    styleEl.textContent = `
+      html.tactical-locked, body.tactical-locked {
+        overflow: hidden !important;
+        overscroll-behavior: none !important;
+        height: 100dvh !important;
+        width: 100vw !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      #tactical.active {
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100vw !important;
+        height: 100dvh !important;
+        max-height: 100dvh !important;
+        overflow: hidden !important;
+        overscroll-behavior: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+        box-sizing: border-box !important;
+        padding: 8px 10px !important;
+        z-index: 20 !important;
+      }
+      #tactical.active .battle-top,
+      #tactical.active .battle-info {
+        flex-shrink: 0 !important;
+      }
+      #tactical.active .battle-main {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+        overflow: hidden !important;
+        position: relative !important;
+      }
+      #tactical.active #battle-grid {
+        touch-action: none !important;
+        user-select: none !important;
+        -webkit-user-select: none !important;
+      }
+      #tactical.active #battle-log {
+        flex-shrink: 0 !important;
+        max-height: 54px !important;
+        overflow-y: auto !important;
+        font-size: 0.78em !important;
+      }
+      #tactical.active .battle-side {
+        flex-shrink: 0 !important;
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: wrap !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 6px !important;
+        margin-top: 6px !important;
+      }
+      #tactical.active .battle-side .side-panel:nth-of-type(1),
+      #tactical.active .battle-side .side-panel:nth-of-type(2) {
+        flex: 1 1 45% !important;
+        font-size: 0.72em !important;
+        padding: 5px 7px !important;
+        margin: 0 !important;
+      }
+      #tactical.active #end-turn {
+        flex: 1 1 100% !important;
+        margin-top: 2px !important;
+        padding: 7px 10px !important;
+        font-size: 0.82em !important;
+      }
+    `;
+    document.head.appendChild(styleEl);
+  }
+  document.documentElement.classList.toggle("tactical-locked", Boolean(active));
+  document.body.classList.toggle("tactical-locked", Boolean(active));
+}
+
 function goToScreen(screenId) {
   const screens = document.querySelectorAll(".screen");
   screens.forEach((s) => s.classList.remove("active"));
   const target = document.getElementById(screenId) || document.getElementById("home");
   if (target) target.classList.add("active");
+  setTacticalViewportLock(screenId === "tactical");
 
   if (screenId === "command") renderCommand();
   if (screenId === "squad") renderSquad();
@@ -1379,7 +1463,7 @@ function renderBattle() {
 
     if (!gridEl.dataset.touchPanBound) {
       gridEl.dataset.touchPanBound = "1";
-      gridEl.style.touchAction = "pan-y";
+      gridEl.style.touchAction = "none";
       let touchStartX = 0;
       let touchStartY = 0;
       let touchMoved = false;
@@ -1966,6 +2050,7 @@ function checkBattleOutcome() {
       }
     });
 
+    setTacticalViewportLock(false);
     saveState();
     renderCommand();
     presentMissionChoiceModal(mission, missionIndex);
@@ -1981,6 +2066,7 @@ function checkBattleOutcome() {
         ro.hp = Math.max(20, Math.round(ro.maxHp * 0.4));
       }
     });
+    setTacticalViewportLock(false);
     saveState();
     renderCommand();
     openModal(`
@@ -2125,6 +2211,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
       state.battle = null;
+      setTacticalViewportLock(false);
       state.metrics.threat = Math.min(100, state.metrics.threat + 6);
       saveState();
       goToScreen("command");
