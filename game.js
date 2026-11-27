@@ -607,55 +607,105 @@ function setTacticalViewportLock(active) {
         margin: 0 !important;
       }
       #tactical.active .battle-top,
-      #tactical.active .battle-info,
-      #tactical.active #battle-log {
+      #tactical.active .battle-info {
         display: none !important;
       }
       #tactical.active .battle-side {
         display: grid !important;
-        grid-template-columns: 1fr 1fr !important;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
         gap: 6px !important;
         padding: 6px 8px 8px 8px !important;
         background: rgba(6, 11, 17, 0.98) !important;
-        border-top: 1px solid rgba(148, 163, 184, 0.22) !important;
+        border-top: 1px solid rgba(148, 163, 184, 0.2) !important;
         flex-shrink: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
         z-index: 20 !important;
+      }
+      #tactical.active #battle-log {
+        display: block !important;
+        grid-column: 1 / -1 !important;
+        background: rgba(12, 20, 29, 0.95) !important;
+        border: 1px solid rgba(148, 163, 184, 0.22) !important;
+        border-left: 3px solid #4ef2a1 !important;
+        border-radius: 6px !important;
+        padding: 6px 9px !important;
+        margin: 0 !important;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+        font-size: clamp(0.72em, 2.7vw, 0.84em) !important;
+        line-height: 1.32 !important;
+        color: #e2e8f0 !important;
+        max-height: 4.1em !important;
+        overflow-y: auto !important;
+        word-break: break-word !important;
       }
       #tactical.active .battle-side .side-panel {
         background: rgba(11, 18, 27, 0.96) !important;
         border: 1px solid rgba(148, 163, 184, 0.22) !important;
         border-radius: 6px !important;
-        padding: 7px 9px !important;
+        padding: 6px 8px !important;
         margin: 0 !important;
         min-width: 0 !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+        box-sizing: border-box !important;
       }
       #tactical.active .battle-side .side-panel:nth-of-type(3) {
         display: none !important;
       }
+      #tactical.active #selected-unit,
+      #tactical.active #target-info {
+        font-size: clamp(0.76em, 3vw, 0.95em) !important;
+        line-height: 1.25 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        display: block !important;
+      }
+      #tactical.active #unit-hp,
+      #tactical.active #unit-ap,
+      #tactical.active #unit-ammo,
+      #tactical.active #hit-chance {
+        font-size: clamp(0.68em, 2.5vw, 0.8em) !important;
+        line-height: 1.25 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        display: block !important;
+      }
       #tactical.active #oz-bottom-actions {
         grid-column: 1 / -1 !important;
         display: grid !important;
-        grid-template-columns: 1.45fr 1fr !important;
+        grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr) !important;
         gap: 6px !important;
-        margin-top: 2px !important;
+        margin-top: 1px !important;
+        min-width: 0 !important;
       }
       #tactical.active #end-turn {
         background: #a3e635 !important;
         color: #071108 !important;
         border: none !important;
         border-radius: 5px !important;
-        padding: 10px 12px !important;
+        padding: 9px 10px !important;
+        font-size: clamp(0.78em, 3.1vw, 0.92em) !important;
         font-weight: 800 !important;
-        letter-spacing: 0.6px !important;
+        letter-spacing: 0.5px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
       }
       #tactical.active #retreat {
         background: #17202a !important;
         color: #e2e8f0 !important;
         border: 1px solid rgba(148, 163, 184, 0.28) !important;
         border-radius: 5px !important;
-        padding: 10px 10px !important;
+        padding: 8px 8px !important;
+        font-size: clamp(0.72em, 2.7vw, 0.84em) !important;
         font-weight: 700 !important;
-        letter-spacing: 0.5px !important;
+        line-height: 1.15 !important;
+        letter-spacing: 0.4px !important;
       }
       #tactical.active .battle-main {
         flex: 1 1 100% !important;
@@ -1786,11 +1836,10 @@ function ensureTacticalExtras() {
   const tactical = document.getElementById("tactical");
   if (!tactical) return;
 
-  const gridEl = document.getElementById("battle-grid");
   const logEl = document.getElementById("battle-log");
-  if (gridEl && logEl && logEl.previousElementSibling !== gridEl) {
-    logEl.style.marginTop = "6px";
-    gridEl.insertAdjacentElement("afterend", logEl);
+  const sideEl = document.querySelector("#tactical .battle-side");
+  if (logEl && sideEl && logEl.parentElement !== sideEl) {
+    sideEl.insertBefore(logEl, sideEl.firstChild);
   }
 
   const oldExtraBar = document.getElementById("tactical-grenade-bar");
@@ -2484,7 +2533,7 @@ function renderBattle() {
   if (selUnit && selEnemy) {
     const chance = calculateHitChance(selUnit, selEnemy, b);
     const cover = getTileCoverAt(b, selEnemy.x, selEnemy.y);
-    const coverText = cover === 2 ? "COB. PESADA (-40%)" : cover === 1 ? "MEIA COB. (-25%)" : "SEM COB.";
+    const coverText = cover === 2 ? "COB. PESADA" : cover === 1 ? "MEIA COB." : "SEM COB.";
     const estDmg = estimateUnitDamage(selUnit, selEnemy);
     setText("target-info", `${selEnemy.name} (${selEnemy.hp} HP · ${coverText})`);
     const chanceStr = `CHANCE: ${chance}% · DANO EST.: ~${estDmg}`;
