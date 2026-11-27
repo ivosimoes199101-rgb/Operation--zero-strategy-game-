@@ -608,9 +608,18 @@ function setTacticalViewportLock(active) {
       }
       #tactical.active .battle-top,
       #tactical.active .battle-info,
-      #tactical.active #battle-log,
-      #tactical.active .battle-side {
+      #tactical.active #battle-log {
         display: none !important;
+      }
+      #tactical.active .battle-side {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 6px !important;
+        padding: 6px 8px 8px 8px !important;
+        background: rgba(6, 11, 17, 0.96) !important;
+        border-top: 1px solid rgba(78, 242, 161, 0.25) !important;
+        flex-shrink: 0 !important;
+        z-index: 20 !important;
       }
       #tactical.active .battle-main {
         flex: 1 1 100% !important;
@@ -2121,65 +2130,9 @@ function renderBattle() {
       });
     }
 
-    let bottomHud = document.getElementById("iso-bottom-hud");
-    if (!bottomHud) {
-      bottomHud = document.createElement("div");
-      bottomHud.id = "iso-bottom-hud";
-      bottomHud.style.cssText = `
-        position:absolute;
-        bottom:8px;
-        left:8px;
-        right:8px;
-        z-index:16;
-        display:flex;
-        align-items:flex-end;
-        justify-content:space-between;
-        gap:8px;
-        pointer-events:none;
-      `;
-      stageParent.appendChild(bottomHud);
-    }
-
-    bottomHud.innerHTML = `
-      <div style="pointer-events:auto;flex:1 1 auto;min-width:0;background:rgba(7,14,22,0.80);backdrop-filter:blur(6px);border:1px solid rgba(148,163,184,0.28);border-radius:10px;padding:6px 9px;">
-        <div style="font-size:0.62em;color:#fde047;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-          ALVO: ${tgtText}
-        </div>
-        <div id="iso-live-log" style="font-size:0.66em;color:#f1f5f9;line-height:1.25;margin-top:2px;max-height:28px;overflow:hidden;">
-          ${b.log || ""}
-        </div>
-      </div>
-      <div style="pointer-events:auto;display:flex;flex-direction:column;gap:5px;flex-shrink:0;">
-        <button type="button" id="iso-end-turn-btn" ${b.phase !== "player" ? "disabled" : ""} style="background:#84cc16;color:#071108;border:none;border-radius:9px;padding:8px 12px;font-size:0.72em;font-weight:800;letter-spacing:0.5px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,0.45);">
-          TERMINAR TURNO
-        </button>
-        <button type="button" id="iso-retreat-btn" style="background:rgba(15,23,42,0.88);color:#e2e8f0;border:1px solid rgba(148,163,184,0.35);border-radius:9px;padding:5px 10px;font-size:0.64em;font-weight:700;cursor:pointer;">
-          ABORTAR
-        </button>
-      </div>
-    `;
-
-    const isoEndBtn = document.getElementById("iso-end-turn-btn");
-    if (isoEndBtn) {
-      isoEndBtn.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        endPlayerTurn();
-      });
-    }
-    const isoRetreatBtn = document.getElementById("iso-retreat-btn");
-    if (isoRetreatBtn) {
-      isoRetreatBtn.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        if (!state.battle) {
-          goToScreen("command");
-          return;
-        }
-        state.battle = null;
-        setTacticalViewportLock(false);
-        state.metrics.threat = Math.min(100, state.metrics.threat + 6);
-        saveState();
-        goToScreen("command");
-      });
+    const existingBottomHud = document.getElementById("iso-bottom-hud");
+    if (existingBottomHud && existingBottomHud.parentElement) {
+      existingBottomHud.parentElement.removeChild(existingBottomHud);
     }
   }
   const selUnit = getSelectedUnit();
@@ -2466,7 +2419,7 @@ function renderBattle() {
 
   const ordersPanel = document.querySelector("#tactical .battle-side .side-panel:nth-of-type(3)");
   if (ordersPanel) {
-    ordersPanel.style.display = "none";
+    ordersPanel.style.display = "";
   }
   ensureEndTurnVisible(b);
 
