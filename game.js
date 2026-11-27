@@ -1287,6 +1287,9 @@ function startMission(mission, missionIndex = 0) {
     phase: "player",
     mode: "normal",
     camera: missionIndex === 0 ? { x: 0, y: 3 } : { x: 2, y: 2 },
+    zoom: 1.0,
+    panX: 0,
+    panY: 0,
     grid: createMissionMap(missionIndex),
     smokes: [],
     hoverTile: null,
@@ -1443,26 +1446,110 @@ function addBattleLog(msg) {
 }
 
 // --- GEOMETRIA ISOMÉTRICA XCOM (2:1) ---
-function getIsoMetrics(canvas) {
+
+function getBattleZoom(battle) {
+  if (!battle || typeof battle.zoom !== "number" || Number.isNaN(battle.zoom)) return 1.0;
+  return Math.max(0.65, Math.min(2.6, battle.zoom));
+}
+
+function clampBattlePan(battle, m) {
+  if (!battle || !m) return;
+  const z = getBattleZoom(battle);
+  const span = GRID_W + GRID_H;
+  const boardW = span * (m.tileW * 0.5) * z;
+  const boardH = span * (m.tileH * 0.5) * z;
+  const marginX = Math.max(90, m.w * 0.35);
+  const marginY = Math.max(75, m.h * 0.30);
+
+  const minPanX = Math.min(-marginX, (m.w - boardW) - marginX);
+  const maxPanX = Math.max(marginX, (m.w - boardW) + marginX);
+  const minPanY = Math.min(-marginY, (m.h - boardH) - marginY);
+  const maxPanY = Math.max(marginY, (m.h - boardH) + marginY);
+
+  if (typeof battle.panX !== "number" || Number.isNaN(battle.panX)) battle.panX = 0;
+  if (typeof battle.panY !== "number" || Number.isNaN(battle.panY)) battle.panY = 0;
+
+  if (minPanX <= maxPanX) {
+    battle.panX = Math.max(minPanX, Math.min(maxPanX, battle.panX));
+  }
+  if (minPanY <= maxPanY) {
+    battle.panY = Math.max(minPanY, Math.min(maxPanY, battle.panY));
+  }
+}
+
+function setBattleZoom(deltaOrFactor, anchorPx = null, anchorPy = null) {
+  const b = state.battle;
+  if (!b) return;
+  const canvas = document.getElementById("iso-battle-canvas");
+  const m = canvas ? getIsoMetrics(canvas, true) : null;
+  const oldZoom = getBattleZoom(b);
+  let nextZoom = typeof deltaOrFactor === "number" && deltaOrFactor < 0.25 && deltaOrFactor > -0.25
+    ? oldZoom + deltaOrFactor
+    : deltaOrFactor;
+  nextZoom = Math.max(0.65, Math.min(2.6, Number(nextZoom.toFixed(2))));
+  if (nextZoom === oldZoom) return;
+
+  if (m) {
+    const ax = typeof anchorPx === "number" ? anchorPx : m.w * 0.5;
+    const ay = typeof anchorPy === "number" ? anchorPy : m.h * 0.45;
+    const baseOrigX = m.baseOriginX + (b.panX || 0);
+    const baseOrigY = m.baseOriginY + (b.panY || 0);
+    const ratio = nextZoom / oldZoom;
+    const newOrigX = ax - (ax - baseOrigX) * ratio;
+    const newOrigY = ay - (ay - baseOrigY) * ratio;
+    b.panX = newOrigX - m.baseOriginX;
+    b.panY = newOrigY - m.baseOriginY;
+  }
+
+  b.zoom = nextZoom;
+  if (m) clampBattlePan(b, getIsoMetrics(canvas, true));
+  renderBattle();
+}
+
+function resetBattleView() {
+  const b = state.battle;
+  if (!b) return;
+  b.zoom = 1.0;
+  b.panX = 0;
+  b.panY = 0;
+  renderBattle();
+}
+
+function getIsoMetrics(canvas, ignoreBattlePan = false) {
   const rect = canvas.getBoundingClientRect();
   const w = Math.max(320, rect.width || canvas.parentElement?.clientWidth || window.innerWidth || 360);
   const h = Math.max(260, rect.height || canvas.parentElement?.clientHeight || window.innerHeight || 420);
 
-  // Num tabuleiro isométrico (GRID_W x GRID_H):
-  // - Largura total do diamante = (GRID_W + GRID_H) * (tileW * 0.5)
-  // - Altura total do diamante = (GRID_W + GRID_H) * (tileH * 0.5), onde tileH = tileW * 0.5
-  const span = GRID_W + GRID_H; // 26
+  const b = state.battle;
+  const zoom = getBattleZoom(b);
+
+  const span = GRID_W + GRID_H;
   const maxTileWByWidth = Math.floor(((w - 20) * 2) / span);
   const maxTileWByHeight = Math.floor(((h - 34) * 4) / span);
-  const tileW = Math.max(22, Math.min(64, Math.min(maxTileWByWidth, maxTileWByHeight)));
-  const tileH = Math.max(11, Math.round(tileW * 0.5));
-  const wallH = Math.max(5, Math.round(tileH * 0.55));
+  const baseTileW = Math.max(22, Math.min(64, Math.min(maxTileWByWidth, maxTileWByHeight)));
+  const tileW = Math.max(14, baseTileW * zoom);
+  const tileH = Math.max(7, tileW * 0.5);
+  const wallH = Math.max(4, tileH * 0.55);
 
   const boardPixelH = span * tileH * 0.5;
-  const originX = w * 0.5 + (GRID_H - GRID_W) * (tileW * 0.25);
-  const originY = Math.max(22, Math.round((h - boardPixelH) * 0.44));
+  const baseOriginX = w * 0.5 + (GRID_H - GRID_W) * (tileW * 0.25);
+  const baseOriginY = Math.max(22, Math.round((h - boardPixelH) * 0.44));
 
-  return { w, h, tileW, tileH, wallH, originX, originY };
+  const panX = (!ignoreBattlePan && b && typeof b.panX === "number") ? b.panX : 0;
+  const panY = (!ignoreBattlePan && b && typeof b.panY === "number") ? b.panY : 0;
+
+  return {
+    w,
+    h,
+    zoom,
+    tileW,
+    tileH,
+    wallH,
+    baseOriginX,
+    baseOriginY,
+    originX: baseOriginX + panX,
+    originY: baseOriginY + panY
+  };
 }
 
 function worldToIso(gx, gy, battle, m) {
@@ -1743,25 +1830,106 @@ function ensureIsoCanvasStage(gridEl) {
     canvas.style.cssText = "width:100%;height:100%;display:block;touch-action:none;user-select:none;-webkit-user-select:none;cursor:pointer;";
     stage.appendChild(canvas);
 
-    // Navegação tátil suave por arrasto/deslize direto no canvas isométrico
-    let pointerDown = false;
+    // Navegação tátil nativa no ecrã tátil: pinça com 2 dedos + arrasto livre em qualquer zoom + toque simples
+    const activePointers = new Map();
+    let isPanning = false;
     let totalMoved = 0;
     let startClientX = 0;
     let startClientY = 0;
     let lastClientX = 0;
     let lastClientY = 0;
+    let pinchStartDist = 0;
+    let pinchStartZoom = 1;
+    let pinchAnchorX = 0;
+    let pinchAnchorY = 0;
+    let pinchLastMidX = 0;
+    let pinchLastMidY = 0;
+    let touchPinchActive = false;
+    let touchPinchStartDist = 0;
+    let touchPinchStartZoom = 1;
+    let touchPinchLastMidX = 0;
+    let touchPinchLastMidY = 0;
+
+    function getPinchInfo() {
+      const pts = Array.from(activePointers.values());
+      if (pts.length < 2) return null;
+      const [p1, p2] = pts;
+      const rect = canvas.getBoundingClientRect();
+      return {
+        dist: Math.max(1, Math.hypot(p2.clientX - p1.clientX, p2.clientY - p1.clientY)),
+        midX: ((p1.clientX + p2.clientX) * 0.5) - rect.left,
+        midY: ((p1.clientY + p2.clientY) * 0.5) - rect.top
+      };
+    }
 
     canvas.addEventListener("pointerdown", (ev) => {
-      pointerDown = true;
+      if (!state.battle) return;
+      if (ev.pointerType === "touch") ev.preventDefault();
+      try { canvas.setPointerCapture(ev.pointerId); } catch (_) {}
+      activePointers.set(ev.pointerId, { clientX: ev.clientX, clientY: ev.clientY });
+
+      if (activePointers.size >= 2) {
+        const pInfo = getPinchInfo();
+        if (pInfo) {
+          pinchStartDist = pInfo.dist;
+          pinchStartZoom = getBattleZoom(state.battle);
+          pinchAnchorX = pInfo.midX;
+          pinchAnchorY = pInfo.midY;
+          pinchLastMidX = pInfo.midX;
+          pinchLastMidY = pInfo.midY;
+          isPanning = false;
+          totalMoved = 999;
+        }
+        return;
+      }
+
+      isPanning = true;
       totalMoved = 0;
       startClientX = ev.clientX;
       startClientY = ev.clientY;
       lastClientX = ev.clientX;
       lastClientY = ev.clientY;
-    });
+    }, { passive: false });
 
     canvas.addEventListener("pointermove", (ev) => {
       if (!state.battle) return;
+      if (ev.pointerType === "touch") ev.preventDefault();
+      if (activePointers.has(ev.pointerId)) {
+        activePointers.set(ev.pointerId, { clientX: ev.clientX, clientY: ev.clientY });
+      }
+
+      if (activePointers.size >= 2) {
+        const pInfo = getPinchInfo();
+        if (pInfo && pinchStartDist > 4) {
+          const factor = pInfo.dist / pinchStartDist;
+          const targetZoom = Math.max(0.65, Math.min(2.6, Number((pinchStartZoom * factor).toFixed(2))));
+          const panDeltaX = pInfo.midX - pinchLastMidX;
+          const panDeltaY = pInfo.midY - pinchLastMidY;
+          pinchLastMidX = pInfo.midX;
+          pinchLastMidY = pInfo.midY;
+          state.battle.panX = (state.battle.panX || 0) + panDeltaX;
+          state.battle.panY = (state.battle.panY || 0) + panDeltaY;
+          setBattleZoom(targetZoom, pinchAnchorX, pinchAnchorY);
+        }
+        return;
+      }
+
+      if (isPanning) {
+        totalMoved = Math.hypot(ev.clientX - startClientX, ev.clientY - startClientY);
+        if (totalMoved > 4) {
+          const dx = ev.clientX - lastClientX;
+          const dy = ev.clientY - lastClientY;
+          lastClientX = ev.clientX;
+          lastClientY = ev.clientY;
+          const m = getIsoMetrics(canvas, true);
+          state.battle.panX = (state.battle.panX || 0) + dx;
+          state.battle.panY = (state.battle.panY || 0) + dy;
+          clampBattlePan(state.battle, m);
+          renderBattle();
+          return;
+        }
+      }
+
       if (state.battle.mode === "frag" || state.battle.mode === "smoke") {
         const rect = canvas.getBoundingClientRect();
         const px = ev.clientX - rect.left;
@@ -1778,35 +1946,19 @@ function ensureIsoCanvasStage(gridEl) {
         state.battle.hoverTile = null;
         renderBattle();
       }
-    });
+    }, { passive: false });
 
-    canvas.addEventListener("pointerleave", () => {
-      if (state.battle && state.battle.hoverTile) {
-        state.battle.hoverTile = null;
-        renderBattle();
+    const finishPointer = (ev) => {
+      const wasPinching = activePointers.size >= 2;
+      activePointers.delete(ev.pointerId);
+      try { canvas.releasePointerCapture(ev.pointerId); } catch (_) {}
+      if (activePointers.size < 2) {
+        pinchStartDist = 0;
       }
-    });
+      if (!isPanning && !wasPinching) return;
+      isPanning = false;
 
-    window.addEventListener("pointermove", (ev) => {
-      if (!pointerDown || !state.battle) return;
-      totalMoved = Math.hypot(ev.clientX - startClientX, ev.clientY - startClientY);
-      if (totalMoved > 18) {
-        const dx = ev.clientX - lastClientX;
-        const dy = ev.clientY - lastClientY;
-        const stepX = Math.abs(dx) >= 30 ? (dx > 0 ? -1 : 1) : 0;
-        const stepY = Math.abs(dy) >= 22 ? (dy > 0 ? -1 : 1) : 0;
-        if (stepX !== 0 || stepY !== 0) {
-          lastClientX = ev.clientX;
-          lastClientY = ev.clientY;
-          panCamera(stepX, stepY);
-        }
-      }
-    });
-
-    window.addEventListener("pointerup", (ev) => {
-      if (!pointerDown) return;
-      pointerDown = false;
-      if (totalMoved <= 14 && state.battle) {
+      if (!wasPinching && activePointers.size === 0 && totalMoved <= 14 && state.battle) {
         const rect = canvas.getBoundingClientRect();
         const px = ev.clientX - rect.left;
         const py = ev.clientY - rect.top;
@@ -1814,7 +1966,81 @@ function ensureIsoCanvasStage(gridEl) {
         const hit = isoToWorld(px, py, state.battle, m);
         if (hit) handleCellClick(hit.x, hit.y);
       }
+    };
+
+    canvas.addEventListener("pointerup", finishPointer);
+    canvas.addEventListener("pointercancel", finishPointer);
+    canvas.addEventListener("pointerleave", () => {
+      if (state.battle && state.battle.hoverTile) {
+        state.battle.hoverTile = null;
+        renderBattle();
+      }
     });
+
+    // Suporte TouchEvent direto para ecrãs táteis em webviews/browsers com pinça de 2 dedos
+    canvas.addEventListener("touchstart", (ev) => {
+      if (!state.battle) return;
+      ev.preventDefault();
+      if (ev.touches.length >= 2) {
+        const t1 = ev.touches[0];
+        const t2 = ev.touches[1];
+        const rect = canvas.getBoundingClientRect();
+        touchPinchActive = true;
+        touchPinchStartDist = Math.max(1, Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY));
+        touchPinchStartZoom = getBattleZoom(state.battle);
+        touchPinchLastMidX = ((t1.clientX + t2.clientX) * 0.5) - rect.left;
+        touchPinchLastMidY = ((t1.clientY + t2.clientY) * 0.5) - rect.top;
+        isPanning = false;
+        totalMoved = 999;
+      }
+    }, { passive: false });
+
+    canvas.addEventListener("touchmove", (ev) => {
+      if (!state.battle) return;
+      ev.preventDefault();
+      if (ev.touches.length >= 2) {
+        const t1 = ev.touches[0];
+        const t2 = ev.touches[1];
+        const rect = canvas.getBoundingClientRect();
+        const dist = Math.max(1, Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY));
+        const midX = ((t1.clientX + t2.clientX) * 0.5) - rect.left;
+        const midY = ((t1.clientY + t2.clientY) * 0.5) - rect.top;
+        if (!touchPinchActive || touchPinchStartDist <= 4) {
+          touchPinchActive = true;
+          touchPinchStartDist = dist;
+          touchPinchStartZoom = getBattleZoom(state.battle);
+          touchPinchLastMidX = midX;
+          touchPinchLastMidY = midY;
+          return;
+        }
+        const factor = dist / touchPinchStartDist;
+        const targetZoom = Math.max(0.65, Math.min(2.6, Number((touchPinchStartZoom * factor).toFixed(2))));
+        const dx = midX - touchPinchLastMidX;
+        const dy = midY - touchPinchLastMidY;
+        touchPinchLastMidX = midX;
+        touchPinchLastMidY = midY;
+        state.battle.panX = (state.battle.panX || 0) + dx;
+        state.battle.panY = (state.battle.panY || 0) + dy;
+        setBattleZoom(targetZoom, midX, midY);
+      }
+    }, { passive: false });
+
+    canvas.addEventListener("touchend", (ev) => {
+      if (ev.touches.length < 2) {
+        touchPinchActive = false;
+        touchPinchStartDist = 0;
+      }
+    }, { passive: false });
+
+    canvas.addEventListener("wheel", (ev) => {
+      if (!state.battle) return;
+      ev.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const px = ev.clientX - rect.left;
+      const py = ev.clientY - rect.top;
+      const step = ev.deltaY < 0 ? 0.16 : -0.16;
+      setBattleZoom(step, px, py);
+    }, { passive: false });
   }
 
   return document.getElementById("iso-battle-canvas");
@@ -2156,21 +2382,55 @@ function renderBattle() {
 
     const selUForHud = getSelectedUnit();
     const selEForHud = getSelectedEnemy();
+    const curZoomPct = Math.round(getBattleZoom(b) * 100);
     const tgtText = selEForHud
       ? `${selEForHud.name} (${selEForHud.hp}HP${selUForHud ? ` · ${calculateHitChance(selUForHud, selEForHud, b)}%` : ""})`
       : "SEM ALVO";
 
     topHud.innerHTML = `
-      <div style="pointer-events:auto;background:rgba(7,14,22,0.78);backdrop-filter:blur(6px);border:1px solid rgba(78,242,161,0.35);border-radius:10px;padding:6px 9px;max-width:44%;">
+      <div style="pointer-events:auto;background:rgba(7,14,22,0.78);backdrop-filter:blur(6px);border:1px solid rgba(78,242,161,0.35);border-radius:10px;padding:6px 9px;max-width:46%;">
         <div style="font-size:0.68em;font-weight:bold;letter-spacing:0.6px;color:#4ef2a1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-          ${formatMissionNumber(b.mission.number)}. ${b.mission.title.toUpperCase()} · T${b.turn}
+          ${formatMissionNumber(b.mission.number)}. ${b.mission.title.toUpperCase()} · T${b.turn} · ${curZoomPct}%
         </div>
         <div style="font-size:0.62em;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">
           ${selUForHud ? `${selUForHud.name.split(" ")[0]}: ${selUForHud.hp}HP · ${selUForHud.ap}PA · ${selUForHud.ammo}M` : `ALVO: ${tgtText}`}
         </div>
+        <div style="display:flex;align-items:center;gap:4px;margin-top:5px;">
+          <button type="button" id="iso-zoom-out" style="background:rgba(15,23,42,0.92);color:#e2e8f0;border:1px solid rgba(148,163,184,0.4);border-radius:5px;padding:2px 7px;font-size:0.66em;font-weight:bold;cursor:pointer;">−</button>
+          <button type="button" id="iso-zoom-reset" style="background:rgba(15,23,42,0.92);color:#4ef2a1;border:1px solid rgba(78,242,161,0.4);border-radius:5px;padding:2px 6px;font-size:0.62em;font-weight:bold;cursor:pointer;">${curZoomPct}%</button>
+          <button type="button" id="iso-zoom-in" style="background:rgba(15,23,42,0.92);color:#e2e8f0;border:1px solid rgba(148,163,184,0.4);border-radius:5px;padding:2px 7px;font-size:0.66em;font-weight:bold;cursor:pointer;">+</button>
+          <button type="button" id="iso-pan-left" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.3);border-radius:5px;padding:2px 5px;font-size:0.62em;cursor:pointer;">◀</button>
+          <button type="button" id="iso-pan-up" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.3);border-radius:5px;padding:2px 5px;font-size:0.62em;cursor:pointer;">▲</button>
+          <button type="button" id="iso-pan-down" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.3);border-radius:5px;padding:2px 5px;font-size:0.62em;cursor:pointer;">▼</button>
+          <button type="button" id="iso-pan-right" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.3);border-radius:5px;padding:2px 5px;font-size:0.62em;cursor:pointer;">▶</button>
+        </div>
       </div>
-      <div id="iso-squad-strip" style="pointer-events:auto;display:flex;flex-wrap:wrap;gap:4px;max-width:54%;justify-content:flex-end;"></div>
+      <div id="iso-squad-strip" style="pointer-events:auto;display:flex;flex-wrap:wrap;gap:4px;max-width:52%;justify-content:flex-end;"></div>
     `;
+
+    const zoomOutBtn = topHud.querySelector("#iso-zoom-out");
+    const zoomInBtn = topHud.querySelector("#iso-zoom-in");
+    const zoomResetBtn = topHud.querySelector("#iso-zoom-reset");
+    const panLeftBtn = topHud.querySelector("#iso-pan-left");
+    const panRightBtn = topHud.querySelector("#iso-pan-right");
+    const panUpBtn = topHud.querySelector("#iso-pan-up");
+    const panDownBtn = topHud.querySelector("#iso-pan-down");
+
+    if (zoomOutBtn) zoomOutBtn.addEventListener("click", (ev) => { ev.stopPropagation(); setBattleZoom(-0.22); });
+    if (zoomInBtn) zoomInBtn.addEventListener("click", (ev) => { ev.stopPropagation(); setBattleZoom(0.22); });
+    if (zoomResetBtn) zoomResetBtn.addEventListener("click", (ev) => { ev.stopPropagation(); resetBattleView(); });
+
+    const nudgePan = (dx, dy) => {
+      const m = canvas ? getIsoMetrics(canvas, true) : null;
+      b.panX = (b.panX || 0) + dx;
+      b.panY = (b.panY || 0) + dy;
+      if (m) clampBattlePan(b, m);
+      renderBattle();
+    };
+    if (panLeftBtn) panLeftBtn.addEventListener("click", (ev) => { ev.stopPropagation(); nudgePan(48, 0); });
+    if (panRightBtn) panRightBtn.addEventListener("click", (ev) => { ev.stopPropagation(); nudgePan(-48, 0); });
+    if (panUpBtn) panUpBtn.addEventListener("click", (ev) => { ev.stopPropagation(); nudgePan(0, 40); });
+    if (panDownBtn) panDownBtn.addEventListener("click", (ev) => { ev.stopPropagation(); nudgePan(0, -40); });
 
     const squadBar = document.getElementById("iso-squad-strip");
     if (squadBar) {
