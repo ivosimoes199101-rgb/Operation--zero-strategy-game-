@@ -1068,7 +1068,7 @@ function startMission(mission, missionIndex = 0) {
     turn: 1,
     phase: "player",
     mode: "normal",
-    camera: { x: 0, y: 1 },
+    camera: { x: 2, y: 1 },
     grid: createMissionMap(missionIndex),
     smokes: [],
     units,
@@ -1137,7 +1137,7 @@ function panCamera(dx, dy) {
   if (!b) return;
   const maxCamX = Math.max(0, GRID_W - ISO_VIEW_W);
   const maxCamY = Math.max(0, GRID_H - ISO_VIEW_H);
-  if (!b.camera) b.camera = { x: 0, y: 1 };
+  if (!b.camera) b.camera = { x: 2, y: 1 };
   b.camera.x = Math.max(0, Math.min(maxCamX, b.camera.x + dx));
   b.camera.y = Math.max(0, Math.min(maxCamY, b.camera.y + dy));
   renderBattle();
@@ -1148,7 +1148,7 @@ function centerCameraOnUnit(unit) {
   if (!b || !unit) return;
   const maxCamX = Math.max(0, GRID_W - ISO_VIEW_W);
   const maxCamY = Math.max(0, GRID_H - ISO_VIEW_H);
-  if (!b.camera) b.camera = { x: 0, y: 1 };
+  if (!b.camera) b.camera = { x: 2, y: 1 };
   b.camera.x = Math.max(0, Math.min(maxCamX, unit.x - Math.floor(ISO_VIEW_W / 2)));
   b.camera.y = Math.max(0, Math.min(maxCamY, unit.y - Math.floor(ISO_VIEW_H / 2)));
 }
@@ -1421,7 +1421,7 @@ function drawIsoSoldierSprite(ctx, sx, sy, w, h, unit, isSelected) {
   ctx.fillStyle = "#f8fafc";
   ctx.font = "bold 8px monospace";
   ctx.textAlign = "center";
-  ctx.fillText(`${unit.name.split(" ")[0].slice(0, 6)} ${unit.hp}`, sx, barY - 3);
+  ctx.fillText(`${unit.name.split(" ")[0]} ${unit.hp}`, sx, barY - 3);
 }
 
 function drawIsoAlienSprite(ctx, sx, sy, w, h, enemy, isTargeted) {
@@ -1793,7 +1793,7 @@ function renderBattle() {
   const turnLabel = document.getElementById("turn-label");
   if (turnLabel) turnLabel.textContent = `TURNO ${b.turn} · ${b.phase === "player" ? "UNIDADE ZERO" : "ALIENÍGENAS"}`;
 
-  if (!b.camera) b.camera = { x: 0, y: 1 };
+  if (!b.camera) b.camera = { x: 2, y: 1 };
   const maxCamX = Math.max(0, GRID_W - ISO_VIEW_W);
   const maxCamY = Math.max(0, GRID_H - ISO_VIEW_H);
   b.camera.x = Math.max(0, Math.min(maxCamX, b.camera.x));
@@ -1806,6 +1806,52 @@ function renderBattle() {
 
   const gridEl = document.getElementById("battle-grid");
   const canvas = ensureIsoCanvasStage(gridEl);
+
+  if (canvas && canvas.parentElement) {
+    let squadBar = document.getElementById("iso-squad-strip");
+    if (!squadBar) {
+      squadBar = document.createElement("div");
+      squadBar.id = "iso-squad-strip";
+      squadBar.style.cssText = `
+        position:absolute;
+        top:6px;
+        right:8px;
+        z-index:15;
+        display:flex;
+        flex-wrap:wrap;
+        gap:4px;
+        max-width:64%;
+        justify-content:flex-end;
+      `;
+      canvas.parentElement.appendChild(squadBar);
+    }
+    squadBar.innerHTML = "";
+    b.units.filter((u) => u.hp > 0).forEach((u) => {
+      const isAct = b.selectedUnitId === u.id;
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.textContent = `${u.name.split(" ")[0]} · ${u.ap}PA`;
+      chip.style.cssText = `
+        font-size:0.65em;
+        padding:2px 6px;
+        border-radius:999px;
+        border:1px solid ${isAct ? "#4ef2a1" : u.ap > 0 ? "rgba(125,211,252,0.45)" : "rgba(148,163,184,0.25)"};
+        background:${isAct ? "rgba(78,242,161,0.24)" : "rgba(9,17,26,0.84)"};
+        color:${isAct ? "#ecfdf5" : "#cbd5e1"};
+        cursor:pointer;
+      `;
+      chip.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        if (b.phase !== "player") return;
+        b.selectedUnitId = isAct ? null : u.id;
+        b.mode = "normal";
+        if (!isAct) centerCameraOnUnit(u);
+        addBattleLog(isAct ? `Ordens de ${u.name} recolhidas.` : `Operacional selecionado: ${u.name}.`);
+        renderBattle();
+      });
+      squadBar.appendChild(chip);
+    });
+  }
   const selUnit = getSelectedUnit();
   const selEnemy = getSelectedEnemy();
 
@@ -1827,7 +1873,7 @@ function renderBattle() {
     ctx.fillStyle = "rgba(78, 242, 161, 0.82)";
     ctx.font = "bold 9px monospace";
     ctx.textAlign = "left";
-    ctx.fillText(`XCOM ISO 2:1 · ARRASTA PARA NAVEGAR [${b.camera.x + 1}..${b.camera.x + ISO_VIEW_W}, ${b.camera.y + 1}..${b.camera.y + ISO_VIEW_H}]`, 10, 14);
+    ctx.fillText(`ISO 2:1 · ARRASTA [${b.camera.x + 1}..${b.camera.x + ISO_VIEW_W}, ${b.camera.y + 1}..${b.camera.y + ISO_VIEW_H}]`, 10, 14);
 
     drawIsoBoardSkirt(ctx, b, m);
 
@@ -1872,6 +1918,16 @@ function renderBattle() {
         }
 
         drawIsoDiamond(ctx, sx, sy, m.tileW, m.tileH, fill, stroke, canMoveHere ? 1.5 : 1);
+
+        if (canMoveHere) {
+          const cCov = getTileCoverAt(b, gx, gy);
+          if (cCov > 0) {
+            ctx.fillStyle = cCov === 2 ? "#93c5fd" : "#fde68a";
+            ctx.font = "bold 8px monospace";
+            ctx.textAlign = "center";
+            ctx.fillText(cCov === 2 ? "▲" : "▪", sx, sy + 2.5);
+          }
+        }
       }
     }
 
