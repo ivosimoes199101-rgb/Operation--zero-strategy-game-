@@ -644,14 +644,14 @@ function setTacticalViewportLock(active) {
       #tactical.active .battle-side {
         display: grid !important;
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
-        gap: 6px !important;
-        padding: 8px 10px 12px 10px !important;
-        background: linear-gradient(180deg, rgba(10, 18, 28, 0.94) 0%, rgba(5, 10, 16, 0.99) 100%) !important;
-        border-top: 1px solid rgba(78, 242, 161, 0.35) !important;
-        border-top-left-radius: 16px !important;
-        border-top-right-radius: 16px !important;
-        box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.65) !important;
-        flex-shrink: 0 !important;
+        gap: 5px !important;
+        padding: 6px 8px 8px 8px !important;
+        background: linear-gradient(180deg, rgba(10, 18, 28, 0.96) 0%, rgba(5, 10, 16, 1) 100%) !important;
+        border-top: 1px solid rgba(78, 242, 161, 0.38) !important;
+        border-top-left-radius: 12px !important;
+        border-top-right-radius: 12px !important;
+        box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.65) !important;
+        flex: 0 0 auto !important;
         width: 100% !important;
         max-width: 100% !important;
         box-sizing: border-box !important;
@@ -752,11 +752,9 @@ function setTacticalViewportLock(active) {
         letter-spacing: 0.4px !important;
       }
       #tactical.active .battle-main {
-        flex: 1 1 100% !important;
+        flex: 1 1 auto !important;
         width: 100% !important;
-        height: 100% !important;
         min-height: 0 !important;
-        max-height: 100% !important;
         margin: 0 !important;
         padding: 0 !important;
         display: flex !important;
@@ -1568,16 +1566,16 @@ function getIsoMetrics(canvas, ignoreBattlePan = false) {
   const zoom = getBattleZoom(b);
 
   const span = GRID_W + GRID_H;
-  const maxTileWByWidth = Math.floor(((w - 32) * 1.72) / span);
-  const maxTileWByHeight = Math.floor(((h - 150) * 3.15) / span);
-  const baseTileW = Math.max(20, Math.min(68, Math.min(maxTileWByWidth, maxTileWByHeight)));
-  const tileW = Math.max(16, baseTileW * zoom);
-  const tileH = Math.max(8, tileW * 0.5);
-  const wallH = Math.max(5, tileH * 0.55);
+  const maxTileWByWidth = Math.floor(((w - 20) * 1.92) / span);
+  const maxTileWByHeight = Math.floor(((h - 90) * 3.65) / span);
+  const baseTileW = Math.max(24, Math.min(78, Math.min(maxTileWByWidth, maxTileWByHeight)));
+  const tileW = Math.max(18, baseTileW * zoom);
+  const tileH = Math.max(9, tileW * 0.5);
+  const wallH = Math.max(5, tileH * 0.58);
 
   const boardPixelH = span * tileH * 0.5;
   const baseOriginX = w * 0.5 + (GRID_H - GRID_W) * (tileW * 0.25);
-  const baseOriginY = Math.max(52, Math.round((h - 108 - boardPixelH) * 0.45) + 16);
+  const baseOriginY = Math.max(54, Math.round((h - boardPixelH) * 0.48) + 6);
 
   const panX = (!ignoreBattlePan && b && typeof b.panX === "number") ? b.panX : 0;
   const panY = (!ignoreBattlePan && b && typeof b.panY === "number") ? b.panY : 0;
