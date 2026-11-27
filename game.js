@@ -581,7 +581,9 @@ function setTacticalViewportLock(active) {
         z-index: 60 !important;
       }
       #tactical.active .battle-top {
-        flex-shrink: 0 !important;
+        flex: 0 0 auto !important;
+        height: auto !important;
+        min-height: 0 !important;
         display: flex !important;
         align-items: center !important;
         justify-content: space-between !important;
@@ -589,16 +591,28 @@ function setTacticalViewportLock(active) {
         margin: 0 !important;
         gap: 6px !important;
       }
+      #tactical.active .battle-top > div,
+      #tactical.active .battle-top > span {
+        margin: 0 !important;
+        padding: 0 !important;
+      }
       #tactical.active .battle-top .tag,
-      #tactical.active .battle-top .status-pill {
+      #tactical.active .battle-top .status-pill,
+      #tactical.active .battle-top .eyebrow,
+      #tactical.active .battle-top small {
         display: none !important;
       }
       #tactical.active .battle-top h2,
       #tactical.active #battle-title {
-        font-size: 0.85em !important;
-        line-height: 1.15 !important;
+        font-size: 0.82em !important;
+        line-height: 1.1 !important;
         margin: 0 !important;
+        padding: 0 !important;
         letter-spacing: 0.5px !important;
+      }
+      #tactical.active > * {
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
       }
       #tactical.active .battle-info {
         flex-shrink: 0 !important;
@@ -1001,8 +1015,8 @@ function renderCampaignMissions() {
 
 const GRID_W = 10;
 const GRID_H = 8;
-const ISO_VIEW_W = 6;
-const ISO_VIEW_H = 6;
+const ISO_VIEW_W = 7;
+const ISO_VIEW_H = 7;
 
 function createMissionMap(missionIndex) {
   const grid = Array.from({ length: GRID_H }, () => Array(GRID_W).fill(0));
@@ -1287,16 +1301,17 @@ function addBattleLog(msg) {
 function getIsoMetrics(canvas) {
   const rect = canvas.getBoundingClientRect();
   const w = Math.max(300, rect.width || canvas.parentElement?.clientWidth || 360);
-  const h = Math.max(240, rect.height || 360);
+  const h = Math.max(260, rect.height || 420);
 
-  const maxTileWByWidth = Math.floor((w - 16) / ISO_VIEW_W);
-  const maxTileWByHeight = Math.floor(((h - 44) / ISO_VIEW_H) * 2);
-  const tileW = Math.max(44, Math.min(76, Math.min(maxTileWByWidth, maxTileWByHeight)));
+  const avgView = (ISO_VIEW_W + ISO_VIEW_H) * 0.5;
+  const maxTileWByWidth = Math.floor((w - 12) / avgView);
+  const maxTileWByHeight = Math.floor(((h - 46) / avgView) * 2);
+  const tileW = Math.max(46, Math.min(84, Math.min(maxTileWByWidth, maxTileWByHeight)));
   const tileH = Math.round(tileW * 0.5);
-  const wallH = Math.max(8, Math.round(tileH * 0.45));
+  const wallH = Math.max(8, Math.round(tileH * 0.44));
   const originX = w * 0.5;
-  const boardPixelH = ISO_VIEW_W * tileH;
-  const originY = Math.max(28, Math.round((h - boardPixelH) * 0.34));
+  const boardPixelH = avgView * tileH;
+  const originY = Math.max(42, Math.round((h - boardPixelH) * 0.48));
 
   return { w, h, tileW, tileH, wallH, originX, originY };
 }
@@ -1993,14 +2008,16 @@ function renderBattle() {
       squadBar.id = "iso-squad-strip";
       squadBar.style.cssText = `
         position:absolute;
-        top:6px;
-        right:8px;
+        top:20px;
+        left:6px;
+        right:6px;
         z-index:15;
         display:flex;
-        flex-wrap:wrap;
+        flex-wrap:nowrap;
+        overflow-x:auto;
         gap:4px;
-        max-width:64%;
-        justify-content:flex-end;
+        justify-content:flex-start;
+        scrollbar-width:none;
       `;
       canvas.parentElement.appendChild(squadBar);
     }
