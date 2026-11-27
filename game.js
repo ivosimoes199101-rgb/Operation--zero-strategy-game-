@@ -1235,316 +1235,8 @@ function ensureTacticalExtras() {
   }
 }
 
-
-// ---------------------------------------------------------------------------
-// 6B. MAPA ISOMÉTRICO EM <canvas> (PROJEÇÃO 2:1, TOQUE PRECISO, CÂMERA E BARRA)
-// ---------------------------------------------------------------------------
-
-function getIsoCanvasMetrics(canvas) {
-  const rect = canvas.getBoundingClientRect();
-  const w = Math.max(260, rect.width || canvas.clientWidth || 360);
-  const h = Math.max(250, rect.height || canvas.clientHeight || 340);
-  const tileW = Math.max(46, Math.min(74, Math.floor(w / 5.3)));
-  const tileH = Math.round(tileW * 0.52);
-  const extrudeH = Math.max(8, Math.round(tileH * 0.36));
-  return { w, h, tileW, tileH, extrudeH };
-}
-
-function isoToScreen(gx, gy, battle, metrics) {
-  const camX = battle && battle.camera ? battle.camera.x : 0;
-  const camY = battle && battle.camera ? battle.camera.y : 0;
-  const lx = gx - camX;
-  const ly = gy - camY;
-  const originX = metrics.w * 0.5;
-  const originY = Math.max(52, metrics.h * 0.23);
-  const sx = originX + (lx - ly) * (metrics.tileW * 0.5);
-  const sy = originY + (lx + ly) * (metrics.tileH * 0.5);
-  return { sx, sy, lx, ly };
-}
-
-function screenToIso(px, py, battle, metrics) {
-  const camX = battle && battle.camera ? battle.camera.x : 0;
-  const camY = battle && battle.camera ? battle.camera.y : 0;
-  const originX = metrics.w * 0.5;
-  const originY = Math.max(52, metrics.h * 0.23);
-  const dx = (px - originX) / (metrics.tileW * 0.5);
-  const dy = (py - originY) / (metrics.tileH * 0.5);
-  const lx = Math.floor((dx + dy) * 0.5 + 0.5);
-  const ly = Math.floor((dy - dx) * 0.5 + 0.5);
-  const gx = lx + camX;
-  const gy = ly + camY;
-  if (gx < 0 || gx >= GRID_W || gy < 0 || gy >= GRID_H) return null;
-  return { x: gx, y: gy };
-}
-
-function drawIsoDiamond(ctx, sx, sy, tileW, tileH, fillStyle, strokeStyle, lineWidth = 1) {
-  const hw = tileW * 0.5;
-  const hh = tileH * 0.5;
-  ctx.beginPath();
-  ctx.moveTo(sx, sy - hh);
-  ctx.lineTo(sx + hw, sy);
-  ctx.lineTo(sx, sy + hh);
-  ctx.lineTo(sx - hw, sy);
-  ctx.closePath();
-  if (fillStyle) {
-    ctx.fillStyle = fillStyle;
-    ctx.fill();
-  }
-  if (strokeStyle) {
-    ctx.strokeStyle = strokeStyle;
-    ctx.lineWidth = lineWidth;
-    ctx.stroke();
-  }
-}
-
-function drawIsoBlock(ctx, sx, sy, tileW, tileH, heightPx, topFill, leftFill, rightFill, strokeStyle = "rgba(255,255,255,0.22)") {
-  const hw = tileW * 0.5;
-  const hh = tileH * 0.5;
-  const ty = sy - heightPx;
-
-  ctx.beginPath();
-  ctx.moveTo(sx - hw, ty);
-  ctx.lineTo(sx, ty + hh);
-  ctx.lineTo(sx, sy + hh);
-  ctx.lineTo(sx - hw, sy);
-  ctx.closePath();
-  ctx.fillStyle = leftFill;
-  ctx.fill();
-  ctx.strokeStyle = strokeStyle;
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(sx + hw, ty);
-  ctx.lineTo(sx, ty + hh);
-  ctx.lineTo(sx, sy + hh);
-  ctx.lineTo(sx + hw, sy);
-  ctx.closePath();
-  ctx.fillStyle = rightFill;
-  ctx.fill();
-  ctx.stroke();
-
-  drawIsoDiamond(ctx, sx, ty, tileW, tileH, topFill, strokeStyle, 1);
-}
-
-function ensureIsoCanvas(gridEl) {
-  if (!gridEl || !gridEl.parentElement) return null;
-  const parent = gridEl.parentElement;
-  gridEl.style.display = "none";
-  let canvas = document.getElementById("iso-battle-canvas");
-  if (!canvas) {
-    canvas = document.createElement("canvas");
-    canvas.id = "iso-battle-canvas";
-    canvas.style.cssText = `
-      width: 100%;
-      height: 100%;
-      min-height: 240px;
-      display: block;
-      touch-action: none;
-      user-select: none;
-      -webkit-user-select: none;
-      border-radius: 8px;
-      background: radial-gradient(circle at 50% 25%, rgba(28,48,68,0.55), rgba(8,13,20,0.92));
-      border: 1px solid rgba(78,242,161,0.25);
-    `;
-    parent.insertBefore(canvas, gridEl);
-
-    let dragStartX = 0;
-    let dragStartY = 0;
-    let lastPanX = 0;
-    let lastPanY = 0;
-    let isDragging = false;
-    let movedDist = 0;
-
-    const onPointerDown = (ev) => {
-      isDragging = true;
-      movedDist = 0;
-      dragStartX = ev.clientX;
-      dragStartY = ev.clientY;
-      lastPanX = ev.clientX;
-      lastPanY = ev.clientY;
-    };
-
-    const onPointerMove = (ev) => {
-      if (!isDragging) return;
-      const dxTotal = ev.clientX - dragStartX;
-      const dyTotal = ev.clientY - dragStartY;
-      movedDist = Math.hypot(dxTotal, dyTotal);
-      if (movedDist > 22) {
-        const stepX = ev.clientX - lastPanX;
-        const stepY = ev.clientY - lastPanY;
-        if (Math.abs(stepX) >= 30 || Math.abs(stepY) >= 22) {
-          const panDx = stepX >= 30 ? -1 : stepX <= -30 ? 1 : 0;
-          const panDy = stepY >= 22 ? -1 : stepY <= -22 ? 1 : 0;
-          lastPanX = ev.clientX;
-          lastPanY = ev.clientY;
-          if (panDx !== 0 || panDy !== 0) {
-            panCamera(panDx, panDy);
-          }
-        }
-      }
-    };
-
-    const onPointerUp = (ev) => {
-      if (!isDragging) return;
-      isDragging = false;
-      if (movedDist <= 14 && state.battle) {
-        const rect = canvas.getBoundingClientRect();
-        const px = ev.clientX - rect.left;
-        const py = ev.clientY - rect.top;
-        const metrics = getIsoCanvasMetrics(canvas);
-        const hit = screenToIso(px, py, state.battle, metrics);
-        if (hit) {
-          handleCellClick(hit.x, hit.y);
-        }
-      }
-    };
-
-    canvas.addEventListener("pointerdown", onPointerDown);
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp);
-  }
-  return canvas;
-}
-
-function renderIsoBattleCanvas(battle, selUnit, gridEl) {
-  const canvas = ensureIsoCanvas(gridEl);
-  if (!canvas || !battle) return;
-
-  const metrics = getIsoCanvasMetrics(canvas);
-  const dpr = window.devicePixelRatio || 1;
-  if (canvas.width !== Math.round(metrics.w * dpr) || canvas.height !== Math.round(metrics.h * dpr)) {
-    canvas.width = Math.round(metrics.w * dpr);
-    canvas.height = Math.round(metrics.h * dpr);
-  }
-
-  const ctx = canvas.getContext("2d");
-  ctx.save();
-  ctx.scale(dpr, dpr);
-  ctx.clearRect(0, 0, metrics.w, metrics.h);
-
-  const camX = battle.camera ? battle.camera.x : 0;
-  const camY = battle.camera ? battle.camera.y : 0;
-  const viewW = Math.min(GRID_W, 6);
-  const viewH = Math.min(GRID_H, 6);
-  const maxMoveRange = getUnitMoveRange(selUnit);
-
-  for (let sum = 0; sum <= viewW + viewH - 2; sum++) {
-    for (let vy = 0; vy < viewH; vy++) {
-      const vx = sum - vy;
-      if (vx < 0 || vx >= viewW) continue;
-      const gx = camX + vx;
-      const gy = camY + vy;
-      const { sx, sy } = isoToScreen(gx, gy, battle, metrics);
-
-      const tileType = battle.grid[gy][gx];
-      const unitHere = battle.units.find((u) => u.x === gx && u.y === gy && u.hp > 0);
-      const enemyHere = battle.enemies.find((e) => e.x === gx && e.y === gy && e.hp > 0);
-      const smokeHere = isInSmoke(battle, gx, gy);
-
-      const distFromSel = selUnit ? Math.abs(selUnit.x - gx) + Math.abs(selUnit.y - gy) : 99;
-      const canMoveHere =
-        battle.phase === "player" &&
-        (battle.mode === "move" || battle.mode === "normal") &&
-        selUnit &&
-        selUnit.ap >= 1 &&
-        !unitHere &&
-        !enemyHere &&
-        tileType !== 3 &&
-        distFromSel > 0 &&
-        distFromSel <= maxMoveRange;
-
-      let fill = "rgba(38, 56, 76, 0.42)";
-      let stroke = "rgba(148, 184, 218, 0.24)";
-      if (canMoveHere) {
-        fill = "rgba(78, 242, 161, 0.26)";
-        stroke = "#4ef2a1";
-      } else if (smokeHere) {
-        fill = "rgba(195, 215, 235, 0.34)";
-        stroke = "rgba(220, 235, 250, 0.5)";
-      }
-
-      drawIsoDiamond(ctx, sx, sy, metrics.tileW, metrics.tileH, fill, stroke, canMoveHere ? 1.6 : 1);
-
-      const cov = (!unitHere && !enemyHere && tileType !== 3) ? getTileCoverAt(battle, gx, gy) : 0;
-      if (cov > 0) {
-        ctx.fillStyle = cov === 2 ? "#7dd3fc" : "#fde047";
-        ctx.font = "bold 9px monospace";
-        ctx.textAlign = "center";
-        ctx.fillText(cov === 2 ? "COB+" : "COB", sx, sy + 3);
-      }
-
-      if (tileType === 3) {
-        drawIsoBlock(ctx, sx, sy, metrics.tileW, metrics.tileH, metrics.extrudeH * 1.4, "#3b495e", "#222b38", "#2d3848");
-      } else if (tileType === 2) {
-        drawIsoBlock(ctx, sx, sy, metrics.tileW, metrics.tileH, metrics.extrudeH * 0.85, "#60a5fa", "#2563eb", "#1d4ed8");
-      } else if (tileType === 1 || tileType === 4) {
-        const isDestructible = tileType === 4;
-        drawIsoBlock(
-          ctx,
-          sx,
-          sy,
-          metrics.tileW,
-          metrics.tileH,
-          metrics.extrudeH * 0.55,
-          isDestructible ? "#fb923c" : "#eab308",
-          isDestructible ? "#c2410c" : "#a16207",
-          isDestructible ? "#9a3412" : "#854d0e"
-        );
-      }
-
-      if (unitHere) {
-        const isSel = selUnit && selUnit.id === unitHere.id;
-        drawIsoBlock(
-          ctx,
-          sx,
-          sy,
-          metrics.tileW * 0.68,
-          metrics.tileH * 0.68,
-          metrics.extrudeH * 0.9,
-          isSel ? "#6ee7b7" : "#4ea8de",
-          "#1e40af",
-          "#1d4ed8",
-          isSel ? "#ffffff" : "#93c5fd"
-        );
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "bold 9px monospace";
-        ctx.textAlign = "center";
-        ctx.fillText(`${unitHere.name.split(" ")[0].slice(0, 5)} ${unitHere.hp}`, sx, sy - metrics.extrudeH * 0.9 - metrics.tileH * 0.35);
-      }
-
-      if (enemyHere) {
-        const isTarget = battle.selectedTargetId === enemyHere.id;
-        drawIsoBlock(
-          ctx,
-          sx,
-          sy,
-          metrics.tileW * 0.72,
-          metrics.tileH * 0.72,
-          metrics.extrudeH * 1.05,
-          isTarget ? "#ffd166" : "#ff5252",
-          "#991b1b",
-          "#7f1d1d",
-          isTarget ? "#ffd166" : "#fca5a5"
-        );
-        const hChance = selUnit ? calculateHitChance(selUnit, enemyHere, battle) : null;
-        ctx.fillStyle = isTarget ? "#ffd166" : "#ffb4b4";
-        ctx.font = "bold 9px monospace";
-        ctx.textAlign = "center";
-        const tag = hChance !== null ? `${enemyHere.archetypeId.slice(0, 4).toUpperCase()} ${hChance}%` : `${enemyHere.archetypeId.slice(0, 4).toUpperCase()} ${enemyHere.hp}`;
-        ctx.fillText(tag, sx, sy - metrics.extrudeH * 1.05 - metrics.tileH * 0.35);
-      }
-    }
-  }
-
-  ctx.restore();
-}
-
 function renderFloatingUnitOrders(battle, selUnit, gridEl) {
   let pop = document.getElementById("floating-unit-orders");
-  const canvas = document.getElementById("iso-battle-canvas");
-  const parent = (canvas && canvas.parentElement) || (gridEl && gridEl.parentElement) || document.getElementById("tactical");
-
   if (!pop) {
     pop = document.createElement("div");
     pop.id = "floating-unit-orders";
@@ -1560,6 +1252,7 @@ function renderFloatingUnitOrders(battle, selUnit, gridEl) {
       min-width:210px;
       max-width:320px;
     `;
+    const parent = gridEl && gridEl.parentElement ? gridEl.parentElement : document.getElementById("tactical");
     if (parent) {
       if (getComputedStyle(parent).position === "static") {
         parent.style.position = "relative";
@@ -1568,7 +1261,7 @@ function renderFloatingUnitOrders(battle, selUnit, gridEl) {
     }
   }
 
-  if (!battle || battle.phase !== "player" || !selUnit || !canvas || !parent) {
+  if (!battle || battle.phase !== "player" || !selUnit || !gridEl) {
     pop.style.display = "none";
     return;
   }
@@ -1585,10 +1278,16 @@ function renderFloatingUnitOrders(battle, selUnit, gridEl) {
     return;
   }
 
-  const metrics = getIsoCanvasMetrics(canvas);
-  const { sx, sy } = isoToScreen(selUnit.x, selUnit.y, battle, metrics);
+  const cellIndex = vy * viewW + vx;
+  const cellEl = gridEl.children[cellIndex];
+  const parent = pop.parentElement;
+  if (!cellEl || !parent) {
+    pop.style.display = "none";
+    return;
+  }
+
   const parentRect = parent.getBoundingClientRect();
-  const canvasRect = canvas.getBoundingClientRect();
+  const cellRect = cellEl.getBoundingClientRect();
 
   const stanceLabel = selUnit.crouched ? "AGACHADO" : "EM PÉ";
   pop.innerHTML = `
@@ -1624,15 +1323,13 @@ function renderFloatingUnitOrders(battle, selUnit, gridEl) {
   pop.style.top = "0px";
   const popRect = pop.getBoundingClientRect();
 
-  const unitScreenX = (canvasRect.left - parentRect.left) + sx;
-  const unitScreenY = (canvasRect.top - parentRect.top) + sy;
-
-  let left = unitScreenX - popRect.width / 2;
+  const centerX = cellRect.left - parentRect.left + cellRect.width / 2;
+  let left = centerX - popRect.width / 2;
   left = Math.max(6, Math.min(parentRect.width - popRect.width - 6, left));
 
-  let top = unitScreenY - popRect.height - metrics.tileH * 0.9;
+  let top = cellRect.top - parentRect.top - popRect.height - 6;
   if (top < 6) {
-    top = unitScreenY + metrics.tileH * 0.7;
+    top = cellRect.bottom - parentRect.top + 6;
   }
   top = Math.max(6, Math.min(parentRect.height - popRect.height - 6, top));
 
@@ -1806,7 +1503,7 @@ function renderBattle() {
       camCoords.textContent = `CÂMERA [${b.camera.x + 1}..${b.camera.x + viewW}, ${b.camera.y + 1}..${b.camera.y + viewH}] / ${GRID_W}x${GRID_H}`;
     }
 
-    gridEl.style.display = "none";
+    gridEl.style.display = "grid";
     gridEl.style.gridTemplateColumns = `repeat(${viewW}, minmax(0, 1fr))`;
     gridEl.style.width = "100%";
     gridEl.style.maxWidth = "100%";
@@ -1961,7 +1658,6 @@ function renderBattle() {
   const selUnit = getSelectedUnit();
   const selEnemy = getSelectedEnemy();
 
-  renderIsoBattleCanvas(b, selUnit, gridEl);
   renderFloatingUnitOrders(b, selUnit, gridEl);
 
   const setText = (id, txt) => {
