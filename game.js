@@ -1830,7 +1830,7 @@ function ensureIsoCanvasStage(gridEl) {
     canvas.style.cssText = "width:100%;height:100%;display:block;touch-action:none;user-select:none;-webkit-user-select:none;cursor:pointer;";
     stage.appendChild(canvas);
 
-    // Navegação tátil nativa no ecrã tátil: pinça com 2 dedos + arrasto livre em qualquer zoom + toque simples
+    // Navegação tátil estável (sem cintilação): arrasto livre em qualquer zoom, pinça de 2 dedos e toque simples
     const activePointers = new Map();
     let isPanning = false;
     let totalMoved = 0;
@@ -1844,11 +1844,15 @@ function ensureIsoCanvasStage(gridEl) {
     let pinchAnchorY = 0;
     let pinchLastMidX = 0;
     let pinchLastMidY = 0;
-    let touchPinchActive = false;
-    let touchPinchStartDist = 0;
-    let touchPinchStartZoom = 1;
-    let touchPinchLastMidX = 0;
-    let touchPinchLastMidY = 0;
+    let rafId = null;
+
+    function scheduleBattleRender() {
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        if (state.battle) renderBattle();
+      });
+    }
 
     function getPinchInfo() {
       const pts = Array.from(activePointers.values());
@@ -1864,8 +1868,6 @@ function ensureIsoCanvasStage(gridEl) {
 
     canvas.addEventListener("pointerdown", (ev) => {
       if (!state.battle) return;
-      if (ev.pointerType === "touch") ev.preventDefault();
-      try { canvas.setPointerCapture(ev.pointerId); } catch (_) {}
       activePointers.set(ev.pointerId, { clientX: ev.clientX, clientY: ev.clientY });
 
       if (activePointers.size >= 2) {
@@ -1889,11 +1891,10 @@ function ensureIsoCanvasStage(gridEl) {
       startClientY = ev.clientY;
       lastClientX = ev.clientX;
       lastClientY = ev.clientY;
-    }, { passive: false });
+    });
 
     canvas.addEventListener("pointermove", (ev) => {
       if (!state.battle) return;
-      if (ev.pointerType === "touch") ev.preventDefault();
       if (activePointers.has(ev.pointerId)) {
         activePointers.set(ev.pointerId, { clientX: ev.clientX, clientY: ev.clientY });
       }
@@ -1909,14 +1910,17 @@ function ensureIsoCanvasStage(gridEl) {
           pinchLastMidY = pInfo.midY;
           state.battle.panX = (state.battle.panX || 0) + panDeltaX;
           state.battle.panY = (state.battle.panY || 0) + panDeltaY;
-          setBattleZoom(targetZoom, pinchAnchorX, pinchAnchorY);
+          state.battle.zoom = targetZoom;
+          const m = getIsoMetrics(canvas, true);
+          clampBattlePan(state.battle, m);
+          scheduleBattleRender();
         }
         return;
       }
 
       if (isPanning) {
         totalMoved = Math.hypot(ev.clientX - startClientX, ev.clientY - startClientY);
-        if (totalMoved > 4) {
+        if (totalMoved > 6) {
           const dx = ev.clientX - lastClientX;
           const dy = ev.clientY - lastClientY;
           lastClientX = ev.clientX;
@@ -1925,7 +1929,7 @@ function ensureIsoCanvasStage(gridEl) {
           state.battle.panX = (state.battle.panX || 0) + dx;
           state.battle.panY = (state.battle.panY || 0) + dy;
           clampBattlePan(state.battle, m);
-          renderBattle();
+          scheduleBattleRender();
           return;
         }
       }
@@ -1940,18 +1944,17 @@ function ensureIsoCanvasStage(gridEl) {
         const same = (!prev && !hit) || (prev && hit && prev.x === hit.x && prev.y === hit.y);
         if (!same) {
           state.battle.hoverTile = hit;
-          renderBattle();
+          scheduleBattleRender();
         }
       } else if (state.battle.hoverTile) {
         state.battle.hoverTile = null;
-        renderBattle();
+        scheduleBattleRender();
       }
-    }, { passive: false });
+    });
 
     const finishPointer = (ev) => {
       const wasPinching = activePointers.size >= 2;
       activePointers.delete(ev.pointerId);
-      try { canvas.releasePointerCapture(ev.pointerId); } catch (_) {}
       if (activePointers.size < 2) {
         pinchStartDist = 0;
       }
@@ -1968,69 +1971,8 @@ function ensureIsoCanvasStage(gridEl) {
       }
     };
 
-    canvas.addEventListener("pointerup", finishPointer);
-    canvas.addEventListener("pointercancel", finishPointer);
-    canvas.addEventListener("pointerleave", () => {
-      if (state.battle && state.battle.hoverTile) {
-        state.battle.hoverTile = null;
-        renderBattle();
-      }
-    });
-
-    // Suporte TouchEvent direto para ecrãs táteis em webviews/browsers com pinça de 2 dedos
-    canvas.addEventListener("touchstart", (ev) => {
-      if (!state.battle) return;
-      ev.preventDefault();
-      if (ev.touches.length >= 2) {
-        const t1 = ev.touches[0];
-        const t2 = ev.touches[1];
-        const rect = canvas.getBoundingClientRect();
-        touchPinchActive = true;
-        touchPinchStartDist = Math.max(1, Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY));
-        touchPinchStartZoom = getBattleZoom(state.battle);
-        touchPinchLastMidX = ((t1.clientX + t2.clientX) * 0.5) - rect.left;
-        touchPinchLastMidY = ((t1.clientY + t2.clientY) * 0.5) - rect.top;
-        isPanning = false;
-        totalMoved = 999;
-      }
-    }, { passive: false });
-
-    canvas.addEventListener("touchmove", (ev) => {
-      if (!state.battle) return;
-      ev.preventDefault();
-      if (ev.touches.length >= 2) {
-        const t1 = ev.touches[0];
-        const t2 = ev.touches[1];
-        const rect = canvas.getBoundingClientRect();
-        const dist = Math.max(1, Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY));
-        const midX = ((t1.clientX + t2.clientX) * 0.5) - rect.left;
-        const midY = ((t1.clientY + t2.clientY) * 0.5) - rect.top;
-        if (!touchPinchActive || touchPinchStartDist <= 4) {
-          touchPinchActive = true;
-          touchPinchStartDist = dist;
-          touchPinchStartZoom = getBattleZoom(state.battle);
-          touchPinchLastMidX = midX;
-          touchPinchLastMidY = midY;
-          return;
-        }
-        const factor = dist / touchPinchStartDist;
-        const targetZoom = Math.max(0.65, Math.min(2.6, Number((touchPinchStartZoom * factor).toFixed(2))));
-        const dx = midX - touchPinchLastMidX;
-        const dy = midY - touchPinchLastMidY;
-        touchPinchLastMidX = midX;
-        touchPinchLastMidY = midY;
-        state.battle.panX = (state.battle.panX || 0) + dx;
-        state.battle.panY = (state.battle.panY || 0) + dy;
-        setBattleZoom(targetZoom, midX, midY);
-      }
-    }, { passive: false });
-
-    canvas.addEventListener("touchend", (ev) => {
-      if (ev.touches.length < 2) {
-        touchPinchActive = false;
-        touchPinchStartDist = 0;
-      }
-    }, { passive: false });
+    window.addEventListener("pointerup", finishPointer);
+    window.addEventListener("pointercancel", finishPointer);
 
     canvas.addEventListener("wheel", (ev) => {
       if (!state.battle) return;
@@ -2807,8 +2749,6 @@ function renderBattle() {
 
   const logEl = document.getElementById("battle-log");
   if (logEl) logEl.textContent = b.log;
-
-  checkBattleOutcome();
 }
 
 function handleCellClick(x, y) {
@@ -2913,6 +2853,7 @@ function handleCellClick(x, y) {
 
       addBattleLog(`${selUnit.name} ${moveType} para (${x + 1},${y + 1}).${rescuedMsg}`);
       renderBattle();
+      checkBattleOutcome();
     }
   }
 }
@@ -2958,6 +2899,7 @@ function throwFragGrenade(unit, tx, ty) {
 
   addBattleLog(`${unit.name} lançou granada de fragmentação em (${tx + 1},${ty + 1}) — ${hits} inimigo(s) atingido(s).`);
   renderBattle();
+  checkBattleOutcome();
 }
 
 function throwSmokeGrenade(unit, tx, ty) {
@@ -3184,6 +3126,7 @@ function endPlayerTurn() {
 
   addBattleLog(`Turno ${b.turn} iniciado — Ordens da Unidade ZERO.`);
   renderBattle();
+  checkBattleOutcome();
 }
 
 function checkBattleOutcome() {
