@@ -949,6 +949,7 @@ function startMission(mission, missionIndex = 0) {
       medkits: (u.medkits ?? 1) + medbayBonusKits,
       overwatch: false,
       hunker: false,
+      crouched: false,
       stunned: false
     };
   });
@@ -990,6 +991,7 @@ function startMission(mission, missionIndex = 0) {
     turn: 1,
     phase: "player",
     mode: "normal",
+    camera: { x: 0, y: 0 },
     grid: createMissionMap(missionIndex),
     smokes: [],
     units,
@@ -1001,6 +1003,81 @@ function startMission(mission, missionIndex = 0) {
 
   goToScreen("tactical");
   renderBattle();
+}
+
+function getUnitMoveRange(unit) {
+  if (!unit) return 0;
+  let range = unit.crouched ? 2 : 4;
+  if (unit.stunned) range = Math.max(1, range - 1);
+  return range;
+}
+
+function toggleCrouchSelectedUnit() {
+  const b = state.battle;
+  if (!b || b.phase !== "player") return;
+  const unit = getSelectedUnit();
+  if (!unit || unit.ap < 1) {
+    addBattleLog("Sem PA para alterar a postura.");
+    return;
+  }
+  unit.ap -= 1;
+  unit.crouched = !unit.crouched;
+  if (unit.crouched) {
+    unit.hunker = true;
+    addBattleLog(`${unit.name} agachou-se (MOV CAUTELOSO: 2 casas, maior proteção).`);
+  } else {
+    unit.hunker = false;
+    addBattleLog(`${unit.name} levantou-se (CORRER: 4 casas de alcance).`);
+  }
+  renderBattle();
+}
+
+function toggleMoveModeSelectedUnit() {
+  const b = state.battle;
+  if (!b || b.phase !== "player") return;
+  const unit = getSelectedUnit();
+  if (!unit) {
+    addBattleLog("Seleciona primeiro um operacional.");
+    return;
+  }
+  if (unit.ap < 1) {
+    addBattleLog(`${unit.name} não tem PA para mover.`);
+    return;
+  }
+  b.mode = b.mode === "move" ? "normal" : "move";
+  const range = getUnitMoveRange(unit);
+  const stanceTxt = unit.crouched ? "agachado/cauteloso" : "de pé/corrida";
+  addBattleLog(
+    b.mode === "move"
+      ? `Modo MOVER ativo (${stanceTxt}, alcance ${range} casas): escolhe uma célula realçada no mapa.`
+      : "Modo de seleção normal restaurado."
+  );
+  renderBattle();
+}
+
+function panCamera(dx, dy) {
+  const b = state.battle;
+  if (!b) return;
+  const viewW = Math.min(GRID_W, 6);
+  const viewH = Math.min(GRID_H, 6);
+  const maxCamX = Math.max(0, GRID_W - viewW);
+  const maxCamY = Math.max(0, GRID_H - viewH);
+  if (!b.camera) b.camera = { x: 0, y: 0 };
+  b.camera.x = Math.max(0, Math.min(maxCamX, b.camera.x + dx));
+  b.camera.y = Math.max(0, Math.min(maxCamY, b.camera.y + dy));
+  renderBattle();
+}
+
+function centerCameraOnUnit(unit) {
+  const b = state.battle;
+  if (!b || !unit) return;
+  const viewW = Math.min(GRID_W, 6);
+  const viewH = Math.min(GRID_H, 6);
+  const maxCamX = Math.max(0, GRID_W - viewW);
+  const maxCamY = Math.max(0, GRID_H - viewH);
+  if (!b.camera) b.camera = { x: 0, y: 0 };
+  b.camera.x = Math.max(0, Math.min(maxCamX, unit.x - Math.floor(viewW / 2)));
+  b.camera.y = Math.max(0, Math.min(maxCamY, unit.y - Math.floor(viewH / 2)));
 }
 
 function getSelectedUnit() {
@@ -1033,9 +1110,12 @@ function calculateHitChance(unit, target, battle) {
   let chance = (unit.aim || 75) + cmdBonus - dist * 3;
 
   const cover = getTileCoverAt(battle, target.x, target.y);
-  if (!unit.hunker) {
+  if (!unit.hunker && !unit.crouched) {
     if (cover === 1) chance -= target.hunker ? 40 : 25;
     if (cover === 2) chance -= target.hunker ? 55 : 40;
+  }
+  if (unit.crouched) {
+    chance += 4;
   }
 
   if (isInSmoke(battle, target.x, target.y)) chance -= 25;
@@ -1072,6 +1152,8 @@ function ensureTacticalExtras() {
       extraBar.id = "tactical-grenade-bar";
       extraBar.style.cssText = "display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;";
       extraBar.innerHTML = `
+        <button id="move-mode-btn" class="primary" style="flex:1;font-size:0.8em;">MOVER</button>
+        <button id="crouch-btn" class="secondary" style="flex:1;font-size:0.8em;">AGACHAR (1 PA)</button>
         <button id="frag-btn" class="secondary" style="flex:1;font-size:0.8em;">GRANADA FRAG (1 PA)</button>
         <button id="smoke-btn" class="secondary" style="flex:1;font-size:0.8em;">GRANADA FUMO (1 PA)</button>
       `;
@@ -1099,6 +1181,14 @@ function ensureTacticalExtras() {
         state.battle.mode = state.battle.mode === "smoke" ? "normal" : "smoke";
         addBattleLog(state.battle.mode === "smoke" ? "Modo GRANADA FUMO ativo: clica numa célula do mapa." : "Modo normal restaurado.");
         renderBattle();
+      });
+
+      document.getElementById("move-mode-btn").addEventListener("click", () => {
+        toggleMoveModeSelectedUnit();
+      });
+
+      document.getElementById("crouch-btn").addEventListener("click", () => {
+        toggleCrouchSelectedUnit();
       });
     }
   }
@@ -1146,12 +1236,15 @@ function renderFloatingUnitOrders(battle, selUnit, gridEl) {
   const parentRect = parent.getBoundingClientRect();
   const cellRect = cellEl.getBoundingClientRect();
 
+  const stanceLabel = selUnit.crouched ? "AGACHADO (CAUTELOSO)" : "EM PÉ (CORRER)";
   pop.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:5px;font-size:0.75em;color:#4ef2a1;">
-      <b>${selUnit.name} · ${selUnit.ap} PA</b>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:5px;font-size:0.73em;color:#4ef2a1;">
+      <b>${selUnit.name} · ${selUnit.ap} PA · ${stanceLabel}</b>
       <button type="button" id="close-floating-orders" style="background:none;border:none;color:#fff;cursor:pointer;font-size:1em;padding:0 2px;">✕</button>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:4px;">
+      <button type="button" data-float-act="move" class="${battle.mode === "move" ? "primary" : "secondary"}" style="font-size:0.72em;padding:4px 7px;">MOVER (${getUnitMoveRange(selUnit)})</button>
+      <button type="button" data-float-act="crouch" class="${selUnit.crouched ? "primary" : "secondary"}" style="font-size:0.72em;padding:4px 7px;">${selUnit.crouched ? "LEVANTAR" : "AGACHAR"}</button>
       <button type="button" data-float-act="fire" class="primary" style="font-size:0.72em;padding:4px 7px;">${
         battle.selectedTargetId
           ? (() => {
@@ -1170,21 +1263,11 @@ function renderFloatingUnitOrders(battle, selUnit, gridEl) {
   `;
 
   pop.style.display = "block";
-  pop.style.left = "0px";
-  pop.style.top = "0px";
-  const popRect = pop.getBoundingClientRect();
-
-  const centerX = cellRect.left - parentRect.left + cellRect.width / 2;
-  let left = centerX - popRect.width / 2;
-  left = Math.max(6, Math.min(parentRect.width - popRect.width - 6, left));
-
-  let top = cellRect.top - parentRect.top - popRect.height - 6;
-  if (top < 6) {
-    top = cellRect.bottom - parentRect.top + 6;
-  }
-
-  pop.style.left = `${Math.round(left)}px`;
-  pop.style.top = `${Math.round(top)}px`;
+  pop.style.left = "6px";
+  pop.style.top = "auto";
+  pop.style.bottom = "6px";
+  pop.style.right = "6px";
+  pop.style.maxWidth = "calc(100% - 12px)";
 
   const closeBtn = pop.querySelector("#close-floating-orders");
   if (closeBtn) {
@@ -1199,7 +1282,9 @@ function renderFloatingUnitOrders(battle, selUnit, gridEl) {
     btn.addEventListener("click", (ev) => {
       ev.stopPropagation();
       const act = btn.getAttribute("data-float-act");
-      if (act === "fire") fireAtTarget();
+      if (act === "move") toggleMoveModeSelectedUnit();
+      else if (act === "crouch") toggleCrouchSelectedUnit();
+      else if (act === "fire") fireAtTarget();
       else if (act === "frag") {
         if (selUnit.ap < 1 || selUnit.frags <= 0) {
           addBattleLog("Sem PA ou sem granadas de fragmentação disponíveis.");
@@ -1269,7 +1354,7 @@ function getUnitVisualBadge(entity, isEnemy) {
     "Engenheiro": "#60a5fa"
   };
   const col = roleColors[entity.role] || "#4ef2a1";
-  const statusTag = entity.overwatch ? "VIG" : entity.hunker ? "HNK" : entity.stunned ? "ATD" : "";
+  const statusTag = entity.crouched ? "AGA" : entity.overwatch ? "VIG" : entity.hunker ? "HNK" : entity.stunned ? "ATD" : "";
 
   return `
     <span style="display:inline-flex;align-items:center;gap:3px;line-height:1;">
@@ -1296,17 +1381,53 @@ function renderBattle() {
   const turnLabel = document.getElementById("turn-label");
   if (turnLabel) turnLabel.textContent = `TURNO ${b.turn} · ${b.phase === "player" ? "UNIDADE ZERO" : "ALIENÍGENAS"}`;
 
+  if (!b.camera) b.camera = { x: 0, y: 0 };
+  const viewW = Math.min(GRID_W, 6);
+  const viewH = Math.min(GRID_H, 6);
+  b.camera.x = Math.max(0, Math.min(GRID_W - viewW, b.camera.x));
+  b.camera.y = Math.max(0, Math.min(GRID_H - viewH, b.camera.y));
+
   const gridEl = document.getElementById("battle-grid");
   if (gridEl) {
+    let camBar = document.getElementById("tactical-camera-bar");
+    if (!camBar) {
+      camBar = document.createElement("div");
+      camBar.id = "tactical-camera-bar";
+      camBar.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px;flex-wrap:wrap;font-size:0.78em;";
+      camBar.innerHTML = `
+        <span id="camera-coords" style="opacity:0.85;">CÂMERA: 1-6, 1-6 / 10x8</span>
+        <div style="display:flex;gap:4px;">
+          <button type="button" id="cam-left" class="secondary" style="padding:3px 8px;">◀</button>
+          <button type="button" id="cam-up" class="secondary" style="padding:3px 8px;">▲</button>
+          <button type="button" id="cam-down" class="secondary" style="padding:3px 8px;">▼</button>
+          <button type="button" id="cam-right" class="secondary" style="padding:3px 8px;">▶</button>
+        </div>
+      `;
+      gridEl.parentElement.insertBefore(camBar, gridEl);
+      document.getElementById("cam-left").addEventListener("click", () => panCamera(-2, 0));
+      document.getElementById("cam-right").addEventListener("click", () => panCamera(2, 0));
+      document.getElementById("cam-up").addEventListener("click", () => panCamera(0, -2));
+      document.getElementById("cam-down").addEventListener("click", () => panCamera(0, 2));
+    }
+    const camCoords = document.getElementById("camera-coords");
+    if (camCoords) {
+      camCoords.textContent = `CÂMERA [${b.camera.x + 1}..${b.camera.x + viewW}, ${b.camera.y + 1}..${b.camera.y + viewH}] / ${GRID_W}x${GRID_H}`;
+    }
+
     gridEl.style.display = "grid";
-    gridEl.style.gridTemplateColumns = `repeat(${GRID_W}, minmax(36px, 1fr))`;
+    gridEl.style.gridTemplateColumns = `repeat(${viewW}, minmax(0, 1fr))`;
+    gridEl.style.width = "100%";
+    gridEl.style.maxWidth = "100%";
+    gridEl.style.boxSizing = "border-box";
     gridEl.style.gap = "4px";
     gridEl.innerHTML = "";
 
     const selUnit = getSelectedUnit();
 
-    for (let y = 0; y < GRID_H; y++) {
-      for (let x = 0; x < GRID_W; x++) {
+    for (let vy = 0; vy < viewH; vy++) {
+      const y = b.camera.y + vy;
+      for (let vx = 0; vx < viewW; vx++) {
+        const x = b.camera.x + vx;
         const cell = document.createElement("button");
         cell.type = "button";
         cell.className = "grid-cell";
@@ -1317,10 +1438,10 @@ function renderBattle() {
         const smokeHere = isInSmoke(b, x, y);
 
         const distFromSel = selUnit ? Math.abs(selUnit.x - x) + Math.abs(selUnit.y - y) : 99;
-        const maxMoveRange = selUnit ? (selUnit.stunned ? 2 : 3) : 0;
+        const maxMoveRange = getUnitMoveRange(selUnit);
         const canMoveHere =
           b.phase === "player" &&
-          b.mode === "normal" &&
+          (b.mode === "move" || b.mode === "normal") &&
           selUnit &&
           selUnit.ap >= 1 &&
           !unitHere &&
@@ -1463,8 +1584,9 @@ function renderBattle() {
   ensureEndTurnVisible(b);
 
   if (selUnit) {
-    const maxMove = selUnit.stunned ? 2 : 3;
-    setText("selected-unit", `${selUnit.name} (${selUnit.role})`);
+    const maxMove = getUnitMoveRange(selUnit);
+    const postureName = selUnit.crouched ? "AGACHADO (CAUTELOSO)" : "DE PÉ (CORRER)";
+    setText("selected-unit", `${selUnit.name} (${selUnit.role}) · ${postureName}`);
     setText("unit-hp", `${selUnit.hp}/${selUnit.maxHp} HP`);
     setText("unit-ap", `${selUnit.ap}/${selUnit.maxAp} PA · MOV ${maxMove}`);
     setText("unit-ammo", `${selUnit.ammo}/${selUnit.maxAmmo} MUN`);
@@ -1532,7 +1654,8 @@ function handleCellClick(x, y) {
       b.selectedUnitId = unitHere.id;
       b.mode = "normal";
       unitHere.overwatch = false;
-      addBattleLog(`Operacional selecionado: ${unitHere.name}.`);
+      centerCameraOnUnit(unitHere);
+      addBattleLog(`Operacional selecionado: ${unitHere.name} (${unitHere.crouched ? "Agachado/Cauteloso: 2" : "Em pé/Correr: 4"}).`);
     }
     renderBattle();
     return;
@@ -1540,14 +1663,17 @@ function handleCellClick(x, y) {
 
   if (selUnit && selUnit.ap >= 1 && b.grid[y][x] !== 3) {
     const dist = Math.abs(selUnit.x - x) + Math.abs(selUnit.y - y);
-    const maxStep = selUnit.stunned ? 2 : 3;
+    const maxStep = getUnitMoveRange(selUnit);
     if (dist > 0 && dist <= maxStep) {
+      const moveType = selUnit.crouched ? "avançou cautelosamente" : "correu";
       selUnit.x = x;
       selUnit.y = y;
       selUnit.ap -= 1;
       selUnit.hunker = false;
       selUnit.stunned = false;
-      addBattleLog(`${selUnit.name} avançou para (${x + 1},${y + 1}).`);
+      if (b.mode === "move") b.mode = "normal";
+      centerCameraOnUnit(selUnit);
+      addBattleLog(`${selUnit.name} ${moveType} para (${x + 1},${y + 1}).`);
       renderBattle();
     }
   }
