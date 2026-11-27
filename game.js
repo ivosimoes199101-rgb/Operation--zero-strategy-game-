@@ -520,6 +520,20 @@ function loadState() {
   }
 }
 
+function resetSaveState() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch (_) {}
+  state = createDefaultState();
+  syncUnitStatsWithBase();
+  saveState();
+  renderCommand();
+  renderSquad();
+  renderBase();
+  renderCampaignMissions();
+  renderIntelligence();
+}
+
 function saveState() {
   try {
     const toSave = { ...state, battle: null };
@@ -583,6 +597,43 @@ function syncUnitStatsWithBase() {
   });
 }
 
+function ensureResetSaveButton() {
+  const cmdSection = document.getElementById("command");
+  if (!cmdSection) return;
+  let btn = document.getElementById("reset-save-btn");
+  if (!btn) {
+    btn = document.createElement("button");
+    btn.id = "reset-save-btn";
+    btn.type = "button";
+    btn.className = "secondary";
+    btn.textContent = "REPOR SAVE";
+    btn.style.cssText = "margin-top:10px;font-size:0.8em;opacity:0.88;";
+    btn.addEventListener("click", () => {
+      openModal(`
+        <h3>REPOR PROGRESSO GUARDADO</h3>
+        <p>Isto vai limpar o save atual no navegador e repor a campanha, base e recursos do início. Queres continuar?</p>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <button type="button" class="primary" id="confirm-reset-save">CONFIRMAR REPOSIÇÃO</button>
+          <button type="button" class="secondary" onclick="closeModal()">CANCELAR</button>
+        </div>
+      `);
+      const confirmBtn = document.getElementById("confirm-reset-save");
+      if (confirmBtn) {
+        confirmBtn.addEventListener("click", () => {
+          resetSaveState();
+          closeModal();
+          openModal(`
+            <h3>SAVE REPOSTO</h3>
+            <p>O estado inicial da operação foi reposto com sucesso.</p>
+            <button type="button" class="primary" onclick="closeModal()">OK</button>
+          `);
+        });
+      }
+    });
+    cmdSection.appendChild(btn);
+  }
+}
+
 function renderCommand() {
   const setText = (id, val) => {
     const el = document.getElementById(id);
@@ -592,6 +643,7 @@ function renderCommand() {
   setText("energy", state.energy);
   setText("materials", state.materials);
   setText("alien", state.alien);
+  ensureResetSaveButton();
 }
 
 function renderSquad() {
@@ -1201,6 +1253,7 @@ function renderBattle() {
         const smokeHere = isInSmoke(b, x, y);
 
         const distFromSel = selUnit ? Math.abs(selUnit.x - x) + Math.abs(selUnit.y - y) : 99;
+        const maxMoveRange = selUnit ? (selUnit.stunned ? 2 : 3) : 0;
         const canMoveHere =
           b.phase === "player" &&
           b.mode === "normal" &&
@@ -1210,7 +1263,7 @@ function renderBattle() {
           !enemyHere &&
           tileType !== 3 &&
           distFromSel > 0 &&
-          distFromSel <= (selUnit.stunned ? 2 : 3);
+          distFromSel <= maxMoveRange;
 
         let bg = "rgba(255,255,255,0.05)";
         let border = "rgba(255,255,255,0.14)";
@@ -1275,7 +1328,8 @@ function renderBattle() {
           }
         }
 
-        cell.style.cssText = `min-height:44px;background:${bg};border:1px solid ${border};border-radius:4px;color:#fff;font-size:0.72em;padding:2px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;`;
+        const outlineStyle = canMoveHere ? "box-shadow:inset 0 0 0 1px rgba(78,242,161,0.35);" : (enemyHere && b.selectedTargetId === enemyHere.id ? "box-shadow:0 0 8px rgba(255,209,102,0.45);" : "");
+        cell.style.cssText = `min-height:44px;background:${bg};border:1px solid ${border};${outlineStyle}border-radius:4px;color:#fff;font-size:0.72em;padding:2px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;`;
         if (subHint) {
           cell.innerHTML = `<span>${label || (smokeHere ? "☁" : "")}</span><span style="font-size:0.82em;opacity:0.85;color:#ffd166;">${subHint}</span>`;
         } else {
