@@ -1074,8 +1074,8 @@ function renderCampaignMissions() {
 
 const GRID_W = 14;
 const GRID_H = 12;
-const ISO_VIEW_W = 6;
-const ISO_VIEW_H = 6;
+const ISO_VIEW_W = GRID_W;
+const ISO_VIEW_H = GRID_H;
 
 function createMissionMap(missionIndex) {
   const grid = Array.from({ length: GRID_H }, () => Array(GRID_W).fill(0));
@@ -1446,43 +1446,39 @@ function addBattleLog(msg) {
 function getIsoMetrics(canvas) {
   const rect = canvas.getBoundingClientRect();
   const w = Math.max(320, rect.width || canvas.parentElement?.clientWidth || window.innerWidth || 360);
-  const h = Math.max(340, rect.height || canvas.parentElement?.clientHeight || window.innerHeight || 520);
+  const h = Math.max(260, rect.height || canvas.parentElement?.clientHeight || window.innerHeight || 420);
 
-  const maxTileWByWidth = Math.floor((w + 24) / ISO_VIEW_W);
-  const maxTileWByHeight = Math.floor(((h * 0.68) / ISO_VIEW_H) * 2);
-  const tileW = Math.max(54, Math.min(96, Math.max(maxTileWByWidth, Math.min(maxTileWByWidth, maxTileWByHeight))));
-  const tileH = Math.round(tileW * 0.5);
-  const wallH = Math.max(10, Math.round(tileH * 0.52));
-  const originX = w * 0.5;
-  const boardPixelH = ISO_VIEW_W * tileH;
-  const originY = Math.max(38, Math.round((h - boardPixelH) * 0.28));
+  // Num tabuleiro isométrico (GRID_W x GRID_H):
+  // - Largura total do diamante = (GRID_W + GRID_H) * (tileW * 0.5)
+  // - Altura total do diamante = (GRID_W + GRID_H) * (tileH * 0.5), onde tileH = tileW * 0.5
+  const span = GRID_W + GRID_H; // 26
+  const maxTileWByWidth = Math.floor(((w - 20) * 2) / span);
+  const maxTileWByHeight = Math.floor(((h - 34) * 4) / span);
+  const tileW = Math.max(22, Math.min(64, Math.min(maxTileWByWidth, maxTileWByHeight)));
+  const tileH = Math.max(11, Math.round(tileW * 0.5));
+  const wallH = Math.max(5, Math.round(tileH * 0.55));
+
+  const boardPixelH = span * tileH * 0.5;
+  const originX = w * 0.5 + (GRID_H - GRID_W) * (tileW * 0.25);
+  const originY = Math.max(22, Math.round((h - boardPixelH) * 0.44));
 
   return { w, h, tileW, tileH, wallH, originX, originY };
 }
 
 function worldToIso(gx, gy, battle, m) {
-  const camX = battle.camera ? battle.camera.x : 0;
-  const camY = battle.camera ? battle.camera.y : 0;
-  const lx = gx - camX;
-  const ly = gy - camY;
   return {
-    sx: m.originX + (lx - ly) * (m.tileW * 0.5),
-    sy: m.originY + (lx + ly) * (m.tileH * 0.5)
+    sx: m.originX + (gx - gy) * (m.tileW * 0.5),
+    sy: m.originY + (gx + gy) * (m.tileH * 0.5)
   };
 }
 
 function isoToWorld(px, py, battle, m) {
-  const camX = battle.camera ? battle.camera.x : 0;
-  const camY = battle.camera ? battle.camera.y : 0;
   const hw = m.tileW * 0.5;
   const hh = m.tileH * 0.5;
   const u = (px - m.originX) / hw;
   const v = (py - m.originY) / hh;
-  const lx = Math.floor((u + v) * 0.5 + 0.5);
-  const ly = Math.floor((v - u) * 0.5 + 0.5);
-  if (lx < 0 || lx >= ISO_VIEW_W || ly < 0 || ly >= ISO_VIEW_H) return null;
-  const gx = lx + camX;
-  const gy = ly + camY;
+  const gx = Math.floor((u + v) * 0.5 + 0.5);
+  const gy = Math.floor((v - u) * 0.5 + 0.5);
   if (gx < 0 || gx >= GRID_W || gy < 0 || gy >= GRID_H) return null;
   return { x: gx, y: gy };
 }
@@ -1508,23 +1504,20 @@ function drawIsoDiamond(ctx, sx, sy, w, h, fill, stroke, lw = 1.2) {
 }
 
 function drawIsoBoardSkirt(ctx, battle, m) {
-  const camX = battle.camera ? battle.camera.x : 0;
-  const camY = battle.camera ? battle.camera.y : 0;
-  const skirtH = Math.max(10, Math.round(m.wallH * 1.15));
+  const skirtH = Math.max(6, Math.round(m.wallH * 0.9));
   const hw = m.tileW * 0.5;
   const hh = m.tileH * 0.5;
 
-  // Borda lateral esquerda do plano isométrico
+  const pSW = worldToIso(0, GRID_H - 1, battle, m);
+  const pS  = worldToIso(GRID_W - 1, GRID_H - 1, battle, m);
+  const pSE = worldToIso(GRID_W - 1, 0, battle, m);
+
+  // Face esquerda inferior (x = 0..GRID_W-1, y = GRID_H-1)
   ctx.beginPath();
-  for (let vx = 0; vx < ISO_VIEW_W; vx++) {
-    const p = worldToIso(camX + vx, camY + ISO_VIEW_H - 1, battle, m);
-    if (vx === 0) ctx.moveTo(p.sx - hw, p.sy);
-    ctx.lineTo(p.sx, p.sy + hh);
-  }
-  const endL = worldToIso(camX + ISO_VIEW_W - 1, camY + ISO_VIEW_H - 1, battle, m);
-  ctx.lineTo(endL.sx, endL.sy + hh + skirtH);
-  const startL = worldToIso(camX, camY + ISO_VIEW_H - 1, battle, m);
-  ctx.lineTo(startL.sx - hw, startL.sy + skirtH);
+  ctx.moveTo(pSW.sx - hw, pSW.sy);
+  ctx.lineTo(pS.sx, pS.sy + hh);
+  ctx.lineTo(pS.sx, pS.sy + hh + skirtH);
+  ctx.lineTo(pSW.sx - hw, pSW.sy + skirtH);
   ctx.closePath();
   ctx.fillStyle = "#101b28";
   ctx.fill();
@@ -1532,17 +1525,12 @@ function drawIsoBoardSkirt(ctx, battle, m) {
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  // Borda lateral direita do plano isométrico
+  // Face direita inferior (x = GRID_W-1, y = 0..GRID_H-1)
   ctx.beginPath();
-  const topR = worldToIso(camX + ISO_VIEW_W - 1, camY, battle, m);
-  ctx.moveTo(topR.sx + hw, topR.sy);
-  for (let vy = 0; vy < ISO_VIEW_H; vy++) {
-    const p = worldToIso(camX + ISO_VIEW_W - 1, camY + vy, battle, m);
-    ctx.lineTo(p.sx, p.sy + hh);
-  }
-  const botR = worldToIso(camX + ISO_VIEW_W - 1, camY + ISO_VIEW_H - 1, battle, m);
-  ctx.lineTo(botR.sx, botR.sy + hh + skirtH);
-  ctx.lineTo(topR.sx + hw, topR.sy + skirtH);
+  ctx.moveTo(pS.sx, pS.sy + hh);
+  ctx.lineTo(pSE.sx + hw, pSE.sy);
+  ctx.lineTo(pSE.sx + hw, pSE.sy + skirtH);
+  ctx.lineTo(pS.sx, pS.sy + hh + skirtH);
   ctx.closePath();
   ctx.fillStyle = "#0a111a";
   ctx.fill();
@@ -2240,7 +2228,7 @@ function renderBattle() {
     ctx.fillStyle = "rgba(78, 242, 161, 0.82)";
     ctx.font = "bold 9px monospace";
     ctx.textAlign = "left";
-    ctx.fillText(`ISO 2:1 · ARRASTA [${b.camera.x + 1}..${b.camera.x + ISO_VIEW_W}, ${b.camera.y + 1}..${b.camera.y + ISO_VIEW_H}]`, 10, 14);
+    ctx.fillText(`MAPA ISOMÉTRICO XCOM · ${GRID_W}x${GRID_H}`, 10, 14);
 
     drawIsoBoardSkirt(ctx, b, m);
 
