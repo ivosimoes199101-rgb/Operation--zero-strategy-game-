@@ -615,7 +615,7 @@ function setTacticalViewportLock(active) {
         letter-spacing: 0.5px;
         cursor: pointer;
         box-shadow: 0 6px 20px rgba(0, 0, 0, 0.65);
-        backdrop-filter: blur(6px);
+        
       }
       body.tactical-locked #oz-fullscreen-toggle-btn {
         display: none !important;
@@ -629,7 +629,7 @@ function setTacticalViewportLock(active) {
         width: 100vw !important;
         margin: 0 !important;
         padding: 0 !important;
-        position: fixed !important;
+        position: relative !important;
         inset: 0 !important;
       }
       body.tactical-locked > header,
@@ -642,7 +642,7 @@ function setTacticalViewportLock(active) {
       body.tactical-locked #tactical,
       body.tactical-locked #tactical.active,
       #tactical.active {
-        position: fixed !important;
+        position: relative !important;
         inset: 0 !important;
         width: 100vw !important;
         height: 100vh !important;
@@ -1463,7 +1463,6 @@ function startMission(mission, missionIndex = 0) {
 
   state.battle.elevation = createMissionElevation(missionIndex, state.battle.grid);
   goToScreen("tactical");
-  renderBattle();
 }
 
 function getUnitMoveRange(unit) {
@@ -2410,6 +2409,7 @@ function ensureIsoCanvasStage(gridEl) {
       startClientY = ev.clientY;
       lastClientX = ev.clientX;
       lastClientY = ev.clientY;
+      try { canvas.setPointerCapture(ev.pointerId); } catch (_) {}
     });
 
     canvas.addEventListener("pointermove", (ev) => {
@@ -2856,56 +2856,63 @@ function _renderBattleInner(b) {
       ? `${selEForHud.name} (${selEForHud.hp}HP${selUForHud ? ` · ${calculateHitChance(selUForHud, selEForHud, b)}%` : ""})`
       : "SEM ALVO";
 
-    topHud.innerHTML = `
-      <div style="pointer-events:auto;background:rgba(7,14,22,0.82);backdrop-filter:blur(6px);border:1px solid rgba(78,242,161,0.35);border-radius:10px;padding:6px 9px;max-width:48%;">
-        <div style="font-size:0.7em;font-weight:bold;letter-spacing:0.6px;color:#4ef2a1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-          ${formatMissionNumber(b.mission.number)}. ${b.mission.title.toUpperCase()}
+    let hudInfoBox = document.getElementById("iso-top-info-box");
+    if (!hudInfoBox) {
+      topHud.innerHTML = `
+        <div id="iso-top-info-box" style="pointer-events:auto;background:rgba(7,14,22,0.82);border:1px solid rgba(78,242,161,0.35);border-radius:10px;padding:6px 9px;max-width:48%;">
+          <div id="iso-hud-title" style="font-size:0.7em;font-weight:bold;letter-spacing:0.6px;color:#4ef2a1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+          <div id="iso-hud-sub" style="font-size:0.64em;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;"></div>
+          <div style="display:flex;align-items:center;gap:4px;margin-top:5px;">
+            <button type="button" id="iso-zoom-out" style="background:rgba(15,23,42,0.92);color:#e2e8f0;border:1px solid rgba(148,163,184,0.4);border-radius:5px;padding:2px 7px;font-size:0.68em;font-weight:bold;cursor:pointer;">−</button>
+            <button type="button" id="iso-zoom-reset" style="background:rgba(15,23,42,0.92);color:#4ef2a1;border:1px solid rgba(78,242,161,0.4);border-radius:5px;padding:2px 6px;font-size:0.64em;font-weight:bold;cursor:pointer;">100%</button>
+            <button type="button" id="iso-zoom-in" style="background:rgba(15,23,42,0.92);color:#e2e8f0;border:1px solid rgba(148,163,184,0.4);border-radius:5px;padding:2px 7px;font-size:0.68em;font-weight:bold;cursor:pointer;">+</button>
+            <button type="button" id="iso-pan-left" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.3);border-radius:5px;padding:2px 5px;font-size:0.64em;cursor:pointer;">◀</button>
+            <button type="button" id="iso-pan-up" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.3);border-radius:5px;padding:2px 5px;font-size:0.64em;cursor:pointer;">▲</button>
+            <button type="button" id="iso-pan-down" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.3);border-radius:5px;padding:2px 5px;font-size:0.64em;cursor:pointer;">▼</button>
+            <button type="button" id="iso-pan-right" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.3);border-radius:5px;padding:2px 5px;font-size:0.64em;cursor:pointer;">▶</button>
+            <button type="button" id="iso-fullscreen-btn" title="Alternar Ecrã Inteiro" style="background:rgba(15,23,42,0.92);color:#4ef2a1;border:1px solid rgba(78,242,161,0.45);border-radius:5px;padding:2px 6px;font-size:0.64em;font-weight:bold;cursor:pointer;">⛶</button>
+          </div>
         </div>
-        <div style="font-size:0.64em;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">
-          ${selUForHud ? `${selUForHud.name.split(" ")[0]}: ${selUForHud.hp}HP · ${selUForHud.ap}PA · ${selUForHud.ammo}M` : `ALVO: ${tgtText}`}
-        </div>
-        <div style="display:flex;align-items:center;gap:4px;margin-top:5px;">
-          <button type="button" id="iso-zoom-out" style="background:rgba(15,23,42,0.92);color:#e2e8f0;border:1px solid rgba(148,163,184,0.4);border-radius:5px;padding:2px 7px;font-size:0.68em;font-weight:bold;cursor:pointer;">−</button>
-          <button type="button" id="iso-zoom-reset" style="background:rgba(15,23,42,0.92);color:#4ef2a1;border:1px solid rgba(78,242,161,0.4);border-radius:5px;padding:2px 6px;font-size:0.64em;font-weight:bold;cursor:pointer;">${curZoomPct}%</button>
-          <button type="button" id="iso-zoom-in" style="background:rgba(15,23,42,0.92);color:#e2e8f0;border:1px solid rgba(148,163,184,0.4);border-radius:5px;padding:2px 7px;font-size:0.68em;font-weight:bold;cursor:pointer;">+</button>
-          <button type="button" id="iso-pan-left" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.3);border-radius:5px;padding:2px 5px;font-size:0.64em;cursor:pointer;">◀</button>
-          <button type="button" id="iso-pan-up" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.3);border-radius:5px;padding:2px 5px;font-size:0.64em;cursor:pointer;">▲</button>
-          <button type="button" id="iso-pan-down" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.3);border-radius:5px;padding:2px 5px;font-size:0.64em;cursor:pointer;">▼</button>
-          <button type="button" id="iso-pan-right" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.3);border-radius:5px;padding:2px 5px;font-size:0.64em;cursor:pointer;">▶</button>
-          <button type="button" id="iso-fullscreen-btn" title="Alternar Ecrã Inteiro" style="background:rgba(15,23,42,0.92);color:#4ef2a1;border:1px solid rgba(78,242,161,0.45);border-radius:5px;padding:2px 6px;font-size:0.64em;font-weight:bold;cursor:pointer;">⛶</button>
-        </div>
-      </div>
-      <div id="iso-squad-strip" style="pointer-events:auto;display:flex;flex-wrap:wrap;gap:5px;max-width:50%;justify-content:flex-end;"></div>
-    `;
+        <div id="iso-squad-strip" style="pointer-events:auto;display:flex;flex-wrap:wrap;gap:5px;max-width:50%;justify-content:flex-end;"></div>
+      `;
 
-    const zoomOutBtn = topHud.querySelector("#iso-zoom-out");
-    const zoomInBtn = topHud.querySelector("#iso-zoom-in");
-    const zoomResetBtn = topHud.querySelector("#iso-zoom-reset");
-    const panLeftBtn = topHud.querySelector("#iso-pan-left");
-    const panRightBtn = topHud.querySelector("#iso-pan-right");
-    const panUpBtn = topHud.querySelector("#iso-pan-up");
-    const panDownBtn = topHud.querySelector("#iso-pan-down");
+      const zoomOutBtn = topHud.querySelector("#iso-zoom-out");
+      const zoomInBtn = topHud.querySelector("#iso-zoom-in");
+      const zoomResetBtn = topHud.querySelector("#iso-zoom-reset");
+      const panLeftBtn = topHud.querySelector("#iso-pan-left");
+      const panRightBtn = topHud.querySelector("#iso-pan-right");
+      const panUpBtn = topHud.querySelector("#iso-pan-up");
+      const panDownBtn = topHud.querySelector("#iso-pan-down");
 
-    if (zoomOutBtn) zoomOutBtn.addEventListener("click", (ev) => { ev.stopPropagation(); setBattleZoom(-0.22); });
-    if (zoomInBtn) zoomInBtn.addEventListener("click", (ev) => { ev.stopPropagation(); setBattleZoom(0.22); });
-    if (zoomResetBtn) zoomResetBtn.addEventListener("click", (ev) => { ev.stopPropagation(); resetBattleView(); });
+      if (zoomOutBtn) zoomOutBtn.addEventListener("click", (ev) => { ev.stopPropagation(); setBattleZoom(-0.22); });
+      if (zoomInBtn) zoomInBtn.addEventListener("click", (ev) => { ev.stopPropagation(); setBattleZoom(0.22); });
+      if (zoomResetBtn) zoomResetBtn.addEventListener("click", (ev) => { ev.stopPropagation(); resetBattleView(); });
 
-    const nudgePan = (dx, dy) => {
-      const m = canvas ? getIsoMetrics(canvas, true) : null;
-      b.panX = (b.panX || 0) + dx;
-      b.panY = (b.panY || 0) + dy;
-      if (m) clampBattlePan(b, m);
-      renderBattle();
-    };
-    if (panLeftBtn) panLeftBtn.addEventListener("click", (ev) => { ev.stopPropagation(); nudgePan(48, 0); });
-    if (panRightBtn) panRightBtn.addEventListener("click", (ev) => { ev.stopPropagation(); nudgePan(-48, 0); });
-    if (panUpBtn) panUpBtn.addEventListener("click", (ev) => { ev.stopPropagation(); nudgePan(0, 40); });
-    if (panDownBtn) panDownBtn.addEventListener("click", (ev) => { ev.stopPropagation(); nudgePan(0, -40); });
-    const fsIsoBtn = topHud.querySelector("#iso-fullscreen-btn");
-    if (fsIsoBtn) fsIsoBtn.addEventListener("click", (ev) => { ev.stopPropagation(); toggleGameFullscreen(); });
+      const nudgePan = (dx, dy) => {
+        const m = canvas ? getIsoMetrics(canvas, true) : null;
+        b.panX = (b.panX || 0) + dx;
+        b.panY = (b.panY || 0) + dy;
+        if (m) clampBattlePan(b, m);
+        renderBattle();
+      };
+      if (panLeftBtn) panLeftBtn.addEventListener("click", (ev) => { ev.stopPropagation(); nudgePan(48, 0); });
+      if (panRightBtn) panRightBtn.addEventListener("click", (ev) => { ev.stopPropagation(); nudgePan(-48, 0); });
+      if (panUpBtn) panUpBtn.addEventListener("click", (ev) => { ev.stopPropagation(); nudgePan(0, 40); });
+      if (panDownBtn) panDownBtn.addEventListener("click", (ev) => { ev.stopPropagation(); nudgePan(0, -40); });
+      const fsIsoBtn = topHud.querySelector("#iso-fullscreen-btn");
+      if (fsIsoBtn) fsIsoBtn.addEventListener("click", (ev) => { ev.stopPropagation(); toggleGameFullscreen(); });
+    }
+
+    const hudTitleEl = document.getElementById("iso-hud-title");
+    const hudSubEl = document.getElementById("iso-hud-sub");
+    const hudZoomEl = document.getElementById("iso-zoom-reset");
+    if (hudTitleEl) hudTitleEl.textContent = `${formatMissionNumber(b.mission.number)}. ${b.mission.title.toUpperCase()}`;
+    if (hudSubEl) hudSubEl.textContent = selUForHud ? `${selUForHud.name.split(" ")[0]}: ${selUForHud.hp}HP · ${selUForHud.ap}PA · ${selUForHud.ammo}M` : `ALVO: ${tgtText}`;
+    if (hudZoomEl) hudZoomEl.textContent = `${curZoomPct}%`;
 
     const squadBar = document.getElementById("iso-squad-strip");
     if (squadBar) {
+      squadBar.innerHTML = "";
       b.units.filter((u) => u.hp > 0).forEach((u) => {
         const isAct = b.selectedUnitId === u.id;
         const chip = document.createElement("button");
