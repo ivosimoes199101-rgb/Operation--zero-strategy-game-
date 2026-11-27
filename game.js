@@ -1144,53 +1144,10 @@ function ensureTacticalExtras() {
     gridEl.insertAdjacentElement("afterend", logEl);
   }
 
-  let extraBar = document.getElementById("tactical-grenade-bar");
-  if (!extraBar) {
-    const ordersPanel = tactical.querySelector(".battle-side .side-panel:nth-of-type(3)");
-    if (ordersPanel) {
-      extraBar = document.createElement("div");
-      extraBar.id = "tactical-grenade-bar";
-      extraBar.style.cssText = "display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;";
-      extraBar.innerHTML = `
-        <button id="move-mode-btn" class="primary" style="flex:1;font-size:0.8em;">MOVER</button>
-        <button id="crouch-btn" class="secondary" style="flex:1;font-size:0.8em;">AGACHAR (1 PA)</button>
-        <button id="frag-btn" class="secondary" style="flex:1;font-size:0.8em;">GRANADA FRAG (1 PA)</button>
-        <button id="smoke-btn" class="secondary" style="flex:1;font-size:0.8em;">GRANADA FUMO (1 PA)</button>
-      `;
-      ordersPanel.insertBefore(extraBar, document.getElementById("end-turn"));
-
-      document.getElementById("frag-btn").addEventListener("click", () => {
-        if (!state.battle || state.battle.phase !== "player") return;
-        const u = getSelectedUnit();
-        if (!u || u.ap < 1 || u.frags <= 0) {
-          addBattleLog("Sem PA ou sem granadas de fragmentação disponíveis.");
-          return;
-        }
-        state.battle.mode = state.battle.mode === "frag" ? "normal" : "frag";
-        addBattleLog(state.battle.mode === "frag" ? "Modo GRANADA FRAG ativo: clica numa célula do mapa." : "Modo normal restaurado.");
-        renderBattle();
-      });
-
-      document.getElementById("smoke-btn").addEventListener("click", () => {
-        if (!state.battle || state.battle.phase !== "player") return;
-        const u = getSelectedUnit();
-        if (!u || u.ap < 1 || u.smokes <= 0) {
-          addBattleLog("Sem PA ou sem granadas de fumo disponíveis.");
-          return;
-        }
-        state.battle.mode = state.battle.mode === "smoke" ? "normal" : "smoke";
-        addBattleLog(state.battle.mode === "smoke" ? "Modo GRANADA FUMO ativo: clica numa célula do mapa." : "Modo normal restaurado.");
-        renderBattle();
-      });
-
-      document.getElementById("move-mode-btn").addEventListener("click", () => {
-        toggleMoveModeSelectedUnit();
-      });
-
-      document.getElementById("crouch-btn").addEventListener("click", () => {
-        toggleCrouchSelectedUnit();
-      });
-    }
+  // Remover barra fixa extra se existir
+  const oldExtraBar = document.getElementById("tactical-grenade-bar");
+  if (oldExtraBar && oldExtraBar.parentElement) {
+    oldExtraBar.parentElement.removeChild(oldExtraBar);
   }
 }
 
@@ -1225,7 +1182,19 @@ function renderFloatingUnitOrders(battle, selUnit, gridEl) {
     return;
   }
 
-  const cellIndex = selUnit.y * GRID_W + selUnit.x;
+  const camX = battle.camera ? battle.camera.x : 0;
+  const camY = battle.camera ? battle.camera.y : 0;
+  const viewW = Math.min(GRID_W, 6);
+  const viewH = Math.min(GRID_H, 6);
+  const vx = selUnit.x - camX;
+  const vy = selUnit.y - camY;
+
+  if (vx < 0 || vx >= viewW || vy < 0 || vy >= viewH) {
+    pop.style.display = "none";
+    return;
+  }
+
+  const cellIndex = vy * viewW + vx;
   const cellEl = gridEl.children[cellIndex];
   const parent = pop.parentElement;
   if (!cellEl || !parent) {
@@ -1236,7 +1205,7 @@ function renderFloatingUnitOrders(battle, selUnit, gridEl) {
   const parentRect = parent.getBoundingClientRect();
   const cellRect = cellEl.getBoundingClientRect();
 
-  const stanceLabel = selUnit.crouched ? "AGACHADO (CAUTELOSO)" : "EM PÉ (CORRER)";
+  const stanceLabel = selUnit.crouched ? "AGACHADO" : "EM PÉ";
   pop.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:5px;font-size:0.73em;color:#4ef2a1;">
       <b>${selUnit.name} · ${selUnit.ap} PA · ${stanceLabel}</b>
@@ -1263,11 +1232,25 @@ function renderFloatingUnitOrders(battle, selUnit, gridEl) {
   `;
 
   pop.style.display = "block";
-  pop.style.left = "6px";
-  pop.style.top = "auto";
-  pop.style.bottom = "6px";
-  pop.style.right = "6px";
-  pop.style.maxWidth = "calc(100% - 12px)";
+  pop.style.bottom = "auto";
+  pop.style.right = "auto";
+  pop.style.maxWidth = "320px";
+  pop.style.left = "0px";
+  pop.style.top = "0px";
+  const popRect = pop.getBoundingClientRect();
+
+  const centerX = cellRect.left - parentRect.left + cellRect.width / 2;
+  let left = centerX - popRect.width / 2;
+  left = Math.max(6, Math.min(parentRect.width - popRect.width - 6, left));
+
+  let top = cellRect.top - parentRect.top - popRect.height - 6;
+  if (top < 6) {
+    top = cellRect.bottom - parentRect.top + 6;
+  }
+  top = Math.max(6, Math.min(parentRect.height - popRect.height - 6, top));
+
+  pop.style.left = `${Math.round(left)}px`;
+  pop.style.top = `${Math.round(top)}px`;
 
   const closeBtn = pop.querySelector("#close-floating-orders");
   if (closeBtn) {
@@ -1577,9 +1560,8 @@ function renderBattle() {
   };
 
   const ordersPanel = document.querySelector("#tactical .battle-side .side-panel:nth-of-type(3)");
-  const canShowOrders = Boolean(selUnit && b.phase === "player");
   if (ordersPanel) {
-    ordersPanel.style.display = canShowOrders ? "" : "none";
+    ordersPanel.style.display = "none";
   }
   ensureEndTurnVisible(b);
 
