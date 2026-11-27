@@ -660,8 +660,11 @@ function renderSquad() {
     card.className = `unit-card ${selected ? "selected" : ""}`;
     card.style.cssText = `border:1px solid ${selected ? "#4ef2a1" : "rgba(255,255,255,0.14)"};padding:10px;border-radius:6px;margin-bottom:8px;cursor:pointer;`;
     card.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <b>${u.name}</b>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          ${getUnitVisualBadge(u, false)}
+          <b>${u.name}</b>
+        </div>
         <small>${selected ? "NA EQUIPA" : "RESERVA"} · NV.${u.level}</small>
       </div>
       <div style="font-size:0.85em;opacity:0.85;margin-top:4px;">
@@ -1236,6 +1239,49 @@ function ensureEndTurnVisible(battle) {
   endTurnBtn.disabled = !isPlayerTurn;
 }
 
+function getUnitVisualBadge(entity, isEnemy) {
+  if (isEnemy) {
+    const archColors = {
+      scout: "#ff7b54",
+      stalker: "#e056fd",
+      swarm: "#ff9f1c",
+      psycher: "#9b5de5",
+      brute: "#ff4757",
+      overlord: "#ff2e63"
+    };
+    const col = archColors[entity.archetypeId] || "#ff5252";
+    const glyph =
+      entity.archetypeId === "brute" || entity.archetypeId === "overlord" ? "M12 3 L20 7 L18 16 L12 21 L6 16 L4 7 Z" :
+      entity.archetypeId === "stalker" ? "M12 3 L21 12 L12 21 L3 12 Z" :
+      entity.archetypeId === "psycher" ? "M12 4 A8 8 0 1 0 12 20 A8 8 0 1 0 12 4 M12 8 A4 4 0 1 1 12 16" :
+      "M12 4 L20 19 L12 15 L4 19 Z";
+    return `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" style="flex-shrink:0;filter:drop-shadow(0 0 3px ${col});"><path d="${glyph}" fill="none" stroke="${col}" stroke-width="2.2" stroke-linejoin="round"/><circle cx="12" cy="12" r="2" fill="${col}"/></svg>`;
+  }
+
+  const roleColors = {
+    "Fuzileiro": "#4ef2a1",
+    "Atirador de Elite": "#38bdf8",
+    "Médico": "#2dd4bf",
+    "Demolições": "#fb923c",
+    "Pesado": "#facc15",
+    "Comando": "#c084fc",
+    "Reconhecimento": "#a3e635",
+    "Engenheiro": "#60a5fa"
+  };
+  const col = roleColors[entity.role] || "#4ef2a1";
+  const statusTag = entity.overwatch ? "VIG" : entity.hunker ? "HNK" : entity.stunned ? "ATD" : "";
+
+  return `
+    <span style="display:inline-flex;align-items:center;gap:3px;line-height:1;">
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" style="flex-shrink:0;">
+        <circle cx="12" cy="7.5" r="3.5" fill="${col}"/>
+        <path d="M5.5 20 C5.5 15.8 8.4 13.5 12 13.5 C15.6 13.5 18.5 15.8 18.5 20" fill="none" stroke="${col}" stroke-width="2.3" stroke-linecap="round"/>
+      </svg>
+      ${statusTag ? `<span style="font-size:0.72em;padding:0 2px;border-radius:3px;background:rgba(0,0,0,0.45);color:${col};border:1px solid ${col};">${statusTag}</span>` : ""}
+    </span>
+  `;
+}
+
 function renderBattle() {
   const b = state.battle;
   if (!b) return;
@@ -1324,12 +1370,23 @@ function renderBattle() {
           subHint = cellCover === 2 ? "COB+" : "COB";
         }
 
+        let topVisualHtml = "";
         if (unitHere) {
           const isSel = selUnit && selUnit.id === unitHere.id;
           const uCover = getTileCoverAt(b, unitHere.x, unitHere.y);
-          bg = isSel ? "rgba(78,242,161,0.35)" : "rgba(64,158,255,0.3)";
-          border = isSel ? "#ffffff" : "#409eff";
-          label = `${unitHere.name.split(" ")[0].slice(0, 4)} ${unitHere.hp}`;
+          const hpPct = Math.max(0, Math.min(100, Math.round((unitHere.hp / unitHere.maxHp) * 100)));
+          const hpBarCol = hpPct > 55 ? "#4ef2a1" : hpPct > 25 ? "#facc15" : "#ff5252";
+          bg = isSel ? "rgba(78,242,161,0.30)" : "rgba(30,64,115,0.42)";
+          border = isSel ? "#ffffff" : "#4ea8de";
+          label = `${unitHere.name.split(" ")[0].slice(0, 5)} ${unitHere.hp}`;
+          topVisualHtml = `
+            <div style="display:flex;align-items:center;justify-content:center;gap:2px;">
+              ${getUnitVisualBadge(unitHere, false)}
+            </div>
+            <div style="width:86%;height:3px;background:rgba(0,0,0,0.5);border-radius:2px;overflow:hidden;">
+              <div style="width:${hpPct}%;height:100%;background:${hpBarCol};"></div>
+            </div>
+          `;
           if (uCover === 2) subHint = "COB+";
           else if (uCover === 1) subHint = "COB";
         }
@@ -1337,9 +1394,18 @@ function renderBattle() {
         if (enemyHere) {
           const isTarget = b.selectedTargetId === enemyHere.id;
           const eCover = getTileCoverAt(b, enemyHere.x, enemyHere.y);
-          bg = isTarget ? "rgba(255,82,82,0.42)" : "rgba(255,82,82,0.22)";
+          const hpPct = Math.max(0, Math.min(100, Math.round((enemyHere.hp / enemyHere.maxHp) * 100)));
+          bg = isTarget ? "rgba(255,82,82,0.38)" : "rgba(95,24,36,0.36)";
           border = isTarget ? "#ffd166" : "#ff5252";
-          label = `${enemyHere.name.split(" ")[0].slice(0, 4)} ${enemyHere.hp}`;
+          label = `${enemyHere.archetypeId.slice(0, 4).toUpperCase()} ${enemyHere.hp}`;
+          topVisualHtml = `
+            <div style="display:flex;align-items:center;justify-content:center;gap:2px;">
+              ${getUnitVisualBadge(enemyHere, true)}
+            </div>
+            <div style="width:86%;height:3px;background:rgba(0,0,0,0.55);border-radius:2px;overflow:hidden;">
+              <div style="width:${hpPct}%;height:100%;background:#ff6b6b;"></div>
+            </div>
+          `;
           if (selUnit) {
             const hChance = calculateHitChance(selUnit, enemyHere, b);
             const eDmg = estimateUnitDamage(selUnit, enemyHere);
@@ -1349,9 +1415,11 @@ function renderBattle() {
           }
         }
 
-        const outlineStyle = canMoveHere ? "box-shadow:inset 0 0 0 1px rgba(78,242,161,0.35);" : (enemyHere && b.selectedTargetId === enemyHere.id ? "box-shadow:0 0 8px rgba(255,209,102,0.45);" : "");
-        cell.style.cssText = `min-height:44px;background:${bg};border:1px solid ${border};${outlineStyle}border-radius:4px;color:#fff;font-size:0.72em;padding:2px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;`;
-        if (subHint) {
+        const outlineStyle = canMoveHere ? "box-shadow:inset 0 0 0 1px rgba(78,242,161,0.35);" : (enemyHere && b.selectedTargetId === enemyHere.id ? "box-shadow:0 0 9px rgba(255,209,102,0.55);" : "");
+        cell.style.cssText = `min-height:52px;background:${bg};border:1px solid ${border};${outlineStyle}border-radius:5px;color:#fff;font-size:0.7em;padding:2px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;`;
+        if (unitHere || enemyHere) {
+          cell.innerHTML = `${topVisualHtml}<span style="line-height:1.05;">${label}</span>${subHint ? `<span style="font-size:0.8em;opacity:0.9;color:#ffd166;line-height:1;">${subHint}</span>` : ""}`;
+        } else if (subHint) {
           cell.innerHTML = `<span>${label || (smokeHere ? "☁" : "")}</span><span style="font-size:0.82em;opacity:0.85;color:#ffd166;">${subHint}</span>`;
         } else {
           cell.textContent = label || (smokeHere ? "☁" : "");
