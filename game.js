@@ -1,6 +1,6 @@
 // ============================================================================
 // OPERATION ZERO — TACTICAL COMMAND SYSTEM (game.js)
-// Compatível com index.html, 12 Operacionais, Base ZERO, Combate 8x6,
+// Compatível com index.html, 12 Operacionais, Base ZERO, Combate 14x12,
 // Campanha de 12 Missões (4 Capítulos), Inimigos Xeno, Granadas e 4 Finais.
 // ============================================================================
 
@@ -79,10 +79,10 @@ const INITIAL_BUILDINGS = [
 ];
 
 const CAMPAIGN_METRICS = {
-  trust: 50,      // Confiança (0-100)
-  resources: 50,  // Recursos (0-100)
-  research: 20,   // Investigação (0-100)
-  threat: 20      // Ameaça (0-100)
+  trust: 50,
+  resources: 50,
+  research: 20,
+  threat: 20
 };
 
 const ENEMY_ARCHETYPES = {
@@ -160,20 +160,20 @@ const CAMPAIGN_MISSIONS = [
     chapter: "I — Primeiro Contacto",
     number: 1,
     title: "Primeiro Contacto",
-    type: "Resgate / Contenção",
-    objective: "Resgatar a equipa desaparecida e eliminar a patrulha inicial.",
-    secondaryObjective: "Recuperar registos sem baixas no esquadrão.",
-    enemies: ["scout", "swarm", "scout"],
-    rewards: { credits: 350, materials: 20, alien: 1, research: 10, xp: 35 },
+    type: "Floresta / Resgate",
+    objective: "Investigar a explosão na floresta, resgatar os dois colegas reféns e eliminar a patrulha.",
+    secondaryObjective: "Salvar ambos os operacionais desaparecidos sem perder a equipa.",
+    enemies: ["scout", "swarm", "stalker"],
+    rewards: { credits: 400, materials: 25, alien: 1, research: 12, xp: 40 },
     choice: {
-      prompt: "Encontraste sobreviventes e registos militares sob fogo cruzado.",
+      prompt: "Após a explosão na floresta e o resgate dos dois colegas reféns em choque, como procedes?",
       optionA: {
-        label: "Priorizar resgate total de sobreviventes (+Confiança)",
-        effects: { trust: 12, resources: 5, threat: 3, credits: 50 }
+        label: "Estabilizar e evacuar os dois colegas em segurança (+14 Confiança)",
+        effects: { trust: 14, resources: 4, threat: 3, credits: 75 }
       },
       optionB: {
-        label: "Extrair rápido com os registos essenciais (+Investigação)",
-        effects: { trust: -4, resources: 12, research: 10, threat: 2, materials: 10 }
+        label: "Rastrear a origem da explosão na mata antes da extração (+12 Investigação)",
+        effects: { trust: -3, resources: 10, research: 12, threat: 4, materials: 10 }
       }
     }
   },
@@ -1010,48 +1010,57 @@ function renderCampaignMissions() {
 }
 
 // ---------------------------------------------------------------------------
-// 6. COMBATE TÁTICO ISOMÉTRICO XCOM (NAVEGAÇÃO TÁTIL + BARRA FLUTUANTE)
+// 6. COMBATE TÁTICO ISOMÉTRICO XCOM (CAMPOS GRANDES 14x12 + MÚLTIPLAS ROTAS)
 // ---------------------------------------------------------------------------
 
-const GRID_W = 10;
-const GRID_H = 8;
-const ISO_VIEW_W = 7;
-const ISO_VIEW_H = 7;
+const GRID_W = 14;
+const GRID_H = 12;
+const ISO_VIEW_W = 9;
+const ISO_VIEW_H = 9;
 
 function createMissionMap(missionIndex) {
   const grid = Array.from({ length: GRID_H }, () => Array(GRID_W).fill(0));
 
-  grid[1][3] = 4;
-  grid[2][3] = 1;
-  grid[3][3] = 2;
-  grid[4][3] = 1;
-  grid[5][3] = 4;
-  grid[6][3] = 1;
+  if (missionIndex === 0) {
+    // Floresta ampla (14x12) com 3 rotas: flanco norte, clareira central e flanco sul
+    grid[2][4] = 1; grid[2][5] = 4; grid[2][6] = 2;
+    grid[3][4] = 3; grid[3][8] = 3;
 
-  grid[2][5] = 2;
-  grid[3][5] = 4;
-  grid[4][5] = 4;
-  grid[5][5] = 2;
+    grid[5][3] = 4; grid[5][5] = 1; grid[5][7] = 2; grid[5][9] = 4;
+    grid[6][4] = 2; grid[6][6] = 4; grid[6][8] = 1;
 
-  grid[0][4] = 3;
-  grid[7][4] = 3;
+    grid[8][3] = 3; grid[8][7] = 3;
+    grid[9][4] = 1; grid[9][5] = 4; grid[9][6] = 2; grid[9][9] = 1;
+    return grid;
+  }
+
+  // Campos abertos multi-estratégia: rotas superior, central e inferior com aberturas de flanqueio
+  grid[2][4] = 2; grid[2][5] = 1; grid[2][8] = 2; grid[2][9] = 4;
+  grid[3][6] = 3; grid[3][10] = 3;
+
+  grid[5][4] = 4; grid[5][6] = 1; grid[5][8] = 2; grid[5][10] = 4;
+  grid[6][5] = 2; grid[6][7] = 4; grid[6][9] = 1;
+
+  grid[8][6] = 3; grid[8][10] = 3;
+  grid[9][4] = 1; grid[9][5] = 4; grid[9][8] = 2; grid[9][9] = 1;
 
   if (missionIndex >= 2) {
-    grid[1][6] = 3;
-    grid[6][6] = 3;
-    grid[3][4] = 1;
+    grid[1][7] = 2;
+    grid[10][7] = 2;
+    grid[4][7] = 1;
+    grid[7][7] = 1;
   }
   if (missionIndex >= 5) {
-    grid[3][6] = 2;
-    grid[4][6] = 2;
-    grid[2][4] = 4;
-    grid[5][4] = 4;
+    grid[4][9] = 2;
+    grid[7][9] = 2;
+    grid[3][5] = 4;
+    grid[8][5] = 4;
   }
   if (missionIndex >= 8) {
-    grid[0][6] = 2;
-    grid[7][6] = 2;
-    grid[1][4] = 1;
-    grid[6][4] = 1;
+    grid[1][10] = 2;
+    grid[10][10] = 2;
+    grid[2][7] = 4;
+    grid[9][7] = 4;
   }
 
   return grid;
@@ -1086,11 +1095,11 @@ function startMission(mission, missionIndex = 0) {
 
   const medbayBonusKits = getBuildingLevel("b-medbay");
   const startPositions = [
-    [0, 1], [0, 3], [0, 4], [0, 6], [1, 3]
+    [1, 2], [1, 5], [1, 6], [1, 9], [2, 5]
   ];
 
   const units = activeSquad.map((u, idx) => {
-    const pos = startPositions[idx] || [0, idx % GRID_H];
+    const pos = startPositions[idx] || [1, idx % GRID_H];
     return {
       ...u,
       side: "player",
@@ -1109,13 +1118,50 @@ function startMission(mission, missionIndex = 0) {
     };
   });
 
+  if (missionIndex === 0) {
+    const hostageCoords = [[5, 2], [6, 9]];
+    const hostageNames = ["COLEGA REFÉM A", "COLEGA REFÉM B"];
+    hostageCoords.forEach(([hx, hy], hIdx) => {
+      if (!units.some((u) => u.x === hx && u.y === hy)) {
+        units.push({
+          id: `hostage-m01-${hIdx}`,
+          name: hostageNames[hIdx],
+          codename: `LOST-0${hIdx + 1}`,
+          role: "Reconhecimento",
+          level: 1,
+          xp: 10,
+          hp: 55,
+          maxHp: 75,
+          ap: 2,
+          maxAp: 2,
+          ammo: 8,
+          maxAmmo: 8,
+          aim: 70,
+          dodge: 12,
+          status: "EM CHOQUE",
+          medkits: 1,
+          frags: 0,
+          smokes: 1,
+          overwatch: false,
+          hunker: true,
+          crouched: true,
+          stunned: true,
+          isHostageRescued: true,
+          side: "player",
+          x: hx,
+          y: hy
+        });
+      }
+    });
+  }
+
   const enemyPositions = [
-    [8, 1], [9, 2], [8, 4], [9, 5], [8, 6], [9, 3]
+    [11, 2], [12, 4], [11, 6], [12, 8], [11, 9], [12, 5]
   ];
 
   const enemies = mission.enemies.map((archId, idx) => {
     const arch = ENEMY_ARCHETYPES[archId] || ENEMY_ARCHETYPES.scout;
-    const pos = enemyPositions[idx] || [7, idx % GRID_H];
+    const pos = enemyPositions[idx] || [11, idx % GRID_H];
     const scaleFactor = 1 + missionIndex * 0.05;
     const maxHp = Math.round(arch.maxHp * scaleFactor);
     return {
@@ -1154,7 +1200,9 @@ function startMission(mission, missionIndex = 0) {
     enemies,
     selectedUnitId: null,
     selectedTargetId: enemies[0] ? enemies[0].id : null,
-    log: `Missão ${formatMissionNumber(mission.number)}: ${mission.title} — Toca num operacional para abrir as ordens flutuantes ou arrasta o plano isométrico.`
+    log: missionIndex === 0
+      ? "Campo amplo da floresta (14x12): escolhe entre flanco norte, rota central ou sul para investigar a explosão e salvar os dois colegas reféns!"
+      : `Missão ${formatMissionNumber(mission.number)}: ${mission.title} — Campo grande (14x12) com várias rotas táticas; arrasta o plano ou toca num operacional.`
   };
 
   goToScreen("tactical");
@@ -1297,8 +1345,6 @@ function addBattleLog(msg) {
   if (logEl) logEl.textContent = msg;
 }
 
-// --- GEOMETRIA ISOMÉTRICA XCOM (2:1) ---
-// Seeded deterministic pseudo-random helper for rich terrain detail
 function ozHash(x, y, seed = 1337) {
   let h = (x * 374761393 + y * 668265263 + seed * 1442695041) | 0;
   h = ((h ^ (h >> 13)) * 1274126177) | 0;
@@ -1370,13 +1416,11 @@ function drawIsoDiamond(ctx, sx, sy, w, h, fill, stroke, lw = 1.2) {
   }
 }
 
-// Desenha solo industrial com cascalho, trilhos ferroviários diagonais, chamas e névoa verde
 function drawAtmosphericGroundTile(ctx, sx, sy, w, h, gx, gy, battle, timeSec) {
   const hw = w * 0.5;
   const hh = h * 0.5;
   const n = ozHash(gx, gy, 42);
 
-  // Base de cascalho / terra escura do pátio ferroviário
   const gGrad = ctx.createLinearGradient(sx, sy - hh, sx, sy + hh);
   if (n > 0.55) {
     gGrad.addColorStop(0, "#2a231e");
@@ -1387,7 +1431,6 @@ function drawAtmosphericGroundTile(ctx, sx, sy, w, h, gx, gy, battle, timeSec) {
   }
   drawIsoDiamond(ctx, sx, sy, w + 0.5, h + 0.5, gGrad, "rgba(255,255,255,0.04)", 0.7);
 
-  // Textura de gravilha/pedras pequenas
   ctx.fillStyle = "rgba(214, 196, 172, 0.08)";
   for (let i = 0; i < 4; i++) {
     const px = sx + (ozHash(gx + i, gy, 91) - 0.5) * hw * 1.1;
@@ -1395,12 +1438,10 @@ function drawAtmosphericGroundTile(ctx, sx, sy, w, h, gx, gy, battle, timeSec) {
     ctx.fillRect(px, py, 1.5, 1.2);
   }
 
-  // Trilhos de linha férrea atravessando o mapa (gx + gy == 5 ou gx == 4)
-  if (gx + gy === 5 || gx + gy === 6) {
+  if (gx + gy === 7 || gx + gy === 8) {
     ctx.save();
     ctx.strokeStyle = "rgba(62, 46, 36, 0.85)";
     ctx.lineWidth = 2.2;
-    const steps = 3;
     for (let s = -1; s <= 1; s++) {
       const rx = sx + s * hw * 0.28;
       const ry = sy + s * hh * 0.28;
@@ -1415,15 +1456,10 @@ function drawAtmosphericGroundTile(ctx, sx, sy, w, h, gx, gy, battle, timeSec) {
     ctx.moveTo(sx - hw * 0.45, sy - hh * 0.25);
     ctx.lineTo(sx + hw * 0.45, sy + hh * 0.25);
     ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(sx - hw * 0.35, sy - hh * 0.35);
-    ctx.lineTo(sx + hw * 0.55, sy + hh * 0.15);
-    ctx.stroke();
     ctx.restore();
   }
 
-  // Focos de incêndio / chamas ambientais em zonas de escombros
-  const hasFire = (gx === 3 && gy === 2) || (gx === 4 && gy === 1) || (gx === 5 && gy === 2) || (gx === 3 && gy === 4);
+  const hasFire = (gx === 5 && gy === 3) || (gx === 6 && gy === 2) || (gx === 7 && gy === 4) || (gx === 5 && gy === 6);
   if (hasFire) {
     const flicker = 0.78 + 0.22 * Math.sin(timeSec * 8 + gx * 2.1 + gy * 1.7);
     const glowR = w * 0.48 * flicker;
@@ -1437,7 +1473,6 @@ function drawAtmosphericGroundTile(ctx, sx, sy, w, h, gx, gy, battle, timeSec) {
     ctx.arc(sx, sy - 2, glowR, 0, Math.PI * 2);
     ctx.fill();
 
-    // Línguas de fogo
     for (let f = -1; f <= 1; f++) {
       const fx = sx + f * 5;
       const fh = (8 + ozHash(gx, gy + f + 3, 55) * 8) * flicker;
@@ -1451,8 +1486,7 @@ function drawAtmosphericGroundTile(ctx, sx, sy, w, h, gx, gy, battle, timeSec) {
     }
   }
 
-  // Névoa / emanação tóxica verde perto de zonas de contenção
-  if ((gx === 2 && gy === 5) || (gx === 3 && gy === 6)) {
+  if ((gx === 3 && gy === 8) || (gx === 4 && gy === 9)) {
     const pulse = 0.85 + 0.15 * Math.cos(timeSec * 3.5 + gx);
     const tGrad = ctx.createRadialGradient(sx, sy, 2, sx, sy, w * 0.55 * pulse);
     tGrad.addColorStop(0, "rgba(74, 222, 128, 0.34)");
@@ -1465,7 +1499,6 @@ function drawAtmosphericGroundTile(ctx, sx, sy, w, h, gx, gy, battle, timeSec) {
   }
 }
 
-// Contorno azulado orgânico à volta da área alcançável de movimento (estilo XCOM)
 function drawMovementBoundaryContour(ctx, battle, m, selUnit, maxMoveRange) {
   if (!selUnit || selUnit.ap < 1 || battle.phase !== "player") return;
   const camX = battle.camera ? battle.camera.x : 0;
@@ -1496,7 +1529,6 @@ function drawMovementBoundaryContour(ctx, battle, m, selUnit, maxMoveRange) {
       if (!isReachable(gx, gy)) continue;
       const { sx, sy } = worldToIso(gx, gy, battle, m);
 
-      // Arestas exteriores do losango onde a casa vizinha não é alcançável
       if (!isReachable(gx, gy - 1)) {
         ctx.beginPath();
         ctx.moveTo(sx - hw, sy);
@@ -1569,7 +1601,6 @@ function drawIsoBoardSkirt(ctx, battle, m) {
   ctx.stroke();
 }
 
-// Caixotes de madeira, contentores/vagões e barricadas industriais
 function drawIsoCoverBlock(ctx, sx, sy, w, h, wallH, isHigh, isDestructible) {
   const cw = w * 0.74;
   const ch = h * 0.74;
@@ -1609,7 +1640,6 @@ function drawIsoCoverBlock(ctx, sx, sy, w, h, wallH, isHigh, isDestructible) {
 
   drawIsoDiamond(ctx, sx, topY, cw, ch, topCol, borderCol, 1.2);
 
-  // Ripas diagonais em caixotes ou nervuras em contentores
   ctx.strokeStyle = isHigh ? "rgba(186,230,253,0.45)" : "rgba(253,224,171,0.35)";
   ctx.lineWidth = 1;
   ctx.beginPath();
@@ -1635,7 +1665,6 @@ function drawUnitPipsAndShield(ctx, sx, topY, hp, maxHp, isEnemy, isSelected) {
     ctx.strokeRect(px, topY, pipW, 3.2);
   }
 
-  // Ícone de escudo tático ao lado da barra
   const shX = startX + totalW + 5;
   const shY = topY + 1.6;
   ctx.beginPath();
@@ -1764,6 +1793,7 @@ function drawIsoAlienSprite(ctx, sx, sy, w, h, enemy, isTargeted) {
 
   drawUnitPipsAndShield(ctx, sx, headY - headR - 7, enemy.hp, enemy.maxHp, true, isTargeted);
 }
+
 function ensureIsoCanvasStage(gridEl) {
   if (!gridEl || !gridEl.parentElement) return null;
   gridEl.style.display = "none";
@@ -1790,7 +1820,6 @@ function ensureIsoCanvasStage(gridEl) {
     canvas.style.cssText = "width:100%;height:100%;display:block;touch-action:none;user-select:none;-webkit-user-select:none;cursor:pointer;";
     stage.appendChild(canvas);
 
-    // Navegação tátil suave por arrasto/deslize direto no canvas isométrico
     let pointerDown = false;
     let totalMoved = 0;
     let startClientX = 0;
@@ -2227,6 +2256,7 @@ function renderBattle() {
       squadBar.appendChild(chip);
     });
   }
+
   const selUnit = getSelectedUnit();
   const selEnemy = getSelectedEnemy();
 
@@ -2253,10 +2283,8 @@ function renderBattle() {
     drawIsoBoardSkirt(ctx, b, m);
 
     const maxMoveRange = getUnitMoveRange(selUnit);
-
     const timeSec = performance.now() * 0.001;
 
-    // 1. Terreno atmosférico com trilhos, chamas e fumo
     for (let sum = 0; sum <= ISO_VIEW_W + ISO_VIEW_H - 2; sum++) {
       for (let vy = 0; vy < ISO_VIEW_H; vy++) {
         const vx = sum - vy;
@@ -2328,7 +2356,6 @@ function renderBattle() {
 
     drawMovementBoundaryContour(ctx, b, m, selUnit, maxMoveRange);
 
-    // 2. Linha de mira entre o soldado selecionado e o alvo selecionado
     if (selUnit && selEnemy) {
       const uPos = worldToIso(selUnit.x, selUnit.y, b, m);
       const ePos = worldToIso(selEnemy.x, selEnemy.y, b, m);
@@ -2343,7 +2370,6 @@ function renderBattle() {
       ctx.restore();
     }
 
-    // 3. Coberturas 3D, soldados e inimigos Xeno por profundidade
     for (let sum = 0; sum <= ISO_VIEW_W + ISO_VIEW_H - 2; sum++) {
       for (let vy = 0; vy < ISO_VIEW_H; vy++) {
         const vx = sum - vy;
