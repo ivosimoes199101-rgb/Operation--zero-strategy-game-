@@ -612,14 +612,50 @@ function setTacticalViewportLock(active) {
         display: none !important;
       }
       #tactical.active .battle-side {
-        display: flex !important;
-        flex-direction: column !important;
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
         gap: 6px !important;
         padding: 6px 8px 8px 8px !important;
-        background: rgba(6, 11, 17, 0.96) !important;
-        border-top: 1px solid rgba(78, 242, 161, 0.25) !important;
+        background: rgba(6, 11, 17, 0.98) !important;
+        border-top: 1px solid rgba(148, 163, 184, 0.22) !important;
         flex-shrink: 0 !important;
         z-index: 20 !important;
+      }
+      #tactical.active .battle-side .side-panel {
+        background: rgba(11, 18, 27, 0.96) !important;
+        border: 1px solid rgba(148, 163, 184, 0.22) !important;
+        border-radius: 6px !important;
+        padding: 7px 9px !important;
+        margin: 0 !important;
+        min-width: 0 !important;
+      }
+      #tactical.active .battle-side .side-panel:nth-of-type(3) {
+        display: none !important;
+      }
+      #tactical.active #oz-bottom-actions {
+        grid-column: 1 / -1 !important;
+        display: grid !important;
+        grid-template-columns: 1.45fr 1fr !important;
+        gap: 6px !important;
+        margin-top: 2px !important;
+      }
+      #tactical.active #end-turn {
+        background: #a3e635 !important;
+        color: #071108 !important;
+        border: none !important;
+        border-radius: 5px !important;
+        padding: 10px 12px !important;
+        font-weight: 800 !important;
+        letter-spacing: 0.6px !important;
+      }
+      #tactical.active #retreat {
+        background: #17202a !important;
+        color: #e2e8f0 !important;
+        border: 1px solid rgba(148, 163, 184, 0.28) !important;
+        border-radius: 5px !important;
+        padding: 10px 10px !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.5px !important;
       }
       #tactical.active .battle-main {
         flex: 1 1 100% !important;
@@ -1360,16 +1396,16 @@ function addBattleLog(msg) {
 function getIsoMetrics(canvas) {
   const rect = canvas.getBoundingClientRect();
   const w = Math.max(320, rect.width || canvas.parentElement?.clientWidth || window.innerWidth || 360);
-  const h = Math.max(420, rect.height || canvas.parentElement?.clientHeight || window.innerHeight || 640);
+  const h = Math.max(340, rect.height || canvas.parentElement?.clientHeight || window.innerHeight || 520);
 
   const maxTileWByWidth = Math.floor((w + 24) / ISO_VIEW_W);
-  const maxTileWByHeight = Math.floor(((h * 0.72) / ISO_VIEW_H) * 2);
+  const maxTileWByHeight = Math.floor(((h * 0.68) / ISO_VIEW_H) * 2);
   const tileW = Math.max(54, Math.min(96, Math.max(maxTileWByWidth, Math.min(maxTileWByWidth, maxTileWByHeight))));
   const tileH = Math.round(tileW * 0.5);
   const wallH = Math.max(10, Math.round(tileH * 0.52));
   const originX = w * 0.5;
   const boardPixelH = ISO_VIEW_W * tileH;
-  const originY = Math.max(68, Math.round((h - boardPixelH) * 0.38));
+  const originY = Math.max(38, Math.round((h - boardPixelH) * 0.28));
 
   return { w, h, tileW, tileH, wallH, originX, originY };
 }
@@ -2122,7 +2158,6 @@ function renderBattle() {
           b.selectedUnitId = isAct ? null : u.id;
           b.mode = "normal";
           b.ordersMinimized = false;
-          if (!isAct) centerCameraOnUnit(u);
           addBattleLog(isAct ? `Ordens de ${u.name} recolhidas.` : `Operacional selecionado: ${u.name}.`);
           renderBattle();
         });
@@ -2417,41 +2452,60 @@ function renderBattle() {
     if (el) el.textContent = txt;
   };
 
-  const ordersPanel = document.querySelector("#tactical .battle-side .side-panel:nth-of-type(3)");
-  if (ordersPanel) {
-    ordersPanel.style.display = "";
-  }
   ensureEndTurnVisible(b);
+
+  const unitHpEl = document.getElementById("unit-hp");
+  const unitApEl = document.getElementById("unit-ap");
+  const unitAmmoEl = document.getElementById("unit-ammo");
+  const hitChanceEl = document.getElementById("hit-chance");
 
   if (selUnit) {
     const maxMove = getUnitMoveRange(selUnit);
-    const postureName = selUnit.crouched ? "AGACHADO (CAUTELOSO)" : "DE PÉ (CORRER)";
+    const postureName = selUnit.crouched ? "AGACHADO" : "DE PÉ (CORRER)";
     setText("selected-unit", `${selUnit.name} (${selUnit.role}) · ${postureName}`);
-    setText("unit-hp", `${selUnit.hp}/${selUnit.maxHp} HP`);
-    setText("unit-ap", `${selUnit.ap}/${selUnit.maxAp} PA · MOV ${maxMove}`);
-    setText("unit-ammo", `${selUnit.ammo}/${selUnit.maxAmmo} MUN`);
+    if (unitHpEl && unitApEl && unitAmmoEl) {
+      unitHpEl.textContent = `${selUnit.hp}/${selUnit.maxHp} HP`;
+      unitApEl.textContent = `${selUnit.ap}/${selUnit.maxAp} PA · MOV ${maxMove}`;
+      unitAmmoEl.textContent = `${selUnit.ammo}/${selUnit.maxAmmo} MUN`;
+    } else {
+      setText("unit-hp", `${selUnit.hp}/${selUnit.maxHp} HP · ${selUnit.ap}/${selUnit.maxAp} PA · ${selUnit.ammo}/${selUnit.maxAmmo} MUN`);
+    }
   } else {
     setText("selected-unit", "SEM OPERACIONAL");
-    setText("unit-hp", "0 HP");
-    setText("unit-ap", "0 PA");
-    setText("unit-ammo", "0 MUN");
+    if (unitHpEl && unitApEl && unitAmmoEl) {
+      unitHpEl.textContent = "0 HP";
+      unitApEl.textContent = "0 PA";
+      unitAmmoEl.textContent = "0 MUN";
+    } else {
+      setText("unit-hp", "0 HP · 0 PA · 0 MUN");
+    }
   }
 
   if (selUnit && selEnemy) {
     const chance = calculateHitChance(selUnit, selEnemy, b);
     const cover = getTileCoverAt(b, selEnemy.x, selEnemy.y);
-    const coverText = cover === 2 ? "COB. PESADA (-40%)" : cover === 1 ? "MEIA COB. (-25%)" : "SEM COB. (0%)";
+    const coverText = cover === 2 ? "COB. PESADA (-40%)" : cover === 1 ? "MEIA COB. (-25%)" : "SEM COB.";
     const estDmg = estimateUnitDamage(selUnit, selEnemy);
     setText("target-info", `${selEnemy.name} (${selEnemy.hp} HP · ${coverText})`);
-    setText("hit-chance", `CHANCE: ${chance}% · DANO EST.: ~${estDmg}`);
+    const chanceStr = `CHANCE: ${chance}% · DANO EST.: ~${estDmg}`;
+    if (hitChanceEl) {
+      hitChanceEl.textContent = chanceStr;
+    } else {
+      setText("target-info", `${selEnemy.name} (${selEnemy.hp} HP · ${coverText}) · ${chanceStr}`);
+    }
   } else if (selEnemy) {
     const cover = getTileCoverAt(b, selEnemy.x, selEnemy.y);
     const coverText = cover === 2 ? "COB. PESADA" : cover === 1 ? "MEIA COB." : "SEM COB.";
     setText("target-info", `${selEnemy.name} (${selEnemy.hp} HP · ${coverText})`);
-    setText("hit-chance", "CHANCE: --% · DANO EST.: --");
+    const chanceStr = "CHANCE: --% · DANO EST.: --";
+    if (hitChanceEl) {
+      hitChanceEl.textContent = chanceStr;
+    } else {
+      setText("target-info", `${selEnemy.name} (${selEnemy.hp} HP · ${coverText}) · ${chanceStr}`);
+    }
   } else {
     setText("target-info", "NENHUM ALVO");
-    setText("hit-chance", "CHANCE: --% · DANO EST.: --");
+    if (hitChanceEl) hitChanceEl.textContent = "CHANCE: --% · DANO EST.: --";
   }
 
   const logEl = document.getElementById("battle-log");
@@ -2502,7 +2556,6 @@ function handleCellClick(x, y) {
       b.ordersMinimized = false;
       b.orderTab = "mov";
       unitHere.overwatch = false;
-      centerCameraOnUnit(unitHere);
       addBattleLog(`Operacional selecionado: ${unitHere.name} (${unitHere.crouched ? "Agachado/Cauteloso: 2" : "Em pé/Correr: 4"}).`);
     }
     renderBattle();
@@ -2526,7 +2579,6 @@ function handleCellClick(x, y) {
       selUnit.hunker = false;
       selUnit.stunned = false;
       if (b.mode === "move") { b.mode = "normal"; b.ordersMinimized = false; }
-      centerCameraOnUnit(selUnit);
 
       let rescuedMsg = "";
       if (b.hostages && b.hostages.length) {
