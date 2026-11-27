@@ -1109,6 +1109,13 @@ function toggleCrouchSelectedUnit() {
   renderBattle();
 }
 
+function hideFloatingOrdersNow() {
+  const pop = document.getElementById("floating-unit-orders");
+  if (pop) {
+    pop.style.setProperty("display", "none", "important");
+  }
+}
+
 function toggleMoveModeSelectedUnit() {
   const b = state.battle;
   if (!b || b.phase !== "player") return;
@@ -1121,14 +1128,20 @@ function toggleMoveModeSelectedUnit() {
     addBattleLog(`${unit.name} não tem PA para mover.`);
     return;
   }
-  b.mode = b.mode === "move" ? "normal" : "move";
-  const range = getUnitMoveRange(unit);
-  const stanceTxt = unit.crouched ? "agachado/cauteloso" : "de pé/corrida";
-  addBattleLog(
-    b.mode === "move"
-      ? `Modo MOVER ativo (${stanceTxt}, alcance ${range} casas): toca num losango realçado no mapa isométrico.`
-      : "Modo de seleção normal restaurado."
-  );
+  if (b.mode === "move") {
+    b.mode = "normal";
+    b.ordersMinimized = false;
+    addBattleLog("Modo de movimento cancelado.");
+  } else {
+    b.mode = "move";
+    b.ordersMinimized = true;
+    hideFloatingOrdersNow();
+    const range = getUnitMoveRange(unit);
+    const stanceTxt = unit.crouched ? "agachado/cauteloso" : "de pé/corrida";
+    addBattleLog(
+      `Modo MOVER ativo (${stanceTxt}, alcance ${range} casas): toca num losango verde no mapa.`
+    );
+  }
   renderBattle();
 }
 
@@ -1611,8 +1624,8 @@ function renderFloatingUnitOrders(battle, selUnit, canvas, m) {
     }
   }
 
-  if (!battle || battle.phase !== "player" || !selUnit || !canvas || !m) {
-    pop.style.display = "none";
+  if (!battle || battle.phase !== "player" || battle.mode === "move" || battle.ordersMinimized || !selUnit || !canvas || !m) {
+    pop.style.setProperty("display", "none", "important");
     return;
   }
 
@@ -1622,7 +1635,7 @@ function renderFloatingUnitOrders(battle, selUnit, canvas, m) {
   const vy = selUnit.y - camY;
 
   if (vx < 0 || vx >= ISO_VIEW_W || vy < 0 || vy >= ISO_VIEW_H) {
-    pop.style.display = "none";
+    pop.style.setProperty("display", "none", "important");
     return;
   }
 
@@ -1661,7 +1674,7 @@ function renderFloatingUnitOrders(battle, selUnit, canvas, m) {
     </div>
   `;
 
-  pop.style.display = "block";
+  pop.style.setProperty("display", "block", "important");
   pop.style.bottom = "auto";
   pop.style.right = "auto";
   pop.style.maxWidth = "320px";
@@ -1694,7 +1707,10 @@ function renderFloatingUnitOrders(battle, selUnit, canvas, m) {
     btn.addEventListener("click", (ev) => {
       ev.stopPropagation();
       const act = btn.getAttribute("data-float-act");
-      if (act === "move") toggleMoveModeSelectedUnit();
+      if (act === "move") {
+        hideFloatingOrdersNow();
+        toggleMoveModeSelectedUnit();
+      }
       else if (act === "crouch") toggleCrouchSelectedUnit();
       else if (act === "fire") fireAtTarget();
       else if (act === "frag") {
@@ -1982,6 +1998,67 @@ function renderBattle() {
 
   renderFloatingUnitOrders(b, selUnit, canvas, isoMetrics);
 
+  if (canvas && canvas.parentElement) {
+    let modePill = document.getElementById("iso-mode-pill");
+    if (!modePill) {
+      modePill = document.createElement("div");
+      modePill.id = "iso-mode-pill";
+      modePill.style.cssText = `
+        position:absolute;
+        bottom:8px;
+        left:50%;
+        transform:translateX(-50%);
+        z-index:22;
+        display:none;
+        align-items:center;
+        gap:8px;
+        padding:5px 10px;
+        border-radius:999px;
+        background:rgba(9,17,26,0.94);
+        border:1px solid #4ef2a1;
+        color:#ecfdf5;
+        font-size:0.72em;
+        box-shadow:0 6px 18px rgba(0,0,0,0.55);
+        white-space:nowrap;
+      `;
+      canvas.parentElement.appendChild(modePill);
+    }
+
+    if (b.phase === "player" && selUnit && (b.mode === "move" || b.ordersMinimized)) {
+      modePill.style.display = "inline-flex";
+      if (b.mode === "move") {
+        modePill.innerHTML = `
+          <span>MOVER <b>${selUnit.name.split(" ")[0]}</b> (alc. ${getUnitMoveRange(selUnit)}) · toca num losango</span>
+          <button type="button" id="cancel-move-pill-btn" style="background:#1e293b;color:#f8fafc;border:1px solid rgba(255,255,255,0.25);border-radius:999px;padding:2px 8px;font-size:0.9em;cursor:pointer;">CANCELAR</button>
+        `;
+        const cBtn = modePill.querySelector("#cancel-move-pill-btn");
+        if (cBtn) {
+          cBtn.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            b.mode = "normal";
+            b.ordersMinimized = false;
+            renderBattle();
+          });
+        }
+      } else {
+        modePill.innerHTML = `
+          <span>ORDENS OCULTAS · campo livre</span>
+          <button type="button" id="restore-orders-pill-btn" style="background:rgba(78,242,161,0.22);color:#4ef2a1;border:1px solid #4ef2a1;border-radius:999px;padding:2px 8px;font-size:0.9em;cursor:pointer;">MOSTRAR</button>
+        `;
+        const rBtn = modePill.querySelector("#restore-orders-pill-btn");
+        if (rBtn) {
+          rBtn.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            b.ordersMinimized = false;
+            renderBattle();
+          });
+        }
+      }
+    } else {
+      modePill.style.display = "none";
+    }
+  }
+
   const setText = (id, txt) => {
     const el = document.getElementById(id);
     if (el) el.textContent = txt;
@@ -2063,6 +2140,7 @@ function handleCellClick(x, y) {
     } else {
       b.selectedUnitId = unitHere.id;
       b.mode = "normal";
+      b.ordersMinimized = false;
       unitHere.overwatch = false;
       centerCameraOnUnit(unitHere);
       addBattleLog(`Operacional selecionado: ${unitHere.name} (${unitHere.crouched ? "Agachado/Cauteloso: 2" : "Em pé/Correr: 4"}).`);
