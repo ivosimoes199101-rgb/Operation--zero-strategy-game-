@@ -644,10 +644,10 @@ function setTacticalViewportLock(active) {
       #tactical.active .battle-side {
         display: grid !important;
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
-        gap: 4px !important;
-        padding: 4px 6px 5px 6px !important;
+        gap: 7px !important;
+        padding: 8px 10px 10px 10px !important;
         background: rgba(6, 11, 17, 0.98) !important;
-        border-top: 1px solid rgba(148, 163, 184, 0.2) !important;
+        border-top: 1px solid rgba(78, 242, 161, 0.28) !important;
         flex-shrink: 0 !important;
         width: 100% !important;
         max-width: 100% !important;
@@ -658,53 +658,54 @@ function setTacticalViewportLock(active) {
       #tactical.active #battle-log {
         display: block !important;
         grid-column: 1 / -1 !important;
-        background: rgba(12, 20, 29, 0.95) !important;
-        border: 1px solid rgba(148, 163, 184, 0.22) !important;
-        border-left: 3px solid #4ef2a1 !important;
-        border-radius: 5px !important;
-        padding: 3px 7px !important;
+        background: rgba(12, 20, 29, 0.96) !important;
+        border: 1px solid rgba(148, 163, 184, 0.26) !important;
+        border-left: 4px solid #4ef2a1 !important;
+        border-radius: 7px !important;
+        padding: 7px 10px !important;
         margin: 0 !important;
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
-        font-size: clamp(0.64em, 2.3vw, 0.74em) !important;
-        line-height: 1.2 !important;
+        font-size: clamp(0.76rem, 2.8vw, 0.88rem) !important;
+        line-height: 1.32 !important;
         color: #e2e8f0 !important;
-        max-height: 2.5em !important;
+        min-height: 2.5em !important;
+        max-height: 4.2em !important;
         overflow-y: auto !important;
         word-break: break-word !important;
       }
       #tactical.active .battle-side .side-panel {
-        background: rgba(11, 18, 27, 0.96) !important;
-        border: 1px solid rgba(148, 163, 184, 0.22) !important;
-        border-radius: 5px !important;
-        padding: 4px 6px !important;
+        background: rgba(11, 18, 27, 0.97) !important;
+        border: 1px solid rgba(148, 163, 184, 0.26) !important;
+        border-radius: 7px !important;
+        padding: 8px 9px !important;
         margin: 0 !important;
         min-width: 0 !important;
         max-width: 100% !important;
         overflow: hidden !important;
         box-sizing: border-box !important;
         font-size: 0 !important;
-        line-height: 1.15 !important;
+        line-height: 1.25 !important;
       }
       #tactical.active .battle-side .side-panel:nth-of-type(3) {
         display: none !important;
       }
       #tactical.active #selected-unit,
       #tactical.active #target-info {
-        font-size: clamp(0.66rem, 2.5vw, 0.78rem) !important;
-        font-weight: 700 !important;
-        line-height: 1.15 !important;
+        font-size: clamp(0.78rem, 2.9vw, 0.92rem) !important;
+        font-weight: 800 !important;
+        line-height: 1.22 !important;
         white-space: nowrap !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
         display: block !important;
-        margin-bottom: 2px !important;
+        margin-bottom: 4px !important;
       }
       #tactical.active #unit-hp,
       #tactical.active #unit-ap,
       #tactical.active #unit-ammo,
       #tactical.active #hit-chance {
-        font-size: clamp(0.6rem, 2.2vw, 0.7rem) !important;
-        line-height: 1.15 !important;
+        font-size: clamp(0.7rem, 2.5vw, 0.8rem) !important;
+        line-height: 1.25 !important;
         white-space: nowrap !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
@@ -719,19 +720,19 @@ function setTacticalViewportLock(active) {
         grid-column: 1 / -1 !important;
         display: grid !important;
         grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr) !important;
-        gap: 5px !important;
-        margin-top: 0 !important;
+        gap: 8px !important;
+        margin-top: 2px !important;
         min-width: 0 !important;
       }
       #tactical.active #end-turn {
         background: #a3e635 !important;
         color: #071108 !important;
         border: none !important;
-        border-radius: 5px !important;
-        padding: 6px 8px !important;
-        font-size: clamp(0.7rem, 2.6vw, 0.82rem) !important;
+        border-radius: 7px !important;
+        padding: 11px 12px !important;
+        font-size: clamp(0.82rem, 3vw, 0.96rem) !important;
         font-weight: 800 !important;
-        letter-spacing: 0.4px !important;
+        letter-spacing: 0.5px !important;
         white-space: nowrap !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
@@ -739,13 +740,13 @@ function setTacticalViewportLock(active) {
       #tactical.active #retreat {
         background: #17202a !important;
         color: #e2e8f0 !important;
-        border: 1px solid rgba(148, 163, 184, 0.28) !important;
-        border-radius: 5px !important;
-        padding: 6px 7px !important;
-        font-size: clamp(0.66rem, 2.4vw, 0.76rem) !important;
+        border: 1px solid rgba(148, 163, 184, 0.32) !important;
+        border-radius: 7px !important;
+        padding: 11px 10px !important;
+        font-size: clamp(0.78rem, 2.8vw, 0.9rem) !important;
         font-weight: 700 !important;
-        line-height: 1.1 !important;
-        letter-spacing: 0.3px !important;
+        line-height: 1.15 !important;
+        letter-spacing: 0.4px !important;
       }
       #tactical.active .battle-main {
         flex: 1 1 100% !important;
@@ -1564,16 +1565,16 @@ function getIsoMetrics(canvas, ignoreBattlePan = false) {
   const zoom = getBattleZoom(b);
 
   const span = GRID_W + GRID_H;
-  const maxTileWByWidth = Math.floor(((w - 20) * 2) / span);
-  const maxTileWByHeight = Math.floor(((h - 34) * 4) / span);
-  const baseTileW = Math.max(22, Math.min(64, Math.min(maxTileWByWidth, maxTileWByHeight)));
-  const tileW = Math.max(14, baseTileW * zoom);
-  const tileH = Math.max(7, tileW * 0.5);
-  const wallH = Math.max(4, tileH * 0.55);
+  const maxTileWByWidth = Math.floor(((w - 8) * 2.15) / span);
+  const maxTileWByHeight = Math.floor(((h - 22) * 4.35) / span);
+  const baseTileW = Math.max(26, Math.min(82, Math.min(maxTileWByWidth, maxTileWByHeight)));
+  const tileW = Math.max(16, baseTileW * zoom * 1.12);
+  const tileH = Math.max(8, tileW * 0.5);
+  const wallH = Math.max(5, tileH * 0.6);
 
   const boardPixelH = span * tileH * 0.5;
   const baseOriginX = w * 0.5 + (GRID_H - GRID_W) * (tileW * 0.25);
-  const baseOriginY = Math.max(22, Math.round((h - boardPixelH) * 0.44));
+  const baseOriginY = Math.max(18, Math.round((h - boardPixelH) * 0.46));
 
   const panX = (!ignoreBattlePan && b && typeof b.panX === "number") ? b.panX : 0;
   const panY = (!ignoreBattlePan && b && typeof b.panY === "number") ? b.panY : 0;
