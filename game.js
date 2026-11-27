@@ -848,34 +848,52 @@ function renderCampaignMissions() {
 // 6. COMBATE TÁTICO (GRELHA 8x6, COBERTURA, GRANADAS, IA XENO E FINAIS)
 // ---------------------------------------------------------------------------
 
-const GRID_W = 8;
-const GRID_H = 6;
+const GRID_W = 10;
+const GRID_H = 8;
 
-// Tipos de tile: 0 = chão normal, 1 = meia cobertura, 2 = cobertura pesada, 3 = bloqueio total
+// Tipos de tile:
+// 0 = chão normal
+// 1 = meia cobertura (barricada/caixotes)
+// 2 = cobertura pesada (muro/coluna)
+// 3 = bloqueio total (estrutura sólida)
+// 4 = cobertura destrutível (caixotes/barricada leve - pode ser destruída por explosivos)
 function createMissionMap(missionIndex) {
   const grid = Array.from({ length: GRID_H }, () => Array(GRID_W).fill(0));
 
-  grid[1][3] = 1;
-  grid[2][3] = 2;
-  grid[3][3] = 1;
-  grid[4][3] = 2;
+  // Linha de cobertura avançada / flancos iniciais (colunas 3 e 4)
+  grid[1][3] = 4;
+  grid[2][3] = 1;
+  grid[3][3] = 2;
+  grid[4][3] = 1;
+  grid[5][3] = 4;
+  grid[6][3] = 1;
 
-  grid[1][5] = 2;
-  grid[2][5] = 1;
-  grid[3][5] = 1;
-  grid[4][5] = 2;
+  // Zona central de manobra e bloqueios (colunas 4 e 5)
+  grid[2][5] = 2;
+  grid[3][5] = 4;
+  grid[4][5] = 4;
+  grid[5][5] = 2;
+
+  // Obstáculos de bloqueio total para criar corredores e flancos
+  grid[0][4] = 3;
+  grid[7][4] = 3;
 
   if (missionIndex >= 2) {
-    grid[0][4] = 3;
-    grid[5][4] = 3;
+    grid[1][6] = 3;
+    grid[6][6] = 3;
+    grid[3][4] = 1;
   }
   if (missionIndex >= 5) {
-    grid[2][4] = 2;
-    grid[3][4] = 2;
+    grid[3][6] = 2;
+    grid[4][6] = 2;
+    grid[2][4] = 4;
+    grid[5][4] = 4;
   }
   if (missionIndex >= 8) {
+    grid[0][6] = 2;
+    grid[7][6] = 2;
     grid[1][4] = 1;
-    grid[4][4] = 1;
+    grid[6][4] = 1;
   }
 
   return grid;
@@ -893,7 +911,7 @@ function getTileCoverAt(battle, x, y) {
     if (nx >= 0 && nx < GRID_W && ny >= 0 && ny < GRID_H) {
       const t = battle.grid[ny][nx];
       if (t === 2 && best < 2) best = 2;
-      else if (t === 1 && best < 1) best = 1;
+      else if ((t === 1 || t === 4) && best < 1) best = 1;
     }
   }
   return best;
@@ -910,7 +928,7 @@ function startMission(mission, missionIndex = 0) {
 
   const medbayBonusKits = getBuildingLevel("b-medbay");
   const startPositions = [
-    [0, 1], [0, 2], [0, 3], [0, 4], [1, 2]
+    [0, 1], [0, 3], [0, 4], [0, 6], [1, 3]
   ];
 
   const units = activeSquad.map((u, idx) => {
@@ -933,7 +951,7 @@ function startMission(mission, missionIndex = 0) {
   });
 
   const enemyPositions = [
-    [6, 1], [7, 2], [6, 3], [7, 4], [6, 2], [7, 3]
+    [8, 1], [9, 2], [8, 4], [9, 5], [8, 6], [9, 3]
   ];
 
   const enemies = mission.enemies.map((archId, idx) => {
@@ -1270,14 +1288,17 @@ function renderBattle() {
         let label = "";
 
         if (tileType === 3) {
-          bg = "rgba(30,35,42,0.9)";
+          bg = "rgba(26,32,42,0.92)";
           label = "■";
         } else if (tileType === 2) {
-          bg = "rgba(90,120,160,0.25)";
+          bg = "rgba(90,120,160,0.26)";
           label = "▲";
         } else if (tileType === 1) {
           bg = "rgba(140,130,70,0.22)";
           label = "▪";
+        } else if (tileType === 4) {
+          bg = "rgba(185,115,55,0.24)";
+          label = "▣";
         }
 
         if (smokeHere) {
@@ -1482,7 +1503,7 @@ function throwFragGrenade(unit, tx, ty) {
       const cy = ty + dy;
       if (cx < 0 || cx >= GRID_W || cy < 0 || cy >= GRID_H) continue;
 
-      if (b.grid[cy][cx] === 1) {
+      if (b.grid[cy][cx] === 1 || b.grid[cy][cx] === 4) {
         b.grid[cy][cx] = 0;
       }
 
