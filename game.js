@@ -2393,24 +2393,24 @@ function _renderBattleInner(b) {
       : "SEM ALVO";
 
     topHud.innerHTML = `
-      <div style="pointer-events:auto;background:rgba(7,14,22,0.78);backdrop-filter:blur(6px);border:1px solid rgba(78,242,161,0.35);border-radius:10px;padding:6px 9px;max-width:46%;">
-        <div style="font-size:0.68em;font-weight:bold;letter-spacing:0.6px;color:#4ef2a1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-          ${formatMissionNumber(b.mission.number)}. ${b.mission.title.toUpperCase()} · T${b.turn} · ${curZoomPct}%
+      <div style="pointer-events:auto;background:rgba(7,14,22,0.82);backdrop-filter:blur(6px);border:1px solid rgba(78,242,161,0.35);border-radius:10px;padding:6px 9px;max-width:48%;">
+        <div style="font-size:0.7em;font-weight:bold;letter-spacing:0.6px;color:#4ef2a1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+          ${formatMissionNumber(b.mission.number)}. ${b.mission.title.toUpperCase()}
         </div>
-        <div style="font-size:0.62em;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">
+        <div style="font-size:0.64em;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">
           ${selUForHud ? `${selUForHud.name.split(" ")[0]}: ${selUForHud.hp}HP · ${selUForHud.ap}PA · ${selUForHud.ammo}M` : `ALVO: ${tgtText}`}
         </div>
         <div style="display:flex;align-items:center;gap:4px;margin-top:5px;">
-          <button type="button" id="iso-zoom-out" style="background:rgba(15,23,42,0.92);color:#e2e8f0;border:1px solid rgba(148,163,184,0.4);border-radius:5px;padding:2px 7px;font-size:0.66em;font-weight:bold;cursor:pointer;">−</button>
-          <button type="button" id="iso-zoom-reset" style="background:rgba(15,23,42,0.92);color:#4ef2a1;border:1px solid rgba(78,242,161,0.4);border-radius:5px;padding:2px 6px;font-size:0.62em;font-weight:bold;cursor:pointer;">${curZoomPct}%</button>
-          <button type="button" id="iso-zoom-in" style="background:rgba(15,23,42,0.92);color:#e2e8f0;border:1px solid rgba(148,163,184,0.4);border-radius:5px;padding:2px 7px;font-size:0.66em;font-weight:bold;cursor:pointer;">+</button>
-          <button type="button" id="iso-pan-left" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.3);border-radius:5px;padding:2px 5px;font-size:0.62em;cursor:pointer;">◀</button>
-          <button type="button" id="iso-pan-up" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.3);border-radius:5px;padding:2px 5px;font-size:0.62em;cursor:pointer;">▲</button>
-          <button type="button" id="iso-pan-down" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.3);border-radius:5px;padding:2px 5px;font-size:0.62em;cursor:pointer;">▼</button>
-          <button type="button" id="iso-pan-right" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.3);border-radius:5px;padding:2px 5px;font-size:0.62em;cursor:pointer;">▶</button>
+          <button type="button" id="iso-zoom-out" style="background:rgba(15,23,42,0.92);color:#e2e8f0;border:1px solid rgba(148,163,184,0.4);border-radius:5px;padding:2px 7px;font-size:0.68em;font-weight:bold;cursor:pointer;">−</button>
+          <button type="button" id="iso-zoom-reset" style="background:rgba(15,23,42,0.92);color:#4ef2a1;border:1px solid rgba(78,242,161,0.4);border-radius:5px;padding:2px 6px;font-size:0.64em;font-weight:bold;cursor:pointer;">${curZoomPct}%</button>
+          <button type="button" id="iso-zoom-in" style="background:rgba(15,23,42,0.92);color:#e2e8f0;border:1px solid rgba(148,163,184,0.4);border-radius:5px;padding:2px 7px;font-size:0.68em;font-weight:bold;cursor:pointer;">+</button>
+          <button type="button" id="iso-pan-left" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.3);border-radius:5px;padding:2px 5px;font-size:0.64em;cursor:pointer;">◀</button>
+          <button type="button" id="iso-pan-up" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.3);border-radius:5px;padding:2px 5px;font-size:0.64em;cursor:pointer;">▲</button>
+          <button type="button" id="iso-pan-down" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.3);border-radius:5px;padding:2px 5px;font-size:0.64em;cursor:pointer;">▼</button>
+          <button type="button" id="iso-pan-right" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.3);border-radius:5px;padding:2px 5px;font-size:0.64em;cursor:pointer;">▶</button>
         </div>
       </div>
-      <div id="iso-squad-strip" style="pointer-events:auto;display:flex;flex-wrap:wrap;gap:4px;max-width:52%;justify-content:flex-end;"></div>
+      <div id="iso-squad-strip" style="pointer-events:auto;display:flex;flex-wrap:wrap;gap:5px;max-width:50%;justify-content:flex-end;"></div>
     `;
 
     const zoomOutBtn = topHud.querySelector("#iso-zoom-out");
