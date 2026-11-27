@@ -559,6 +559,11 @@ function setTacticalViewportLock(active) {
         margin: 0 !important;
         padding: 0 !important;
       }
+      body.tactical-locked > header,
+      body.tactical-locked .topbar,
+      body.tactical-locked .app-header {
+        display: none !important;
+      }
       #tactical.active {
         position: fixed !important;
         inset: 0 !important;
@@ -571,24 +576,50 @@ function setTacticalViewportLock(active) {
         flex-direction: column !important;
         justify-content: space-between !important;
         box-sizing: border-box !important;
-        padding: 8px 10px !important;
-        z-index: 20 !important;
+        padding: 6px 8px 8px 8px !important;
+        background: #070d14 !important;
+        z-index: 60 !important;
       }
       #tactical.active .battle-top {
         flex-shrink: 0 !important;
-        padding: 2px 0 !important;
-        gap: 4px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        padding: 0 0 2px 0 !important;
+        margin: 0 !important;
+        gap: 6px !important;
+      }
+      #tactical.active .battle-top .tag,
+      #tactical.active .battle-top .status-pill {
+        display: none !important;
       }
       #tactical.active .battle-top h2,
-      #tactical.active .battle-top #turn-label {
-        font-size: 0.82em !important;
+      #tactical.active #battle-title {
+        font-size: 0.85em !important;
+        line-height: 1.15 !important;
         margin: 0 !important;
+        letter-spacing: 0.5px !important;
       }
       #tactical.active .battle-info {
         flex-shrink: 0 !important;
-        font-size: 0.68em !important;
-        padding: 2px 4px !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        gap: 6px !important;
+        font-size: 0.64em !important;
+        line-height: 1.15 !important;
+        padding: 2px 2px 4px 2px !important;
         margin: 0 !important;
+      }
+      #tactical.active .battle-info span:first-child {
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+      }
+      #tactical.active .battle-info #turn-label {
+        flex-shrink: 0 !important;
+        color: #4ef2a1 !important;
+        font-weight: bold !important;
       }
       #tactical.active .battle-main {
         flex: 1 1 auto !important;
@@ -611,41 +642,48 @@ function setTacticalViewportLock(active) {
       }
       #tactical.active #battle-log {
         flex-shrink: 0 !important;
-        max-height: 30px !important;
+        max-height: 28px !important;
         overflow-y: auto !important;
-        font-size: 0.7em !important;
+        font-size: 0.68em !important;
         line-height: 1.2 !important;
         padding: 3px 6px !important;
         margin-top: 4px !important;
       }
       #tactical.active .battle-side {
         flex-shrink: 0 !important;
-        display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        align-items: center !important;
-        justify-content: space-between !important;
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
         gap: 4px !important;
         margin-top: 4px !important;
       }
       #tactical.active .battle-side .side-panel:nth-of-type(1),
       #tactical.active .battle-side .side-panel:nth-of-type(2) {
-        flex: 1 1 0 !important;
         min-width: 0 !important;
-        font-size: 0.65em !important;
-        line-height: 1.15 !important;
-        padding: 3px 5px !important;
+        font-size: 0.64em !important;
+        line-height: 1.2 !important;
+        padding: 4px 6px !important;
         margin: 0 !important;
         white-space: nowrap !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
       }
-      #tactical.active #end-turn {
-        flex: 0 0 auto !important;
-        margin-top: 0 !important;
-        padding: 5px 8px !important;
+      #tactical.active #oz-bottom-actions {
+        grid-column: 1 / -1 !important;
+        display: flex !important;
+        gap: 6px !important;
+        margin-top: 2px !important;
+      }
+      #tactical.active #oz-bottom-actions #end-turn {
+        flex: 2 1 0 !important;
+        margin: 0 !important;
+        padding: 7px 10px !important;
+        font-size: 0.76em !important;
+      }
+      #tactical.active #oz-bottom-actions #retreat {
+        flex: 1 1 0 !important;
+        margin: 0 !important;
+        padding: 7px 8px !important;
         font-size: 0.72em !important;
-        white-space: nowrap !important;
       }
     `;
     document.head.appendChild(styleEl);
@@ -1854,12 +1892,22 @@ function renderFloatingUnitOrders(battle, selUnit, canvas, m) {
 
 function ensureEndTurnVisible(battle) {
   const endTurnBtn = document.getElementById("end-turn");
+  const retreatBtn = document.getElementById("retreat");
   const battleSide = document.querySelector("#tactical .battle-side");
   if (!endTurnBtn || !battleSide) return;
 
-  if (endTurnBtn.parentElement !== battleSide) {
-    endTurnBtn.style.marginTop = "8px";
-    battleSide.appendChild(endTurnBtn);
+  let actionRow = document.getElementById("oz-bottom-actions");
+  if (!actionRow) {
+    actionRow = document.createElement("div");
+    actionRow.id = "oz-bottom-actions";
+    battleSide.appendChild(actionRow);
+  }
+
+  if (endTurnBtn.parentElement !== actionRow) {
+    actionRow.appendChild(endTurnBtn);
+  }
+  if (retreatBtn && retreatBtn.parentElement !== actionRow) {
+    actionRow.appendChild(retreatBtn);
   }
 
   const isPlayerTurn = Boolean(battle && battle.phase === "player");
