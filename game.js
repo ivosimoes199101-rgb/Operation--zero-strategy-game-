@@ -716,13 +716,10 @@ function setTacticalViewportLock(active) {
       #tactical.active .battle-side {
         display: grid !important;
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
-        gap: clamp(4px, 1vw, 8px) !important;
-        padding: 6px max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)) !important;
-        background: linear-gradient(180deg, rgba(10, 18, 28, 0.96) 0%, rgba(5, 10, 16, 1) 100%) !important;
-        border-top: 1px solid rgba(78, 242, 161, 0.38) !important;
-        border-top-left-radius: 12px !important;
-        border-top-right-radius: 12px !important;
-        box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.65) !important;
+        gap: 4px !important;
+        padding: 4px max(6px, env(safe-area-inset-right)) max(5px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left)) !important;
+        background: linear-gradient(180deg, rgba(11, 20, 30, 0.94) 0%, rgba(7, 13, 21, 0.98) 100%) !important;
+        border-top: 1px solid rgba(78, 242, 161, 0.34) !important;
         flex: 0 0 auto !important;
         width: 100% !important;
         max-width: 100% !important;
@@ -732,18 +729,18 @@ function setTacticalViewportLock(active) {
       #tactical.active #battle-log {
         display: block !important;
         grid-column: 1 / -1 !important;
-        background: rgba(12, 20, 29, 0.96) !important;
-        border: 1px solid rgba(148, 163, 184, 0.26) !important;
-        border-left: 4px solid #4ef2a1 !important;
-        border-radius: 7px !important;
-        padding: 6px 10px !important;
+        background: rgba(10, 18, 27, 0.88) !important;
+        border: 1px solid rgba(148, 163, 184, 0.2) !important;
+        border-left: 3px solid #4ef2a1 !important;
+        border-radius: 6px !important;
+        padding: 4px 8px !important;
         margin: 0 !important;
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
-        font-size: clamp(0.74rem, 2.4vw, 0.86rem) !important;
-        line-height: 1.28 !important;
+        font-size: clamp(0.7rem, 2.2vw, 0.82rem) !important;
+        line-height: 1.2 !important;
         color: #e2e8f0 !important;
-        min-height: 2.2em !important;
-        max-height: 3.6em !important;
+        min-height: 1.5em !important;
+        max-height: 2.5em !important;
         overflow-y: auto !important;
         word-break: break-word !important;
       }
@@ -1443,9 +1440,13 @@ function startMission(mission, missionIndex = 0) {
     phase: "player",
     mode: "normal",
     camera: missionIndex === 0 ? { x: 0, y: 3 } : { x: 2, y: 2 },
-    zoom: 1.38,
-    panX: 115,
-    panY: -25,
+    zoom: 1.56,
+    targetZoom: 1.56,
+    panX: 135,
+    panY: -36,
+    targetPanX: 135,
+    targetPanY: -36,
+    hoveredEnemyId: null,
     grid: createMissionMap(missionIndex),
     elevation: null,
     vfxQueue: [],
@@ -1542,11 +1543,57 @@ function panCamera(dx, dy) {
 function centerCameraOnUnit(unit) {
   const b = state.battle;
   if (!b || !unit) return;
-  const maxCamX = Math.max(0, GRID_W - ISO_VIEW_W);
-  const maxCamY = Math.max(0, GRID_H - ISO_VIEW_H);
-  if (!b.camera) b.camera = { x: 2, y: 1 };
-  b.camera.x = Math.max(0, Math.min(maxCamX, unit.x - Math.floor(ISO_VIEW_W / 2)));
-  b.camera.y = Math.max(0, Math.min(maxCamY, unit.y - Math.floor(ISO_VIEW_H / 2)));
+  const canvas = document.getElementById("iso-battle-canvas");
+  if (!canvas) return;
+  const m = getIsoMetrics(canvas, true);
+  // Posição relativa ao centro do ecrã para manter a unidade em destaque na área útil
+  const isoX = (unit.x - unit.y) * (m.tileW * 0.5);
+  const isoY = (unit.x + unit.y) * (m.tileH * 0.5) - getTileElevation(b, unit.x, unit.y) * getElevationStepPx(m);
+  const desiredOriginX = m.w * 0.52 - isoX;
+  const desiredOriginY = m.h * 0.44 - isoY;
+  b.targetPanX = desiredOriginX - m.baseOriginX;
+  b.targetPanY = desiredOriginY - m.baseOriginY;
+  clampBattlePan(b, m);
+  ensureSmoothCameraLoop();
+}
+
+let ozSmoothCamActive = false;
+function ensureSmoothCameraLoop() {
+  if (ozSmoothCamActive) return;
+  ozSmoothCamActive = true;
+  const tick = () => {
+    const b = state.battle;
+    if (!b) {
+      ozSmoothCamActive = false;
+      return;
+    }
+    const curZ = getBattleZoom(b);
+    const tgtZ = typeof b.targetZoom === "number" ? b.targetZoom : curZ;
+    const curPx = typeof b.panX === "number" ? b.panX : 0;
+    const curPy = typeof b.panY === "number" ? b.panY : 0;
+    const tgtPx = typeof b.targetPanX === "number" ? b.targetPanX : curPx;
+    const tgtPy = typeof b.targetPanY === "number" ? b.targetPanY : curPy;
+
+    const dz = tgtZ - curZ;
+    const dpx = tgtPx - curPx;
+    const dpy = tgtPy - curPy;
+
+    if (Math.abs(dz) < 0.002 && Math.abs(dpx) < 0.5 && Math.abs(dpy) < 0.5) {
+      b.zoom = tgtZ;
+      b.panX = tgtPx;
+      b.panY = tgtPy;
+      ozSmoothCamActive = false;
+      renderBattle();
+      return;
+    }
+
+    b.zoom = curZ + dz * 0.22;
+    b.panX = curPx + dpx * 0.22;
+    b.panY = curPy + dpy * 0.22;
+    renderBattle();
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
 }
 
 function getSelectedUnit() {
@@ -1611,8 +1658,8 @@ function addBattleLog(msg) {
 // --- GEOMETRIA ISOMÉTRICA XCOM (2:1) ---
 
 function getBattleZoom(battle) {
-  if (!battle || typeof battle.zoom !== "number" || Number.isNaN(battle.zoom)) return 1.38;
-  return Math.max(0.85, Math.min(2.8, battle.zoom));
+  if (!battle || typeof battle.zoom !== "number" || Number.isNaN(battle.zoom)) return 1.56;
+  return Math.max(1.05, Math.min(3.0, battle.zoom));
 }
 
 function clampBattlePan(battle, m) {
@@ -1664,18 +1711,28 @@ function setBattleZoom(deltaOrFactor, anchorPx = null, anchorPy = null) {
     b.panY = newOrigY - m.baseOriginY;
   }
 
-  b.zoom = nextZoom;
-  if (m) clampBattlePan(b, getIsoMetrics(canvas, true));
-  renderBattle();
+  b.targetZoom = nextZoom;
+  b.targetPanX = b.panX - m.baseOriginX;
+  b.targetPanY = b.panY - m.baseOriginY;
+  // Atualizar âncora suave para o ponto de zoom
+  const ax = typeof anchorPx === "number" ? anchorPx : m.w * 0.5;
+  const ay = typeof anchorPy === "number" ? anchorPy : m.h * 0.48;
+  const baseOrigX = m.baseOriginX + (b.panX || 0);
+  const baseOrigY = m.baseOriginY + (b.panY || 0);
+  const ratio = nextZoom / oldZoom;
+  b.targetPanX = (ax - (ax - baseOrigX) * ratio) - m.baseOriginX;
+  b.targetPanY = (ay - (ay - baseOrigY) * ratio) - m.baseOriginY;
+  if (m) clampBattlePan(b, { ...m, panX: b.targetPanX, panY: b.targetPanY });
+  ensureSmoothCameraLoop();
 }
 
 function resetBattleView() {
   const b = state.battle;
   if (!b) return;
-  b.zoom = 1.38;
-  b.panX = 95;
-  b.panY = -18;
-  renderBattle();
+  b.targetZoom = 1.56;
+  b.targetPanX = 120;
+  b.targetPanY = -28;
+  ensureSmoothCameraLoop();
 }
 
 function getIsoMetrics(canvas, ignoreBattlePan = false) {
@@ -1688,14 +1745,14 @@ function getIsoMetrics(canvas, ignoreBattlePan = false) {
 
   const span = GRID_W + GRID_H;
   const isLandscape = w > h;
-  const maxTileWByWidth = Math.floor((w * 2.35) / span);
-  const maxTileWByHeight = Math.floor((h * 4.55) / span);
-  const upperCap = isLandscape ? 128 : 104;
-  const baseTileW = Math.max(28, Math.min(upperCap, Math.min(maxTileWByWidth, maxTileWByHeight)));
-  const tileW = Math.max(24, baseTileW * zoom);
-  // Perspetiva 2.5D mais baixa/cinematográfica estilo XCOM 2 (reduz vista aérea)
-  const tileH = Math.max(11, tileW * 0.45);
-  const wallH = Math.max(8, tileH * 0.82);
+  const maxTileWByWidth = Math.floor((w * 2.65) / span);
+  const maxTileWByHeight = Math.floor((h * 5.1) / span);
+  const upperCap = isLandscape ? 142 : 118;
+  const baseTileW = Math.max(32, Math.min(upperCap, Math.min(maxTileWByWidth, maxTileWByHeight)));
+  const tileW = Math.max(28, baseTileW * zoom);
+  // Perspetiva 2.5D mais cinematográfica estilo XCOM 2 (menos vista aérea)
+  const tileH = Math.max(12, tileW * 0.42);
+  const wallH = Math.max(10, tileH * 0.9);
 
   const boardPixelH = span * tileH * 0.5;
   const baseOriginX = w * 0.5 + (GRID_H - GRID_W) * (tileW * 0.25);
@@ -2176,133 +2233,144 @@ function drawIsoCoverBlock(ctx, sx, sy, w, h, wallH, tileType, isForestMission =
   }
 }
 
-function drawIsoSoldierSprite(ctx, sx, sy, w, h, unit, isSelected, coverLevel = 0) {
-  // Sombra projetada realista no chão
+function drawIsoSoldierSprite(ctx, sx, sy, w, h, unit, isSelected, coverLevel = 0, animState = null) {
+  // Sombra projetada suave estilo XCOM 2
   ctx.save();
   ctx.beginPath();
-  ctx.ellipse(sx + w * 0.12, sy + h * 0.08, w * 0.32, h * 0.24, -0.3, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(0, 0, 0, 0.58)";
+  ctx.ellipse(sx + w * 0.14, sy + h * 0.1, w * 0.36, h * 0.26, -0.25, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0, 0, 0, 0.52)";
   ctx.fill();
   ctx.restore();
 
-  // Indicador no chão APENAS se selecionado ou em cobertura (sem anéis permanentes de tabuleiro)
   if (isSelected) {
-    drawTacticalCornerBrackets(ctx, sx, sy, w * 0.95, h * 0.95, "#4ef2a1", 1.9);
+    drawTacticalCornerBrackets(ctx, sx, sy, w * 0.98, h * 0.98, "#4ef2a1", 2.0);
   }
-  if (coverLevel > 0) {
-    drawCoverShieldBadge(ctx, sx + w * 0.28, sy - 6, coverLevel, isSelected);
+  if (coverLevel > 0 && (isSelected || animState?.isMoving || animState?.isFiring)) {
+    drawCoverShieldBadge(ctx, sx + w * 0.30, sy - 7, coverLevel, isSelected);
   }
 
-  const crouchOffset = unit.crouched ? 4.0 : 0;
-  const scaleU = Math.max(0.85, w / 44);
-  const bodyH = Math.round(16 * scaleU);
-  const headR = Math.max(3.8, 4.4 * scaleU);
+  const dirX = animState?.dirX >= 0 ? 1 : -1;
+  const stridePhase = animState?.stridePhase || 0;
+  const isMoving = Boolean(animState?.isMoving);
+  const recoil = animState?.recoil || 0;
+
+  const crouchOffset = unit.crouched ? 5.2 : 0;
+  const bobOffset = isMoving ? Math.abs(Math.sin(stridePhase)) * (unit.crouched ? 1.8 : 3.2) : 0;
+  const scaleU = Math.max(1.05, w / 36);
+  const bodyH = Math.round(21 * scaleU);
+  const headR = Math.max(4.6, 5.2 * scaleU);
   const footY = sy - 1;
-  const hipY = footY - bodyH * 0.38 + crouchOffset * 0.5;
-  const shoulderY = footY - bodyH * 0.88 + crouchOffset;
-  const headY = shoulderY - headR - 1.2;
+  const hipY = footY - bodyH * 0.38 + crouchOffset * 0.55 - bobOffset * 0.4;
+  const shoulderY = footY - bodyH * 0.88 + crouchOffset - bobOffset;
+  const headY = shoulderY - headR - 1.4;
 
   const roleArmorCol = {
-    "Fuzileiro": "#15803d",
-    "Atirador de Elite": "#0369a1",
-    "Médico": "#0f766e",
-    "Demolições": "#c2410c",
-    "Pesado": "#a16207",
-    "Comando": "#7e22ce",
-    "Reconhecimento": "#4d7c0f",
-    "Engenheiro": "#1d4ed8"
-  }[unit.role] || "#1e3a5f";
+    "Fuzileiro": "#1f4d36",
+    "Atirador de Elite": "#1e3a5f",
+    "Médico": "#184e4a",
+    "Demolições": "#6b321b",
+    "Pesado": "#5a461e",
+    "Comando": "#3d295c",
+    "Reconhecimento": "#344e24",
+    "Engenheiro": "#223b5e"
+  }[unit.role] || "#263645";
 
-  // Mochila tática (camada traseira 2.5D)
+  const swing = isMoving ? Math.sin(stridePhase) * 5.5 * scaleU : 0;
+
+  // Mochila / equipamento dorsal
+  const packX = sx - dirX * (6.5 * scaleU);
   ctx.fillStyle = "#1e293b";
   ctx.strokeStyle = "#64748b";
-  ctx.lineWidth = 1;
-  ctx.fillRect(sx - 6.5 * scaleU, shoulderY + 1, 4 * scaleU, bodyH * 0.44);
-  ctx.strokeRect(sx - 6.5 * scaleU, shoulderY + 1, 4 * scaleU, bodyH * 0.44);
+  ctx.lineWidth = 1.1;
+  ctx.fillRect(packX - 2.5 * scaleU, shoulderY + 1, 5 * scaleU, bodyH * 0.46);
+  ctx.strokeRect(packX - 2.5 * scaleU, shoulderY + 1, 5 * scaleU, bodyH * 0.46);
 
-  // Pernas com botas blindadas
+  // Pernas articuladas (caminhada / corrida)
   ctx.strokeStyle = isSelected ? "#d1fae5" : "#94a3b8";
-  ctx.lineWidth = 2.6 * scaleU;
+  ctx.lineWidth = 3.1 * scaleU;
   ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.moveTo(sx - 2.5 * scaleU, hipY);
-  ctx.lineTo(sx - 4.0 * scaleU, footY);
-  ctx.moveTo(sx + 2.5 * scaleU, hipY);
-  ctx.lineTo(sx + 4.2 * scaleU, footY);
+  ctx.moveTo(sx - 2.4 * scaleU, hipY);
+  ctx.lineTo(sx - 3.6 * scaleU + swing, footY);
+  ctx.moveTo(sx + 2.4 * scaleU, hipY);
+  ctx.lineTo(sx + 3.6 * scaleU - swing, footY);
   ctx.stroke();
 
-  // Tronco / Colete tático 2D
-  ctx.fillStyle = isSelected ? "#16a34a" : roleArmorCol;
-  ctx.strokeStyle = isSelected ? "#86efac" : "#93c5fd";
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  const rw = 11 * scaleU;
-  const rh = bodyH * 0.54;
+  // Tronco / Colete tático com detalhes de placa e cinto
+  ctx.fillStyle = isSelected ? "#236b48" : roleArmorCol;
+  ctx.strokeStyle = isSelected ? "#86efac" : "#cbd5e1";
+  ctx.lineWidth = 1.25;
+  const rw = 13 * scaleU;
+  const rh = bodyH * 0.55;
   const rx = sx - rw * 0.5;
   const ry = shoulderY;
-  ctx.roundRect ? ctx.roundRect(rx, ry, rw, rh, 2.5) : ctx.rect(rx, ry, rw, rh);
+  ctx.beginPath();
+  ctx.roundRect ? ctx.roundRect(rx, ry, rw, rh, 3) : ctx.rect(rx, ry, rw, rh);
   ctx.fill();
   ctx.stroke();
 
-  // Ombreiras
-  ctx.fillStyle = "#334155";
+  // Cinto tático / coldre
+  ctx.strokeStyle = "#eab308";
+  ctx.lineWidth = 1.3;
   ctx.beginPath();
-  ctx.arc(sx - rw * 0.48, shoulderY + 2, 2.2 * scaleU, 0, Math.PI * 2);
-  ctx.arc(sx + rw * 0.48, shoulderY + 2, 2.2 * scaleU, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.moveTo(rx + 1.5, ry + rh * 0.78);
+  ctx.lineTo(rx + rw - 1.5, ry + rh * 0.78);
+  ctx.stroke();
 
-  // Capacete militar + viseira tática brilhante
+  // Capacete + viseira
   ctx.beginPath();
   ctx.arc(sx, headY, headR, 0, Math.PI * 2);
   ctx.fillStyle = isSelected ? "#4ef2a1" : "#cbd5e1";
   ctx.fill();
   ctx.strokeStyle = "#0f172a";
-  ctx.lineWidth = 1.1;
+  ctx.lineWidth = 1.2;
   ctx.stroke();
 
-  // Viseira azul/ciano estilo XCOM
+  // Viseira iluminada orientada pela direção
   ctx.fillStyle = "#38bdf8";
-  ctx.fillRect(sx - 0.5 * scaleU, headY - 1.5 * scaleU, headR * 0.95, 2.4 * scaleU);
+  const visorW = headR * 0.92;
+  const visorX = dirX >= 0 ? sx - 0.5 * scaleU : sx - visorW + 0.5 * scaleU;
+  ctx.fillRect(visorX, headY - 1.6 * scaleU, visorW, 2.5 * scaleU);
 
-  // Esquadria da arma / espingarda de assalto
+  // Arma principal com recuo ao disparar
+  const gunKick = recoil * 4.2 * scaleU;
+  const gunStartX = sx + dirX * (1.5 * scaleU) - dirX * gunKick;
+  const gunStartY = shoulderY + 4.8 * scaleU;
+  const gunEndX = gunStartX + dirX * (13.5 * scaleU);
+  const gunEndY = gunStartY - 2.2 * scaleU;
+
   ctx.strokeStyle = "#0f172a";
-  ctx.lineWidth = 3.2 * scaleU;
+  ctx.lineWidth = 3.8 * scaleU;
   ctx.beginPath();
-  ctx.moveTo(sx - 1 * scaleU, shoulderY + 4.5 * scaleU);
-  ctx.lineTo(sx + 11.5 * scaleU, shoulderY + 1.5 * scaleU);
+  ctx.moveTo(gunStartX, gunStartY);
+  ctx.lineTo(gunEndX, gunEndY);
   ctx.stroke();
 
   ctx.strokeStyle = "#e2e8f0";
-  ctx.lineWidth = 1.6 * scaleU;
+  ctx.lineWidth = 1.8 * scaleU;
   ctx.beginPath();
-  ctx.moveTo(sx - 1 * scaleU, shoulderY + 4.5 * scaleU);
-  ctx.lineTo(sx + 11.5 * scaleU, shoulderY + 1.5 * scaleU);
+  ctx.moveTo(gunStartX, gunStartY);
+  ctx.lineTo(gunEndX, gunEndY);
   ctx.stroke();
 
-  // Indicador de Vigilância (Overwatch) ou Hunker
-  if (unit.overwatch || unit.hunker) {
-    ctx.fillStyle = unit.overwatch ? "#facc15" : "#38bdf8";
-    ctx.font = "bold 8px monospace";
+  // Evitar sobreposição de nomes e barras de vida: mostrar apenas quando selecionado ou em combate ativo
+  if (isSelected || animState?.isFiring) {
+    const barW = Math.max(28, Math.round(30 * scaleU));
+    const barH = 4.2;
+    const barX = sx - barW * 0.5;
+    const barY = headY - headR - 9;
+    const ratio = Math.max(0, Math.min(1, unit.hp / Math.max(1, unit.maxHp)));
+
+    ctx.fillStyle = "rgba(2, 6, 12, 0.88)";
+    ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
+    ctx.fillStyle = ratio > 0.5 ? "#22c55e" : ratio > 0.25 ? "#eab308" : "#ef4444";
+    ctx.fillRect(barX, barY, barW * ratio, barH);
+
+    ctx.fillStyle = "#f8fafc";
+    ctx.font = "bold 8.5px monospace";
     ctx.textAlign = "center";
-    ctx.fillText(unit.overwatch ? "◉ VIG" : "🛡 HNK", sx, headY - headR - 15);
+    ctx.fillText(`${unit.name.split(" ")[0]} ${unit.hp}`, sx, barY - 3);
   }
-
-  // Barra de vida 2.5D flutuante
-  const barW = Math.max(24, Math.round(26 * scaleU));
-  const barH = 3.8;
-  const barX = sx - barW * 0.5;
-  const barY = headY - headR - 8;
-  const ratio = Math.max(0, Math.min(1, unit.hp / Math.max(1, unit.maxHp)));
-
-  ctx.fillStyle = "rgba(2, 6, 12, 0.85)";
-  ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
-  ctx.fillStyle = ratio > 0.5 ? "#22c55e" : ratio > 0.25 ? "#eab308" : "#ef4444";
-  ctx.fillRect(barX, barY, barW * ratio, barH);
-
-  ctx.fillStyle = "#f8fafc";
-  ctx.font = "bold 8px monospace";
-  ctx.textAlign = "center";
-  ctx.fillText(`${unit.name.split(" ")[0]} ${unit.hp}`, sx, barY - 3);
 }
 
 function drawIsoAlienSprite(ctx, sx, sy, w, h, enemy, isTargeted) {
@@ -2377,22 +2445,23 @@ function drawIsoAlienSprite(ctx, sx, sy, w, h, enemy, isTargeted) {
   ctx.arc(sx + 1.5 * scaleE, headY - 0.5, 1.3 * scaleE, 0, Math.PI * 2);
   ctx.fill();
 
-  // Barra de vida inimiga
-  const barW = Math.max(24, Math.round(26 * scaleE));
-  const barH = 3.8;
-  const barX = sx - barW * 0.5;
-  const barY = headY - headR - 8;
-  const ratio = Math.max(0, Math.min(1, enemy.hp / Math.max(1, enemy.maxHp)));
+  if (isTargeted) {
+    const barW = Math.max(28, Math.round(30 * scaleE));
+    const barH = 4.2;
+    const barX = sx - barW * 0.5;
+    const barY = headY - headR - 9;
+    const ratio = Math.max(0, Math.min(1, enemy.hp / Math.max(1, enemy.maxHp)));
 
-  ctx.fillStyle = "rgba(2, 6, 12, 0.85)";
-  ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
-  ctx.fillStyle = "#ef4444";
-  ctx.fillRect(barX, barY, barW * ratio, barH);
+    ctx.fillStyle = "rgba(2, 6, 12, 0.88)";
+    ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
+    ctx.fillStyle = "#ef4444";
+    ctx.fillRect(barX, barY, barW * ratio, barH);
 
-  ctx.fillStyle = isTargeted ? "#fde047" : "#fca5a5";
-  ctx.font = "bold 8px monospace";
-  ctx.textAlign = "center";
-  ctx.fillText(`${enemy.archetypeId.slice(0, 5).toUpperCase()} ${enemy.hp}`, sx, barY - 3);
+    ctx.fillStyle = "#fde047";
+    ctx.font = "bold 8.5px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(`${enemy.archetypeId.slice(0, 5).toUpperCase()} ${enemy.hp}`, sx, barY - 3);
+  }
 }
 
 function drawBattleVfxLayer(ctx, battle, m) {
@@ -3210,7 +3279,7 @@ function _renderBattleInner(b) {
         const distFromSel = selUnit ? Math.abs(selUnit.x - gx) + Math.abs(selUnit.y - gy) : 99;
         const canMoveHere =
           b.phase === "player" &&
-          (b.mode === "move" || b.mode === "normal") &&
+          b.mode === "move" &&
           selUnit &&
           selUnit.ap >= 1 &&
           !unitHere &&
@@ -3260,17 +3329,18 @@ function _renderBattleInner(b) {
       }
     }
 
-    // 2. Linha de visão / mira 2.5D entre o soldado selecionado e o alvo selecionado
-    if (selUnit && selEnemy) {
+    // 2. Linha de visão apenas quando o jogador aponta para um inimigo (modo disparar ou alvo apontado)
+    const pointedEnemy = (b.mode === "fire" && selEnemy) ? selEnemy : null;
+    if (selUnit && pointedEnemy) {
       const uPos = worldToIso(selUnit.x, selUnit.y, b, m);
-      const ePos = worldToIso(selEnemy.x, selEnemy.y, b, m);
+      const ePos = worldToIso(pointedEnemy.x, pointedEnemy.y, b, m);
       ctx.save();
-      ctx.setLineDash([5, 4]);
-      ctx.strokeStyle = "rgba(255, 209, 102, 0.78)";
-      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 4]);
+      ctx.strokeStyle = "rgba(250, 204, 21, 0.86)";
+      ctx.lineWidth = 1.8;
       ctx.beginPath();
-      ctx.moveTo(uPos.sx, uPos.sy - 11);
-      ctx.lineTo(ePos.sx, ePos.sy - 11);
+      ctx.moveTo(uPos.sx, uPos.sy - 14);
+      ctx.lineTo(ePos.sx, ePos.sy - 14);
       ctx.stroke();
       ctx.restore();
     }
@@ -3305,7 +3375,32 @@ function _renderBattleInner(b) {
         if (unitHere) {
           const snap = getCoverSnapOffset(b, gx, gy, m.tileW, m.tileH);
           const isUnitSel = Boolean(selUnit && selUnit.id === unitHere.id);
-          drawIsoSoldierSprite(ctx, sx + snap.ox, sy + snap.oy, m.tileW, m.tileH, unitHere, isUnitSel, snap.coverLevel);
+          const activeMoveAnim = (b.vfxQueue || []).find((v) => v.type === "move_anim" && v.unitId === unitHere.id);
+          const activeFireAnim = (b.vfxQueue || []).find((v) => v.type === "shot" && v.shooterId === unitHere.id);
+          let drawSx = sx + snap.ox;
+          let drawSy = sy + snap.oy;
+          const animState = {
+            dirX: unitHere.facingX || 1,
+            stridePhase: 0,
+            isMoving: false,
+            isFiring: Boolean(activeFireAnim),
+            recoil: 0
+          };
+          if (activeMoveAnim) {
+            const p = Math.min(1, (performance.now() - activeMoveAnim.createdAt) / activeMoveAnim.duration);
+            const fromPt = worldToIso(activeMoveAnim.fromX, activeMoveAnim.fromY, b, m);
+            const toPt = worldToIso(gx, gy, b, m);
+            drawSx = fromPt.sx + (toPt.sx - fromPt.sx) * p;
+            drawSy = fromPt.sy + (toPt.sy - fromPt.sy) * p;
+            animState.isMoving = true;
+            animState.stridePhase = p * Math.PI * 5;
+            animState.dirX = (toPt.sx - fromPt.sx) >= 0 ? 1 : -1;
+          }
+          if (activeFireAnim) {
+            const p = Math.min(1, (performance.now() - activeFireAnim.createdAt) / activeFireAnim.duration);
+            animState.recoil = p < 0.35 ? (1 - p / 0.35) : 0;
+          }
+          drawIsoSoldierSprite(ctx, drawSx, drawSy, m.tileW, m.tileH, unitHere, isUnitSel, snap.coverLevel, animState);
         }
 
         if (enemyHere) {
@@ -3546,9 +3641,20 @@ function handleCellClick(x, y) {
     const dist = Math.abs(selUnit.x - x) + Math.abs(selUnit.y - y);
     const maxStep = getUnitMoveRange(selUnit);
     if (dist > 0 && dist <= maxStep) {
+      const prevX = selUnit.x;
+      const prevY = selUnit.y;
       const moveType = selUnit.crouched ? "avançou cautelosamente" : "correu";
+      selUnit.facingX = (x - prevX) >= 0 ? 1 : -1;
       selUnit.x = x;
       selUnit.y = y;
+      spawnBattleVfx({
+        type: "move_anim",
+        unitId: selUnit.id,
+        fromX: prevX,
+        fromY: prevY,
+        duration: selUnit.crouched ? 460 : 340
+      });
+      centerCameraOnUnit(selUnit);
       selUnit.ap -= 1;
       selUnit.hunker = false;
       selUnit.stunned = false;
@@ -3691,7 +3797,8 @@ function fireAtTarget() {
     const armorMitigation = Math.floor((target.armor || 0) * 0.45);
     const finalDmg = Math.max(8, rawDmg - armorMitigation);
     target.hp = Math.max(0, target.hp - finalDmg);
-    spawnBattleVfx({ type: "shot", fromX: unit.x, fromY: unit.y, toX: target.x, toY: target.y, color: "#38bdf8", hit: true, duration: 420 });
+    unit.facingX = (target.x - unit.x) >= 0 ? 1 : -1;
+    spawnBattleVfx({ type: "shot", shooterId: unit.id, fromX: unit.x, fromY: unit.y, toX: target.x, toY: target.y, color: "#38bdf8", hit: true, duration: 420 });
     spawnBattleVfx({ type: "floater", x: target.x, y: target.y, text: `-${finalDmg} HP`, color: "#4ef2a1", duration: 750 });
     addBattleLog(`${unit.name} acertou em ${target.name} (${chance}%) — ${finalDmg} de dano!`);
   } else {
