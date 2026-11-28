@@ -2630,14 +2630,14 @@ function renderFloatingUnitOrders(battle, selUnit, canvas, m) {
     pop.dataset.ozPopSig = popSig;
   }
 
-  pop.style.setProperty("display", "block", "important");
-  pop.style.bottom = "auto";
-  pop.style.right = "auto";
-  pop.style.maxWidth = "255px";
-  pop.style.left = "0px";
-  pop.style.top = "0px";
-
   if (contentChanged || !pop.dataset.ozPopW) {
+    pop.style.setProperty("visibility", "hidden", "important");
+    pop.style.setProperty("display", "block", "important");
+    pop.style.bottom = "auto";
+    pop.style.right = "auto";
+    pop.style.maxWidth = "255px";
+    pop.style.left = "0px";
+    pop.style.top = "0px";
     const r0 = pop.getBoundingClientRect();
     pop.dataset.ozPopW = String(Math.round(r0.width || 210));
     pop.dataset.ozPopH = String(Math.round(r0.height || 92));
@@ -2654,7 +2654,14 @@ function renderFloatingUnitOrders(battle, selUnit, canvas, m) {
   }
   top = Math.max(6, Math.min(parentRect.height - popH - 6, top));
 
+  pop.style.bottom = "auto";
+  pop.style.right = "auto";
+  pop.style.maxWidth = "255px";
+  pop.style.left = "0px";
+  pop.style.top = "0px";
   pop.style.transform = `translate3d(${Math.round(left)}px, ${Math.round(top)}px, 0)`;
+  pop.style.setProperty("visibility", "visible", "important");
+  pop.style.setProperty("display", "block", "important");
 
   const closeBtn = pop.querySelector("#close-floating-orders");
   if (closeBtn) {
@@ -2992,7 +2999,8 @@ function _renderBattleInner(b) {
     const ctx = canvas.getContext("2d");
     ctx.save();
     ctx.scale(dpr, dpr);
-    ctx.clearRect(0, 0, rw, rh);
+    ctx.fillStyle = "#081019";
+    ctx.fillRect(0, 0, rw, rh);
 
     ctx.fillStyle = "rgba(78, 242, 161, 0.82)";
     ctx.font = "bold 9px monospace";
