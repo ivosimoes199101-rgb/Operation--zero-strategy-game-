@@ -2337,6 +2337,9 @@ function ensureIsoCanvasStage(gridEl) {
       min-height:220px;
       border-radius:10px;
       overflow:hidden;
+      transform:translateZ(0);
+      -webkit-transform:translateZ(0);
+      backface-visibility:hidden;
       border:1px solid rgba(78, 242, 161, 0.34);
       background:radial-gradient(circle at 50% 25%, #16283b 0%, #09111a 75%, #05090f 100%);
       box-shadow:inset 0 0 24px rgba(0, 0, 0, 0.72);
@@ -2345,7 +2348,7 @@ function ensureIsoCanvasStage(gridEl) {
 
     const canvas = document.createElement("canvas");
     canvas.id = "iso-battle-canvas";
-    canvas.style.cssText = "width:100%;height:100%;display:block;touch-action:none;user-select:none;-webkit-user-select:none;cursor:pointer;";
+    canvas.style.cssText = "width:100%;height:100%;display:block;touch-action:none;user-select:none;-webkit-user-select:none;cursor:pointer;transform:translateZ(0);-webkit-transform:translateZ(0);backface-visibility:hidden;";
     stage.appendChild(canvas);
 
     // Navegação tátil estável (sem cintilação): arrasto livre em qualquer zoom, pinça de 2 dedos e toque simples
@@ -2810,19 +2813,27 @@ function getUnitVisualBadge(entity, isEnemy) {
 }
 
 let __ozRenderQueued = false;
+let __ozInsideInnerRender = false;
 function renderBattle() {
   const b = state.battle;
   if (!b) return;
+  if (__ozInsideInnerRender) {
+    _renderBattleInner(b);
+    return;
+  }
   if (__ozRenderQueued) return;
   __ozRenderQueued = true;
   requestAnimationFrame(() => {
     __ozRenderQueued = false;
     const cur = state.battle;
     if (!cur) return;
+    __ozInsideInnerRender = true;
     try {
       _renderBattleInner(cur);
     } catch (err) {
       addBattleLog("Aviso de renderização tática: " + (err && err.message ? err.message : "erro"));
+    } finally {
+      __ozInsideInnerRender = false;
     }
   });
 }
