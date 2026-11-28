@@ -2039,30 +2039,19 @@ function setBattleZoom(deltaOrFactor, anchorPx = null, anchorPy = null) {
   nextZoom = Math.max(0.85, Math.min(2.8, Number(nextZoom.toFixed(2))));
   if (nextZoom === oldZoom) return;
 
+  b.targetZoom = nextZoom;
   if (m) {
     const ax = typeof anchorPx === "number" ? anchorPx : m.w * 0.5;
     const ay = typeof anchorPy === "number" ? anchorPy : m.h * 0.48;
     const baseOrigX = m.baseOriginX + (b.panX || 0);
     const baseOrigY = m.baseOriginY + (b.panY || 0);
     const ratio = nextZoom / oldZoom;
-    const newOrigX = ax - (ax - baseOrigX) * ratio;
-    const newOrigY = ay - (ay - baseOrigY) * ratio;
-    b.panX = newOrigX - m.baseOriginX;
-    b.panY = newOrigY - m.baseOriginY;
+    const targetOrigX = ax - (ax - baseOrigX) * ratio;
+    const targetOrigY = ay - (ay - baseOrigY) * ratio;
+    b.targetPanX = targetOrigX - m.baseOriginX;
+    b.targetPanY = targetOrigY - m.baseOriginY;
+    clampBattlePan(b, { ...m, zoom: nextZoom, panX: b.targetPanX, panY: b.targetPanY });
   }
-
-  b.targetZoom = nextZoom;
-  b.targetPanX = b.panX - m.baseOriginX;
-  b.targetPanY = b.panY - m.baseOriginY;
-  // Atualizar âncora suave para o ponto de zoom
-  const ax = typeof anchorPx === "number" ? anchorPx : m.w * 0.5;
-  const ay = typeof anchorPy === "number" ? anchorPy : m.h * 0.48;
-  const baseOrigX = m.baseOriginX + (b.panX || 0);
-  const baseOrigY = m.baseOriginY + (b.panY || 0);
-  const ratio = nextZoom / oldZoom;
-  b.targetPanX = (ax - (ax - baseOrigX) * ratio) - m.baseOriginX;
-  b.targetPanY = (ay - (ay - baseOrigY) * ratio) - m.baseOriginY;
-  if (m) clampBattlePan(b, { ...m, panX: b.targetPanX, panY: b.targetPanY });
   ensureSmoothCameraLoop();
 }
 
@@ -3484,8 +3473,13 @@ function ensureIsoCanvasStage(gridEl) {
       }
     };
 
-    window.addEventListener("pointerup", finishPointer);
-    window.addEventListener("pointercancel", finishPointer);
+    canvas.addEventListener("pointerup", finishPointer);
+    canvas.addEventListener("pointercancel", finishPointer);
+    canvas.addEventListener("pointerleave", (ev) => {
+      if (activePointers.has(ev.pointerId)) {
+        finishPointer(ev);
+      }
+    });
 
     canvas.addEventListener("wheel", (ev) => {
       if (!state.battle) return;
@@ -5144,3 +5138,672 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 });
+
+// ============================================================================
+// FASE 4 — EFEITOS VISUAIS E AMBIENTE CINEMATOGRÁFICO (EXCLUSIVAMENTE VISUAL)
+// Qualidade gráfica inspirada em XCOM 2, sem alterar mecânicas ou regras.
+// ============================================================================
+
+function getAtmosphereProfile(battle) {
+  const mIdx = battle ? (battle.missionIndex || 0) : 0;
+  const presets = [
+    {
+      id: "forest_dusk",
+      label: "FLORESTA · CREPÚSCULO",
+      ambientTop: "#14261c",
+      ambientMid: "#1e3526",
+      ambientBot: "#0d1812",
+      sunAngle: 0.58,
+      sunTint: "rgba(255, 214, 153, 0.14)",
+      shadowTint: "rgba(3, 8, 6, 0.48)",
+      contactTint: "rgba(0, 0, 0, 0.68)",
+      fogAlpha: 0.09,
+      rainAlpha: 0,
+      dustAlpha: 0.04,
+      nightFactor: 0.18,
+      smokeTint: [215, 226, 218]
+    },
+    {
+      id: "quarantine_haze",
+      label: "QUARENTENA · NEVOEIRO TÁTICO",
+      ambientTop: "#17202b",
+      ambientMid: "#222e3c",
+      ambientBot: "#0d131a",
+      sunAngle: 0.45,
+      sunTint: "rgba(186, 230, 253, 0.10)",
+      shadowTint: "rgba(4, 8, 14, 0.50)",
+      contactTint: "rgba(0, 0, 0, 0.70)",
+      fogAlpha: 0.16,
+      rainAlpha: 0,
+      dustAlpha: 0.05,
+      nightFactor: 0.24,
+      smokeTint: [203, 213, 225]
+    },
+    {
+      id: "urban_rain",
+      label: "SETOR URBANO · CHUVA LIGEIRA",
+      ambientTop: "#131c26",
+      ambientMid: "#1b2734",
+      ambientBot: "#090e14",
+      sunAngle: 0.65,
+      sunTint: "rgba(148, 197, 255, 0.09)",
+      shadowTint: "rgba(2, 6, 11, 0.46)",
+      contactTint: "rgba(0, 0, 0, 0.72)",
+      fogAlpha: 0.11,
+      rainAlpha: 0.26,
+      dustAlpha: 0.0,
+      nightFactor: 0.28,
+      smokeTint: [188, 200, 214]
+    },
+    {
+      id: "arid_dust",
+      label: "PERÍMETRO SECO · POEIRA",
+      ambientTop: "#292118",
+      ambientMid: "#382c1f",
+      ambientBot: "#15100b",
+      sunAngle: 0.52,
+      sunTint: "rgba(253, 186, 116, 0.16)",
+      shadowTint: "rgba(14, 9, 5, 0.47)",
+      contactTint: "rgba(0, 0, 0, 0.66)",
+      fogAlpha: 0.08,
+      rainAlpha: 0,
+      dustAlpha: 0.15,
+      nightFactor: 0.12,
+      smokeTint: [231, 214, 192]
+    },
+    {
+      id: "night_ops",
+      label: "OPERAÇÃO NOTURNA · LUZES ARTIFICIAIS",
+      ambientTop: "#09111d",
+      ambientMid: "#101c2e",
+      ambientBot: "#050911",
+      sunAngle: 0.72,
+      sunTint: "rgba(96, 165, 250, 0.11)",
+      shadowTint: "rgba(1, 3, 8, 0.56)",
+      contactTint: "rgba(0, 0, 0, 0.76)",
+      fogAlpha: 0.12,
+      rainAlpha: 0,
+      dustAlpha: 0.03,
+      nightFactor: 0.44,
+      smokeTint: [165, 180, 204]
+    }
+  ];
+  const base = presets[mIdx % presets.length];
+  const customId = battle && battle.atmosOverride;
+  if (customId) {
+    const found = presets.find((p) => p.id === customId);
+    if (found) return found;
+  }
+  return base;
+}
+
+function getQualityTier(battle) {
+  if (battle && battle.qualityTier) return battle.qualityTier;
+  const isSmallScreen = typeof window !== "undefined" && Math.min(window.innerWidth || 800, window.innerHeight || 600) < 520;
+  const dpr = typeof window !== "undefined" ? (window.devicePixelRatio || 1) : 1;
+  if (isSmallScreen || dpr <= 1.25) return "mobile";
+  return "high";
+}
+
+function ensurePhase4SceneState(battle) {
+  if (!battle) return null;
+  if (!battle.p4) {
+    const scatters = [];
+    for (let i = 0; i < 42; i++) {
+      scatters.push({
+        gx: ((i * 3.7) % (GRID_W - 1)) + 0.5,
+        gy: ((i * 5.3) % (GRID_H - 1)) + 0.5,
+        r: 1.1 + (i % 3) * 0.65,
+        phase: i * 0.75,
+        kind: i % 4 === 0 ? "flag" : i % 2 === 0 ? "spore" : "debris"
+      });
+    }
+    const lights = [];
+    for (let y = 0; y < GRID_H; y++) {
+      for (let x = 0; x < GRID_W; x++) {
+        const t = battle.grid && battle.grid[y] ? battle.grid[y][x] : 0;
+        if (t === 3 || t === 4) {
+          lights.push({
+            x,
+            y,
+            isBeacon: t === 3,
+            freq: 1.6 + ((x + y) % 4) * 0.55,
+            phase: (x * 1.1 + y * 0.8),
+            color: t === 3 ? "rgba(78, 242, 161, 0.24)" : "rgba(251, 191, 36, 0.22)"
+          });
+        }
+      }
+    }
+    const rainDrops = Array.from({ length: 48 }, (_, idx) => ({
+      u: ((idx * 0.19) % 1),
+      v: ((idx * 0.37) % 1),
+      speed: 0.55 + (idx % 5) * 0.12,
+      len: 8 + (idx % 4) * 3
+    }));
+
+    battle.p4 = {
+      scatters,
+      lights,
+      rainDrops,
+      scars: [],
+      particles: [],
+      shakeMag: 0,
+      shakeUntil: 0,
+      lastFrameTime: performance.now(),
+      fpsSmooth: 60
+    };
+  }
+  return battle.p4;
+}
+
+function registerBattleImpactVisual(battle, gx, gy, kind = "impact", count = 8) {
+  const p4 = ensurePhase4SceneState(battle);
+  if (!p4) return;
+  const tier = getQualityTier(battle);
+  const maxParticles = tier === "mobile" ? 42 : 110;
+  const actualCount = tier === "mobile" ? Math.max(3, Math.ceil(count * 0.5)) : count;
+
+  if (kind === "explosion" || kind === "hit") {
+    p4.scars.push({
+      x: gx,
+      y: gy,
+      kind,
+      alpha: kind === "explosion" ? 0.52 : 0.32,
+      radius: kind === "explosion" ? 1.15 : 0.45
+    });
+    if (p4.scars.length > 24) p4.scars.shift();
+  }
+
+  if (kind === "explosion") {
+    p4.shakeMag = Math.min(9, (p4.shakeMag || 0) + 5.5);
+    p4.shakeUntil = performance.now() + 360;
+  } else if (kind === "hit") {
+    p4.shakeMag = Math.min(4.5, (p4.shakeMag || 0) + 1.8);
+    p4.shakeUntil = performance.now() + 140;
+  }
+
+  for (let i = 0; i < actualCount; i++) {
+    if (p4.particles.length >= maxParticles) p4.particles.shift();
+    const ang = (Math.PI * 2 * i) / actualCount + (Math.random() - 0.5) * 0.5;
+    const spd = kind === "explosion" ? (26 + Math.random() * 54) : kind === "dust" ? (8 + Math.random() * 18) : (16 + Math.random() * 34);
+    const isSmoke = kind === "explosion" && i % 2 === 1;
+    p4.particles.push({
+      gx,
+      gy,
+      ox: (Math.random() - 0.5) * 8,
+      oy: (Math.random() - 0.5) * 4,
+      vx: Math.cos(ang) * spd,
+      vy: Math.sin(ang) * spd * 0.65 - (kind === "explosion" ? 24 : 10),
+      life: 0,
+      maxLife: kind === "explosion" ? (520 + Math.random() * 480) : (280 + Math.random() * 320),
+      size: isSmoke ? (5 + Math.random() * 6) : (2 + Math.random() * 2.5),
+      isSmoke,
+      color: isSmoke
+        ? "rgba(148, 163, 184, 0.55)"
+        : kind === "explosion"
+          ? (i % 3 === 0 ? "#fde047" : "#fb923c")
+          : kind === "dust"
+            ? "rgba(214, 196, 165, 0.55)"
+            : "#facc15"
+    });
+  }
+}
+
+function getCameraShakeOffset(battle) {
+  const p4 = battle && battle.p4;
+  if (!p4 || !p4.shakeMag || performance.now() > p4.shakeUntil) {
+    return { dx: 0, dy: 0 };
+  }
+  const rem = Math.max(0, (p4.shakeUntil - performance.now()) / 360);
+  const mag = p4.shakeMag * rem;
+  const t = performance.now() * 0.065;
+  return {
+    dx: Math.sin(t * 1.7) * mag,
+    dy: Math.cos(t * 2.3) * mag * 0.75
+  };
+}
+
+function drawPhase4AtmosphereBackdrop(ctx, battle, m) {
+  const atm = getAtmosphereProfile(battle);
+  const p4 = ensurePhase4SceneState(battle);
+  const now = performance.now();
+
+  if (p4) {
+    const dt = Math.max(1, Math.min(100, now - (p4.lastFrameTime || now)));
+    p4.lastFrameTime = now;
+    const instFps = 1000 / dt;
+    p4.fpsSmooth = p4.fpsSmooth * 0.88 + instFps * 0.12;
+    if (p4.fpsSmooth < 26 && battle.qualityTier !== "mobile") {
+      battle.qualityTier = "mobile";
+    }
+  }
+
+  const skyGrad = ctx.createLinearGradient(0, 0, m.w, m.h);
+  skyGrad.addColorStop(0, atm.ambientTop);
+  skyGrad.addColorStop(0.55, atm.ambientMid);
+  skyGrad.addColorStop(1, atm.ambientBot);
+  ctx.fillStyle = skyGrad;
+  ctx.fillRect(0, 0, m.w, m.h);
+
+  // Luz direcional suave vinda do quadrante superior esquerdo
+  const dirGrad = ctx.createRadialGradient(
+    m.w * 0.18,
+    m.h * 0.14,
+    12,
+    m.w * 0.35,
+    m.h * 0.35,
+    Math.max(m.w, m.h) * 0.85
+  );
+  dirGrad.addColorStop(0, atm.sunTint);
+  dirGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
+  ctx.fillStyle = dirGrad;
+  ctx.fillRect(0, 0, m.w, m.h);
+
+  // Reflexo sutil de iluminação na linha do horizonte do cenário
+  const horizonY = m.originY - m.tileH * 0.5;
+  const reflGrad = ctx.createLinearGradient(0, horizonY - 24, 0, horizonY + 34);
+  reflGrad.addColorStop(0, "rgba(148, 163, 184, 0)");
+  reflGrad.addColorStop(0.5, `rgba(226, 232, 240, ${(0.045 * (1 - atm.nightFactor * 0.5)).toFixed(4)})`);
+  reflGrad.addColorStop(1, "rgba(148, 163, 184, 0)");
+  ctx.fillStyle = reflGrad;
+  ctx.fillRect(0, horizonY - 24, m.w, 58);
+
+  return atm;
+}
+
+function drawPhase4GroundScarsAndLights(ctx, battle, m) {
+  const p4 = ensurePhase4SceneState(battle);
+  if (!p4) return;
+  const nowSec = performance.now() * 0.001;
+
+  // Marcas de explosão e impactos persistentes no solo
+  (p4.scars || []).forEach((sc) => {
+    const pos = worldToIso(sc.x, sc.y, battle, m);
+    drawIsoDiamond(
+      ctx,
+      pos.sx,
+      pos.sy,
+      m.tileW * (0.75 + sc.radius),
+      m.tileH * (0.75 + sc.radius),
+      `rgba(15, 18, 22, ${sc.alpha})`,
+      sc.kind === "explosion" ? `rgba(120, 53, 15, ${(sc.alpha * 0.75).toFixed(2)})` : null,
+      1.0
+    );
+  });
+
+  // Luzes provenientes de edifícios e estruturas militares (com oscilação subtil)
+  const tier = getQualityTier(battle);
+  const lights = tier === "mobile" ? (p4.lights || []).slice(0, 4) : (p4.lights || []);
+  lights.forEach((lt) => {
+    const pos = worldToIso(lt.x, lt.y, battle, m);
+    const pulse = 0.65 + 0.35 * Math.sin(nowSec * lt.freq + lt.phase);
+    const rad = m.tileW * (lt.isBeacon ? 1.15 : 0.72) * (0.92 + 0.08 * pulse);
+    const g = ctx.createRadialGradient(pos.sx, pos.sy - 6, 2, pos.sx, pos.sy - 6, rad);
+    const colBase = lt.isBeacon
+      ? `rgba(78, 242, 161, ${(0.14 * pulse).toFixed(3)})`
+      : `rgba(251, 191, 36, ${(0.11 * pulse).toFixed(3)})`;
+    g.addColorStop(0, colBase);
+    g.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(pos.sx, pos.sy - 6, rad, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+function drawPhase4DynamicAmbientAndParticles(ctx, battle, m) {
+  const atm = getAtmosphereProfile(battle);
+  const p4 = ensurePhase4SceneState(battle);
+  if (!p4) return;
+  const now = performance.now();
+  const nowSec = now * 0.001;
+  const tier = getQualityTier(battle);
+
+  // Fumo contínuo em células com fumo tático ou estruturas danificadas
+  (battle.smokes || []).forEach((sm) => {
+    const pos = worldToIso(sm.x, sm.y, battle, m);
+    const puffs = tier === "mobile" ? 2 : 4;
+    for (let i = 0; i < puffs; i++) {
+      const driftX = Math.sin(nowSec * 1.4 + i * 1.7 + sm.x) * (m.tileW * 0.22);
+      const liftY = -6 - i * 5 - ((nowSec * 8 + i * 7) % 10);
+      const r = m.tileW * (0.28 + i * 0.07);
+      const [sr, sg, sb] = atm.smokeTint;
+      ctx.fillStyle = `rgba(${sr}, ${sg}, ${sb}, ${(0.22 - i * 0.035).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(pos.sx + driftX, pos.sy + liftY, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  });
+
+  // Fumo proveniente de estruturas/veículos em áreas com marcas de explosão
+  (p4.scars || []).filter((s) => s.kind === "explosion").slice(-3).forEach((sc) => {
+    const pos = worldToIso(sc.x, sc.y, battle, m);
+    const wispX = pos.sx + Math.sin(nowSec * 1.9 + sc.x) * 8;
+    const wispY = pos.sy - 14 - ((nowSec * 12) % 16);
+    ctx.fillStyle = "rgba(30, 41, 59, 0.28)";
+    ctx.beginPath();
+    ctx.arc(wispX, wispY, m.tileW * 0.22, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Vegetação com movimento subtil, bandeiras/elementos militares e partículas no ar
+  const scatters = tier === "mobile" ? (p4.scatters || []).slice(0, 18) : (p4.scatters || []);
+  scatters.forEach((sc) => {
+    const gx = Math.floor(sc.gx);
+    const gy = Math.floor(sc.gy);
+    if (gx < 0 || gx >= GRID_W || gy < 0 || gy >= GRID_H) return;
+    if (battle.grid && battle.grid[gy] && battle.grid[gy][gx] === 3) return;
+    const pos = worldToIso(sc.gx, sc.gy, battle, m);
+    const sway = Math.sin(nowSec * 2.1 + sc.phase) * 2.2;
+
+    if (sc.kind === "flag" && battle.missionIndex > 0) {
+      // Pequeno mastro militar com flâmula em movimento suave
+      ctx.strokeStyle = "rgba(203, 213, 225, 0.45)";
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(pos.sx, pos.sy);
+      ctx.lineTo(pos.sx, pos.sy - 13);
+      ctx.stroke();
+
+      ctx.fillStyle = "rgba(78, 242, 161, 0.55)";
+      ctx.beginPath();
+      ctx.moveTo(pos.sx, pos.sy - 13);
+      ctx.lineTo(pos.sx + 7 + sway * 0.7, pos.sy - 10.5 + sway * 0.35);
+      ctx.lineTo(pos.sx, pos.sy - 8);
+      ctx.closePath();
+      ctx.fill();
+    } else if (sc.kind === "spore") {
+      const floatY = pos.sy - 6 - ((nowSec * 7 + sc.phase * 5) % 14);
+      ctx.fillStyle = atm.dustAlpha > 0.1
+        ? "rgba(253, 186, 116, 0.32)"
+        : "rgba(187, 247, 208, 0.26)";
+      ctx.beginPath();
+      ctx.arc(pos.sx + sway, floatY, sc.r * 0.85, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = "rgba(148, 163, 184, 0.28)";
+      ctx.fillRect(pos.sx - sc.r * 0.5, pos.sy - 1, sc.r * 1.4, sc.r * 0.8);
+    }
+  });
+
+  // Partículas ativas de combate, detritos, poeira e fumo
+  if (Array.isArray(p4.particles) && p4.particles.length > 0) {
+    const remaining = [];
+    p4.particles.forEach((pt) => {
+      pt.life += 16.6;
+      if (pt.life >= pt.maxLife) return;
+      const t = pt.life / pt.maxLife;
+      const basePos = worldToIso(pt.gx, pt.gy, battle, m);
+      const px = basePos.sx + pt.ox + pt.vx * t;
+      const py = basePos.sy + pt.oy + pt.vy * t + (pt.isSmoke ? -t * 14 : t * t * 18);
+      const alpha = Math.max(0, 1 - t);
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      if (pt.isSmoke) {
+        ctx.fillStyle = pt.color;
+        ctx.beginPath();
+        ctx.arc(px, py, pt.size * (1 + t * 0.85), 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.fillStyle = pt.color;
+        ctx.fillRect(px - pt.size * 0.5, py - pt.size * 0.5, pt.size, pt.size);
+      }
+      ctx.restore();
+      remaining.push(pt);
+    });
+    p4.particles = remaining;
+  }
+
+  // Condição atmosférica: chuva ligeira (apenas visual)
+  if (atm.rainAlpha > 0 && tier !== "mobile") {
+    ctx.save();
+    ctx.strokeStyle = `rgba(186, 230, 253, ${(atm.rainAlpha * 0.65).toFixed(3)})`;
+    ctx.lineWidth = 1.0;
+    ctx.beginPath();
+    p4.rainDrops.forEach((drop) => {
+      const rx = ((drop.u * m.w + nowSec * 45) % m.w);
+      const ry = ((drop.v * m.h + nowSec * 360 * drop.speed) % m.h);
+      ctx.moveTo(rx, ry);
+      ctx.lineTo(rx - drop.len * 0.35, ry + drop.len);
+    });
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Nevoeiro atmosférico subtil e contraste de iluminação
+  if (atm.fogAlpha > 0) {
+    const fogGrad = ctx.createLinearGradient(0, 0, 0, m.h);
+    fogGrad.addColorStop(0, `rgba(148, 163, 184, ${(atm.fogAlpha * 0.45).toFixed(3)})`);
+    fogGrad.addColorStop(0.55, `rgba(148, 163, 184, ${(atm.fogAlpha * 0.22).toFixed(3)})`);
+    fogGrad.addColorStop(1, "rgba(15, 23, 42, 0.14)");
+    ctx.fillStyle = fogGrad;
+    ctx.fillRect(0, 0, m.w, m.h);
+  }
+
+  // Vinheta cinematográfica subtil para profundidade e contraste
+  const vig = ctx.createRadialGradient(
+    m.w * 0.5,
+    m.h * 0.5,
+    Math.min(m.w, m.h) * 0.34,
+    m.w * 0.5,
+    m.h * 0.5,
+    Math.max(m.w, m.h) * 0.72
+  );
+  vig.addColorStop(0, "rgba(0, 0, 0, 0)");
+  vig.addColorStop(1, `rgba(2, 6, 12, ${(0.22 + atm.nightFactor * 0.25).toFixed(3)})`);
+  ctx.fillStyle = vig;
+  ctx.fillRect(0, 0, m.w, m.h);
+}
+
+// Integrar efeitos visuais de Fase 4 nos eventos visuais existentes sem alterar lógica
+const __ozOrigSpawnBattleVfx = typeof spawnBattleVfx === "function" ? spawnBattleVfx : null;
+if (__ozOrigSpawnBattleVfx) {
+  spawnBattleVfx = function (vfx) {
+    __ozOrigSpawnBattleVfx(vfx);
+    const b = state.battle;
+    if (!b || !vfx) return;
+    if (vfx.type === "explosion") {
+      registerBattleImpactVisual(b, vfx.x, vfx.y, "explosion", 18);
+    } else if (vfx.type === "shot") {
+      registerBattleImpactVisual(b, vfx.toX, vfx.toY, vfx.hit ? "hit" : "dust", vfx.hit ? 10 : 6);
+    } else if (vfx.type === "move_anim") {
+      registerBattleImpactVisual(b, vfx.fromX, vfx.fromY, "dust", 5);
+    }
+  };
+}
+
+// Renderização cinematográfica completa do canvas 2.5D com iluminação, sombras, partículas e atmosfera
+const __ozOrigRenderBattleInner = typeof _renderBattleInner === "function" ? _renderBattleInner : null;
+if (__ozOrigRenderBattleInner) {
+  _renderBattleInner = function (b) {
+    __ozOrigRenderBattleInner(b);
+    const canvas = document.getElementById("iso-battle-canvas");
+    if (!canvas || !b) return;
+    const p4 = ensurePhase4SceneState(b);
+    const shake = getCameraShakeOffset(b);
+    const m = getIsoMetrics(canvas);
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const ctx = canvas.getContext("2d");
+
+    ctx.save();
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, m.w, m.h);
+    drawPhase4AtmosphereBackdrop(ctx, b, m);
+
+    const shakenM = {
+      ...m,
+      originX: m.originX + shake.dx,
+      originY: m.originY + shake.dy
+    };
+
+    drawIsoBoardSkirt(ctx, b, shakenM);
+
+    const selUnit = getSelectedUnit();
+    const selEnemy = getSelectedEnemy();
+    const maxMoveRange = getUnitMoveRange(selUnit);
+    const isForestMission = b.missionIndex === 0;
+
+    for (let sum = 0; sum <= ISO_VIEW_W + ISO_VIEW_H - 2; sum++) {
+      for (let vy = 0; vy < ISO_VIEW_H; vy++) {
+        const vx = sum - vy;
+        if (vx < 0 || vx >= ISO_VIEW_W) continue;
+        const gx = b.camera.x + vx;
+        const gy = b.camera.y + vy;
+        const { sx, sy, elev } = worldToIso(gx, gy, b, shakenM);
+
+        const tileType = b.grid[gy][gx];
+        const unitHere = b.units.find((u) => u.x === gx && u.y === gy && u.hp > 0);
+        const enemyHere = b.enemies.find((e) => e.x === gx && e.y === gy && e.hp > 0);
+        const hostageHere = (b.hostages || []).find((h) => !h.rescued && h.x === gx && h.y === gy);
+        const smokeHere = isInSmoke(b, gx, gy);
+
+        const distFromSel = selUnit ? Math.abs(selUnit.x - gx) + Math.abs(selUnit.y - gy) : 99;
+        const canMoveHere =
+          b.phase === "player" &&
+          b.mode === "move" &&
+          selUnit &&
+          selUnit.ap >= 1 &&
+          !unitHere &&
+          !enemyHere &&
+          !hostageHere &&
+          tileType !== 3 &&
+          distFromSel > 0 &&
+          distFromSel <= maxMoveRange;
+
+        const surfaceType = getCellTerrainSurface(b, gx, gy);
+        const coverAtMoveTile = canMoveHere ? getTileCoverAt(b, gx, gy) : 0;
+        drawIsoTerrainColumn(ctx, sx, sy, shakenM.tileW, shakenM.tileH, elev, surfaceType, gx, gy, canMoveHere, b.mode === "move", smokeHere, coverAtMoveTile);
+
+        if (b.hoverTile && (b.mode === "frag" || b.mode === "smoke")) {
+          const hx = b.hoverTile.x;
+          const hy = b.hoverTile.y;
+          if (b.mode === "frag") {
+            if (Math.abs(gx - hx) <= 1 && Math.abs(gy - hy) <= 1) {
+              const isCenter = gx === hx && gy === hy;
+              drawIsoDiamond(
+                ctx,
+                sx,
+                sy,
+                shakenM.tileW,
+                shakenM.tileH,
+                isCenter ? "rgba(239, 68, 68, 0.42)" : "rgba(251, 146, 60, 0.28)",
+                isCenter ? "#ff4d4d" : "#fb923c",
+                isCenter ? 1.8 : 1.3
+              );
+            }
+          } else if (b.mode === "smoke") {
+            if (gy === hy && Math.abs(gx - hx) <= 1) {
+              const isCenter = gx === hx;
+              drawIsoDiamond(
+                ctx,
+                sx,
+                sy,
+                shakenM.tileW,
+                shakenM.tileH,
+                isCenter ? "rgba(226, 232, 240, 0.44)" : "rgba(148, 163, 184, 0.28)",
+                "#f8fafc",
+                isCenter ? 1.8 : 1.3
+              );
+            }
+          }
+        }
+      }
+    }
+
+    drawPhase4GroundScarsAndLights(ctx, b, shakenM);
+
+    const pointedEnemy = (b.mode === "fire" && selEnemy) ? selEnemy : null;
+    if (selUnit && pointedEnemy) {
+      const uPos = worldToIso(selUnit.x, selUnit.y, b, shakenM);
+      const ePos = worldToIso(pointedEnemy.x, pointedEnemy.y, b, shakenM);
+      ctx.save();
+      ctx.setLineDash([6, 4]);
+      ctx.strokeStyle = "rgba(250, 204, 21, 0.86)";
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(uPos.sx, uPos.sy - 14);
+      ctx.lineTo(ePos.sx, ePos.sy - 14);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    for (let sum = 0; sum <= ISO_VIEW_W + ISO_VIEW_H - 2; sum++) {
+      for (let vy = 0; vy < ISO_VIEW_H; vy++) {
+        const vx = sum - vy;
+        if (vx < 0 || vx >= ISO_VIEW_W) continue;
+        const gx = b.camera.x + vx;
+        const gy = b.camera.y + vy;
+        const { sx, sy } = worldToIso(gx, gy, b, shakenM);
+
+        const tileType = b.grid[gy][gx];
+        const unitHere = b.units.find((u) => u.x === gx && u.y === gy && u.hp > 0);
+        const enemyHere = b.enemies.find((e) => e.x === gx && e.y === gy && e.hp > 0);
+
+        if (tileType === 1 || tileType === 2 || tileType === 3 || tileType === 4) {
+          drawIsoCoverBlock(ctx, sx, sy, shakenM.tileW, shakenM.tileH, shakenM.wallH, tileType, isForestMission, gx, gy);
+        }
+
+        const hostageSpriteHere = (b.hostages || []).find((h) => !h.rescued && h.x === gx && h.y === gy);
+        if (hostageSpriteHere) {
+          drawTacticalCornerBrackets(ctx, sx, sy, shakenM.tileW * 0.9, shakenM.tileH * 0.9, "#facc15", 1.8);
+          drawIsoSoldierSprite(ctx, sx, sy, shakenM.tileW, shakenM.tileH, { ...hostageSpriteHere, crouched: true }, false, 0);
+          ctx.fillStyle = "#fde047";
+          ctx.font = "bold 8px monospace";
+          ctx.textAlign = "center";
+          ctx.fillText("SOS", sx, sy - shakenM.tileH * 0.95);
+        }
+
+        if (unitHere) {
+          const snap = getCoverSnapOffset(b, gx, gy, shakenM.tileW, shakenM.tileH);
+          const isUnitSel = Boolean(selUnit && selUnit.id === unitHere.id);
+          const activeMoveAnim = (b.vfxQueue || []).find((v) => v.type === "move_anim" && v.unitId === unitHere.id);
+          const activeFireAnim = (b.vfxQueue || []).find((v) => v.type === "shot" && v.shooterId === unitHere.id);
+          let drawSx = sx + snap.ox;
+          let drawSy = sy + snap.oy;
+          const animState = {
+            dirX: unitHere.facingX || 1,
+            stridePhase: 0,
+            isMoving: false,
+            isFiring: Boolean(activeFireAnim),
+            recoil: 0
+          };
+          if (activeMoveAnim) {
+            const p = Math.min(1, (performance.now() - activeMoveAnim.createdAt) / activeMoveAnim.duration);
+            const fromPt = worldToIso(activeMoveAnim.fromX, activeMoveAnim.fromY, b, shakenM);
+            const toPt = worldToIso(gx, gy, b, shakenM);
+            drawSx = fromPt.sx + (toPt.sx - fromPt.sx) * p;
+            drawSy = fromPt.sy + (toPt.sy - fromPt.sy) * p;
+            animState.isMoving = true;
+            animState.stridePhase = p * Math.PI * 5;
+            animState.dirX = (toPt.sx - fromPt.sx) >= 0 ? 1 : -1;
+          }
+          if (activeFireAnim) {
+            const p = Math.min(1, (performance.now() - activeFireAnim.createdAt) / activeFireAnim.duration);
+            animState.recoil = p < 0.35 ? (1 - p / 0.35) : 0;
+          }
+          drawIsoSoldierSprite(ctx, drawSx, drawSy, shakenM.tileW, shakenM.tileH, unitHere, isUnitSel, snap.coverLevel, animState);
+        }
+
+        if (enemyHere) {
+          drawIsoAlienSprite(ctx, sx, sy, shakenM.tileW, shakenM.tileH, enemyHere, Boolean(selEnemy && selEnemy.id === enemyHere.id));
+        }
+      }
+    }
+
+    drawBattleVfxLayer(ctx, b, shakenM);
+    drawPhase4DynamicAmbientAndParticles(ctx, b, shakenM);
+
+    ctx.restore();
+    renderFloatingUnitOrders(b, selUnit, canvas, shakenM);
+
+    // Manter loop visual ativo enquanto houver animações/partículas/tremor
+    const hasActiveAnim =
+      (b.vfxQueue && b.vfxQueue.length > 0) ||
+      (p4 && p4.particles && p4.particles.length > 0) ||
+      (p4 && p4.shakeUntil && performance.now() < p4.shakeUntil);
+    if (hasActiveAnim && !ozVfxLoopActive) {
+      ensureVfxAnimationLoop();
+    }
+  };
+}
