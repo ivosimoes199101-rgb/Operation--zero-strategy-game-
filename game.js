@@ -2004,20 +2004,27 @@ function getBattleZoom(battle) {
 
 function clampBattlePan(battle, m) {
   if (!battle || !m) return;
-  const z = getBattleZoom(battle);
   const span = GRID_W + GRID_H;
-  const boardW = span * (m.tileW * 0.5) * z;
-  const boardH = span * (m.tileH * 0.5) * z;
-  const marginX = Math.max(140, m.w * 0.45);
-  const marginY = Math.max(110, m.h * 0.38);
+  const boardW = span * (m.tileW * 0.5);
+  const boardH = span * (m.tileH * 0.5);
 
-  const minPanX = Math.min(-marginX, (m.w - boardW) - marginX);
-  const maxPanX = Math.max(marginX, (m.w - boardW) + marginX);
-  const minPanY = Math.min(-marginY, (m.h - boardH) - marginY);
-  const maxPanY = Math.max(marginY, (m.h - boardH) + marginY);
+  // Mantém sempre uma boa parte do mapa visível dentro da área útil do ecrã
+  const padX = Math.min(m.w * 0.35, Math.max(70, boardW * 0.22));
+  const padTop = Math.min(m.h * 0.28, Math.max(60, boardH * 0.20));
+  const padBot = Math.min(m.h * 0.32, Math.max(70, boardH * 0.24));
 
-  if (typeof battle.panX !== "number" || Number.isNaN(battle.panX)) battle.panX = 0;
-  if (typeof battle.panY !== "number" || Number.isNaN(battle.panY)) battle.panY = 0;
+  const minOrigX = Math.min(m.w - padX - boardW * 0.5, m.w * 0.5 - boardW * 0.55);
+  const maxOrigX = Math.max(padX + boardW * 0.5, m.w * 0.5 + boardW * 0.55);
+  const minOrigY = Math.min(m.h - padBot - boardH, m.h * 0.5 - boardH * 0.65);
+  const maxOrigY = Math.max(padTop, m.h * 0.5 + boardH * 0.25);
+
+  const minPanX = minOrigX - m.baseOriginX;
+  const maxPanX = maxOrigX - m.baseOriginX;
+  const minPanY = minOrigY - m.baseOriginY;
+  const maxPanY = maxOrigY - m.baseOriginY;
+
+  if (typeof battle.panX !== "number" || Number.isNaN(battle.panX)) battle.panX = 155;
+  if (typeof battle.panY !== "number" || Number.isNaN(battle.panY)) battle.panY = -44;
 
   if (minPanX <= maxPanX) {
     battle.panX = Math.max(minPanX, Math.min(maxPanX, battle.panX));
@@ -3368,8 +3375,11 @@ function ensureIsoCanvasStage(gridEl) {
       };
     }
 
+    let dragArmed = false;
+
     canvas.addEventListener("pointerdown", (ev) => {
       if (!state.battle) return;
+      try { canvas.setPointerCapture(ev.pointerId); } catch (_) {}
       activePointers.set(ev.pointerId, { clientX: ev.clientX, clientY: ev.clientY });
 
       if (activePointers.size >= 2) {
@@ -3382,18 +3392,20 @@ function ensureIsoCanvasStage(gridEl) {
           pinchLastMidX = pInfo.midX;
           pinchLastMidY = pInfo.midY;
           isPanning = false;
+          dragArmed = false;
           totalMoved = 999;
         }
         return;
       }
 
       isPanning = true;
+      dragArmed = false;
       totalMoved = 0;
       startClientX = ev.clientX;
       startClientY = ev.clientY;
       lastClientX = ev.clientX;
       lastClientY = ev.clientY;
-          });
+    });
 
     canvas.addEventListener("pointermove", (ev) => {
       if (!state.battle) return;
@@ -3405,14 +3417,17 @@ function ensureIsoCanvasStage(gridEl) {
         const pInfo = getPinchInfo();
         if (pInfo && pinchStartDist > 4) {
           const factor = pInfo.dist / pinchStartDist;
-          const targetZoom = Math.max(0.65, Math.min(2.6, Number((pinchStartZoom * factor).toFixed(2))));
+          const targetZoom = Math.max(0.85, Math.min(2.6, Number((pinchStartZoom * factor).toFixed(2))));
           const panDeltaX = pInfo.midX - pinchLastMidX;
           const panDeltaY = pInfo.midY - pinchLastMidY;
           pinchLastMidX = pInfo.midX;
           pinchLastMidY = pInfo.midY;
-          state.battle.panX = (state.battle.panX || 0) + panDeltaX;
-          state.battle.panY = (state.battle.panY || 0) + panDeltaY;
+          state.battle.targetPanX = (state.battle.targetPanX ?? state.battle.panX ?? 0) + panDeltaX;
+          state.battle.targetPanY = (state.battle.targetPanY ?? state.battle.panY ?? 0) + panDeltaY;
+          state.battle.panX = state.battle.targetPanX;
+          state.battle.panY = state.battle.targetPanY;
           state.battle.zoom = targetZoom;
+          state.battle.targetZoom = targetZoom;
           const m = getIsoMetrics(canvas, true);
           clampBattlePan(state.battle, m);
           scheduleBattleRender();
@@ -3422,14 +3437,23 @@ function ensureIsoCanvasStage(gridEl) {
 
       if (isPanning) {
         totalMoved = Math.hypot(ev.clientX - startClientX, ev.clientY - startClientY);
-        if (totalMoved > 6) {
+        // Só começa a arrastar câmara após um movimento intencional (> 14px) para não estragar toques em telemóvel
+        if (totalMoved > 14) {
+          if (!dragArmed) {
+            dragArmed = true;
+            lastClientX = ev.clientX;
+            lastClientY = ev.clientY;
+            return;
+          }
           const dx = ev.clientX - lastClientX;
           const dy = ev.clientY - lastClientY;
           lastClientX = ev.clientX;
           lastClientY = ev.clientY;
           const m = getIsoMetrics(canvas, true);
-          state.battle.panX = (state.battle.panX || 0) + dx;
-          state.battle.panY = (state.battle.panY || 0) + dy;
+          state.battle.targetPanX = (state.battle.targetPanX ?? state.battle.panX ?? 0) + dx;
+          state.battle.targetPanY = (state.battle.targetPanY ?? state.battle.panY ?? 0) + dy;
+          state.battle.panX = state.battle.targetPanX;
+          state.battle.panY = state.battle.targetPanY;
           clampBattlePan(state.battle, m);
           scheduleBattleRender();
           return;
@@ -5617,18 +5641,36 @@ if (__ozOrigSpawnBattleVfx) {
 const __ozOrigRenderBattleInner = typeof _renderBattleInner === "function" ? _renderBattleInner : null;
 if (__ozOrigRenderBattleInner) {
   _renderBattleInner = function (b) {
-    __ozOrigRenderBattleInner(b);
+    if (!b) return;
     const canvas = document.getElementById("iso-battle-canvas");
-    if (!canvas || !b) return;
+    if (!canvas) {
+      __ozOrigRenderBattleInner(b);
+      return;
+    }
+    const m0 = getIsoMetrics(canvas, true);
+    clampBattlePan(b, m0);
+
+    // Atualiza DOM/HUD/botões através da função base sem redesenhar o canvas duas vezes
+    __ozOrigRenderBattleInner(b);
+
     const p4 = ensurePhase4SceneState(b);
     const shake = getCameraShakeOffset(b);
     const m = getIsoMetrics(canvas);
+    clampBattlePan(b, m);
     const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const rw = Math.round(m.w);
+    const rh = Math.round(m.h);
+    const targetW = Math.round(rw * dpr);
+    const targetH = Math.round(rh * dpr);
+    if (Math.abs(canvas.width - targetW) > 1 || Math.abs(canvas.height - targetH) > 1) {
+      canvas.width = targetW;
+      canvas.height = targetH;
+    }
     const ctx = canvas.getContext("2d");
 
     ctx.save();
     ctx.scale(dpr, dpr);
-    ctx.clearRect(0, 0, m.w, m.h);
+    ctx.clearRect(0, 0, rw, rh);
     drawPhase4AtmosphereBackdrop(ctx, b, m);
 
     const shakenM = {
