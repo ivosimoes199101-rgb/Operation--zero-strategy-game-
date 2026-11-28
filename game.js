@@ -621,6 +621,346 @@ function setTacticalViewportLock(active) {
         display: none !important;
       }
 
+      /* === FASE 3 — HUD MILITAR CINEMATOGRÁFICA 2.5D (XCOM 2) === */
+      #tactical.active {
+        --hud-bg: rgba(8, 15, 24, 0.84);
+        --hud-bg-solid: rgba(7, 13, 21, 0.96);
+        --hud-border: rgba(148, 163, 184, 0.24);
+        --hud-ally: #4ef2a1;
+        --hud-enemy: #f87171;
+        --hud-warn: #fbbf24;
+        --hud-text: #f1f5f9;
+        --hud-muted: #94a3b8;
+        font-family: "Rajdhani", "Orbitron", "Segoe UI", system-ui, -apple-system, sans-serif !important;
+      }
+      #tactical.active button {
+        touch-action: manipulation !important;
+        -webkit-tap-highlight-color: rgba(78, 242, 161, 0.22) !important;
+        transition: transform 120ms ease, background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease !important;
+      }
+      #tactical.active button:active:not(:disabled) {
+        transform: scale(0.96) !important;
+      }
+
+      /* Painel Superior Discreto — Informações da Missão e Turno */
+      #oz-xcom-top-bar {
+        position: absolute !important;
+        top: max(6px, env(safe-area-inset-top)) !important;
+        left: max(8px, env(safe-area-inset-left)) !important;
+        right: max(8px, env(safe-area-inset-right)) !important;
+        z-index: 24 !important;
+        display: flex !important;
+        flex-wrap: wrap !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 6px !important;
+        pointer-events: none !important;
+      }
+      .oz-xcom-mission-pill {
+        pointer-events: auto !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        background: linear-gradient(90deg, rgba(8, 16, 26, 0.90) 0%, rgba(12, 24, 37, 0.80) 100%) !important;
+        border: 1px solid rgba(78, 242, 161, 0.34) !important;
+        border-left: 3px solid #4ef2a1 !important;
+        border-radius: 6px !important;
+        padding: 5px 9px !important;
+        backdrop-filter: blur(6px) !important;
+        max-width: min(62vw, 480px) !important;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45) !important;
+      }
+      .oz-xcom-mission-meta {
+        min-width: 0 !important;
+        flex: 1 1 auto !important;
+      }
+      .oz-xcom-mission-title {
+        font-size: clamp(0.68rem, 2.1vw, 0.8rem) !important;
+        font-weight: 800 !important;
+        letter-spacing: 0.06em !important;
+        color: #4ef2a1 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+      }
+      .oz-xcom-mission-obj {
+        font-size: clamp(0.6rem, 1.85vw, 0.7rem) !important;
+        color: #cbd5e1 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        margin-top: 1px !important;
+      }
+      .oz-xcom-turn-badge {
+        flex-shrink: 0 !important;
+        background: rgba(15, 23, 42, 0.92) !important;
+        border: 1px solid rgba(148, 163, 184, 0.32) !important;
+        border-radius: 4px !important;
+        padding: 3px 6px !important;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+        font-size: clamp(0.58rem, 1.75vw, 0.68rem) !important;
+        font-weight: 700 !important;
+        color: #f8fafc !important;
+        text-transform: uppercase !important;
+      }
+      .oz-xcom-turn-badge.enemy-phase {
+        border-color: rgba(248, 113, 113, 0.65) !important;
+        color: #fca5a5 !important;
+      }
+      .oz-xcom-collapse-btn {
+        background: rgba(15, 23, 42, 0.88) !important;
+        color: #cbd5e1 !important;
+        border: 1px solid rgba(148, 163, 184, 0.28) !important;
+        border-radius: 4px !important;
+        min-width: 26px !important;
+        min-height: 26px !important;
+        padding: 0 5px !important;
+        font-size: 0.72rem !important;
+        font-weight: 700 !important;
+        cursor: pointer !important;
+      }
+
+      /* Painel da Equipa — Seleção Direta, Saúde, PA e Destaque de Unidade Ativa */
+      #oz-xcom-squad-bar {
+        pointer-events: auto !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 4px !important;
+        overflow-x: auto !important;
+        scrollbar-width: none !important;
+        max-width: 100% !important;
+        padding-bottom: 2px !important;
+      }
+      #oz-xcom-squad-bar::-webkit-scrollbar {
+        display: none !important;
+      }
+      .oz-squad-op-btn {
+        display: flex !important;
+        align-items: center !important;
+        gap: 5px !important;
+        min-height: 38px !important;
+        padding: 4px 7px !important;
+        border-radius: 6px !important;
+        background: rgba(9, 16, 25, 0.82) !important;
+        border: 1px solid rgba(148, 163, 184, 0.24) !important;
+        color: #cbd5e1 !important;
+        cursor: pointer !important;
+        opacity: 0.82 !important;
+        flex-shrink: 0 !important;
+      }
+      .oz-squad-op-btn.has-ap {
+        border-color: rgba(78, 242, 161, 0.35) !important;
+      }
+      .oz-squad-op-btn.selected-op {
+        opacity: 1 !important;
+        background: linear-gradient(180deg, rgba(20, 48, 38, 0.95) 0%, rgba(10, 24, 20, 0.96) 100%) !important;
+        border-color: #4ef2a1 !important;
+        box-shadow: 0 0 0 1px rgba(78, 242, 161, 0.45), 0 6px 14px rgba(0, 0, 0, 0.55) !important;
+        color: #ecfdf5 !important;
+      }
+      .oz-squad-op-meta {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        line-height: 1.08 !important;
+      }
+      .oz-squad-op-name {
+        font-size: clamp(0.62rem, 1.9vw, 0.72rem) !important;
+        font-weight: 800 !important;
+        letter-spacing: 0.04em !important;
+        white-space: nowrap !important;
+      }
+      .oz-squad-op-stats {
+        display: flex !important;
+        align-items: center !important;
+        gap: 4px !important;
+        margin-top: 2px !important;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+        font-size: 0.56rem !important;
+      }
+      .oz-mini-hp-track {
+        width: 28px !important;
+        height: 4px !important;
+        background: rgba(15, 23, 42, 0.95) !important;
+        border-radius: 2px !important;
+        overflow: hidden !important;
+        border: 1px solid rgba(255, 255, 255, 0.14) !important;
+      }
+      .oz-mini-hp-fill {
+        height: 100% !important;
+        transition: width 180ms ease !important;
+      }
+      .oz-ap-pips {
+        display: inline-flex !important;
+        gap: 2px !important;
+      }
+      .oz-ap-pip {
+        width: 5px !important;
+        height: 7px !important;
+        border-radius: 1.5px !important;
+        background: rgba(148, 163, 184, 0.25) !important;
+      }
+      .oz-ap-pip.active {
+        background: #4ef2a1 !important;
+        box-shadow: 0 0 5px rgba(78, 242, 161, 0.65) !important;
+      }
+
+      /* Painel de Combate Contextual (Inimigo Selecionado / Apontado) */
+      #oz-xcom-combat-card {
+        position: absolute !important;
+        top: 86px !important;
+        right: max(8px, env(safe-area-inset-right)) !important;
+        z-index: 23 !important;
+        width: min(215px, 56vw) !important;
+        background: rgba(18, 9, 12, 0.90) !important;
+        border: 1px solid rgba(248, 113, 113, 0.55) !important;
+        border-left: 3px solid #f87171 !important;
+        border-radius: 7px !important;
+        padding: 7px 9px !important;
+        backdrop-filter: blur(6px) !important;
+        box-shadow: 0 8px 22px rgba(0, 0, 0, 0.62) !important;
+        color: #f8fafc !important;
+        pointer-events: auto !important;
+      }
+      .oz-combat-header {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        gap: 6px !important;
+        border-bottom: 1px solid rgba(248, 113, 113, 0.24) !important;
+        padding-bottom: 4px !important;
+        margin-bottom: 5px !important;
+      }
+      .oz-combat-name {
+        font-size: 0.72rem !important;
+        font-weight: 800 !important;
+        color: #fca5a5 !important;
+        letter-spacing: 0.04em !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+      }
+      .oz-combat-hp-bar {
+        width: 100% !important;
+        height: 5px !important;
+        background: rgba(15, 23, 42, 0.92) !important;
+        border-radius: 2px !important;
+        overflow: hidden !important;
+        margin: 3px 0 5px 0 !important;
+      }
+      .oz-combat-hp-fill {
+        height: 100% !important;
+        background: linear-gradient(90deg, #ef4444, #f87171) !important;
+      }
+      .oz-combat-metrics {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 4px 6px !important;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+        font-size: 0.62rem !important;
+      }
+      .oz-combat-metric-lbl {
+        color: #94a3b8 !important;
+        font-size: 0.55rem !important;
+        display: block !important;
+      }
+      .oz-combat-metric-val {
+        color: #f8fafc !important;
+        font-weight: 700 !important;
+      }
+      .oz-combat-metric-val.hit-high {
+        color: #4ef2a1 !important;
+      }
+      .oz-combat-metric-val.hit-mid {
+        color: #fbbf24 !important;
+      }
+      .oz-combat-metric-val.hit-low {
+        color: #f87171 !important;
+      }
+
+      /* Painel Inferior Compacto do Soldado Selecionado + Ações Táteis */
+      #oz-xcom-selected-dock {
+        grid-column: 1 / -1 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 6px !important;
+        background: rgba(10, 18, 29, 0.94) !important;
+        border: 1px solid rgba(78, 242, 161, 0.36) !important;
+        border-left: 3px solid #4ef2a1 !important;
+        border-radius: 8px !important;
+        padding: 7px 9px !important;
+      }
+      .oz-sel-top-row {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 8px !important;
+        flex-wrap: wrap !important;
+      }
+      .oz-sel-identity {
+        display: flex !important;
+        align-items: center !important;
+        gap: 7px !important;
+        min-width: 0 !important;
+      }
+      .oz-sel-name {
+        font-size: clamp(0.76rem, 2.4vw, 0.9rem) !important;
+        font-weight: 800 !important;
+        color: #ecfdf5 !important;
+        letter-spacing: 0.04em !important;
+        white-space: nowrap !important;
+      }
+      .oz-sel-role {
+        font-size: 0.64rem !important;
+        color: #4ef2a1 !important;
+        font-weight: 700 !important;
+      }
+      .oz-sel-vitals {
+        display: flex !important;
+        align-items: center !important;
+        gap: 10px !important;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+        font-size: clamp(0.66rem, 2vw, 0.76rem) !important;
+        color: #e2e8f0 !important;
+      }
+      .oz-sel-actions-grid {
+        display: grid !important;
+        grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)) !important;
+        gap: 5px !important;
+        width: 100% !important;
+      }
+      .oz-tactical-act-btn {
+        min-height: 40px !important;
+        padding: 5px 6px !important;
+        border-radius: 6px !important;
+        border: 1px solid rgba(148, 163, 184, 0.32) !important;
+        background: rgba(17, 27, 40, 0.94) !important;
+        color: #f1f5f9 !important;
+        font-size: clamp(0.62rem, 1.9vw, 0.72rem) !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.03em !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 4px !important;
+        cursor: pointer !important;
+        white-space: nowrap !important;
+      }
+      .oz-tactical-act-btn.primary-fire {
+        background: rgba(220, 38, 38, 0.24) !important;
+        border-color: rgba(248, 113, 113, 0.65) !important;
+        color: #fecaca !important;
+      }
+      .oz-tactical-act-btn.primary-move {
+        background: rgba(16, 185, 129, 0.22) !important;
+        border-color: rgba(78, 242, 161, 0.65) !important;
+        color: #d1fae5 !important;
+      }
+      .oz-tactical-act-btn:disabled {
+        opacity: 0.38 !important;
+        cursor: not-allowed !important;
+      }
+
       /* === MODO TÁTICO FULL-VIEWPORT (SEM ESPAÇOS PRETOS NEM SCROLL) === */
       html.tactical-locked, body.tactical-locked {
         overflow: hidden !important;
@@ -3419,6 +3759,10 @@ function ensureEndTurnVisible(battle) {
   const isPlayerTurn = Boolean(battle && battle.phase === "player");
   endTurnBtn.style.display = "";
   endTurnBtn.disabled = !isPlayerTurn;
+  endTurnBtn.textContent = isPlayerTurn ? "TERMINAR TURNO" : "TURNO INIMIGO...";
+  if (retreatBtn && !retreatBtn.textContent.trim()) {
+    retreatBtn.textContent = "ABORTAR OPERAÇÃO";
+  }
 }
 
 function getUnitVisualBadge(entity, isEnemy) {
@@ -3519,50 +3863,40 @@ function _renderBattleInner(b) {
   if (canvas && canvas.parentElement) {
     const stageParent = canvas.parentElement;
 
-    let topHud = document.getElementById("iso-top-hud");
+    let topHud = document.getElementById("oz-xcom-top-bar");
     if (!topHud) {
       topHud = document.createElement("div");
-      topHud.id = "iso-top-hud";
-      topHud.style.cssText = `
-        position:absolute;
-        top:8px;
-        left:8px;
-        right:8px;
-        z-index:16;
-        display:flex;
-        align-items:flex-start;
-        justify-content:space-between;
-        gap:8px;
-        pointer-events:none;
-      `;
+      topHud.id = "oz-xcom-top-bar";
       stageParent.appendChild(topHud);
     }
 
     const selUForHud = getSelectedUnit();
     const selEForHud = getSelectedEnemy();
     const curZoomPct = Math.round(getBattleZoom(b) * 100);
-    const tgtText = selEForHud
-      ? `${selEForHud.name} (${selEForHud.hp}HP${selUForHud ? ` · ${calculateHitChance(selUForHud, selEForHud, b)}%` : ""})`
-      : "SEM ALVO";
+    const isCollapsed = Boolean(b.topHudCollapsed);
+    const opStatus = b.phase === "player" ? `T${b.turn} · ALIADO` : `T${b.turn} · XENO`;
 
-    let hudInfoBox = document.getElementById("iso-top-info-box");
-    if (!hudInfoBox) {
+    if (!document.getElementById("oz-xcom-mission-box")) {
       topHud.innerHTML = `
-        <div id="iso-top-info-box" style="pointer-events:auto;background:rgba(7,14,22,0.82);border:1px solid rgba(78,242,161,0.35);border-radius:10px;padding:6px 9px;max-width:48%;">
-          <div id="iso-hud-title" style="font-size:0.7em;font-weight:bold;letter-spacing:0.6px;color:#4ef2a1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
-          <div id="iso-hud-sub" style="font-size:0.64em;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;"></div>
-          <div style="display:flex;align-items:center;gap:4px;margin-top:5px;">
-            <button type="button" id="iso-zoom-out" style="background:rgba(15,23,42,0.92);color:#e2e8f0;border:1px solid rgba(148,163,184,0.4);border-radius:5px;padding:2px 7px;font-size:0.68em;font-weight:bold;cursor:pointer;">−</button>
-            <button type="button" id="iso-zoom-reset" style="background:rgba(15,23,42,0.92);color:#4ef2a1;border:1px solid rgba(78,242,161,0.4);border-radius:5px;padding:2px 6px;font-size:0.64em;font-weight:bold;cursor:pointer;">100%</button>
-            <button type="button" id="iso-zoom-in" style="background:rgba(15,23,42,0.92);color:#e2e8f0;border:1px solid rgba(148,163,184,0.4);border-radius:5px;padding:2px 7px;font-size:0.68em;font-weight:bold;cursor:pointer;">+</button>
-            <button type="button" id="iso-pan-left" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.3);border-radius:5px;padding:2px 5px;font-size:0.64em;cursor:pointer;">◀</button>
-            <button type="button" id="iso-pan-up" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.3);border-radius:5px;padding:2px 5px;font-size:0.64em;cursor:pointer;">▲</button>
-            <button type="button" id="iso-pan-down" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.3);border-radius:5px;padding:2px 5px;font-size:0.64em;cursor:pointer;">▼</button>
-            <button type="button" id="iso-pan-right" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.3);border-radius:5px;padding:2px 5px;font-size:0.64em;cursor:pointer;">▶</button>
-            <button type="button" id="iso-fullscreen-btn" title="Alternar Ecrã Inteiro" style="background:rgba(15,23,42,0.92);color:#4ef2a1;border:1px solid rgba(78,242,161,0.45);border-radius:5px;padding:2px 6px;font-size:0.64em;font-weight:bold;cursor:pointer;">⛶</button>
+        <div id="oz-xcom-mission-box" class="oz-xcom-mission-pill">
+          <div class="oz-xcom-mission-meta">
+            <div id="iso-hud-title" class="oz-xcom-mission-title"></div>
+            <div id="iso-hud-sub" class="oz-xcom-mission-obj"></div>
+            <div id="oz-xcom-cam-controls" style="display:flex;align-items:center;gap:3px;margin-top:4px;flex-wrap:wrap;">
+              <button type="button" id="iso-zoom-out" style="background:rgba(15,23,42,0.92);color:#e2e8f0;border:1px solid rgba(148,163,184,0.36);border-radius:4px;padding:2px 6px;font-size:0.64rem;font-weight:700;cursor:pointer;">−</button>
+              <button type="button" id="iso-zoom-reset" style="background:rgba(15,23,42,0.92);color:#4ef2a1;border:1px solid rgba(78,242,161,0.38);border-radius:4px;padding:2px 5px;font-size:0.6rem;font-weight:700;cursor:pointer;">100%</button>
+              <button type="button" id="iso-zoom-in" style="background:rgba(15,23,42,0.92);color:#e2e8f0;border:1px solid rgba(148,163,184,0.36);border-radius:4px;padding:2px 6px;font-size:0.64rem;font-weight:700;cursor:pointer;">+</button>
+              <button type="button" id="iso-pan-left" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.28);border-radius:4px;padding:2px 5px;font-size:0.6rem;cursor:pointer;">◀</button>
+              <button type="button" id="iso-pan-up" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.28);border-radius:4px;padding:2px 5px;font-size:0.6rem;cursor:pointer;">▲</button>
+              <button type="button" id="iso-pan-down" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.28);border-radius:4px;padding:2px 5px;font-size:0.6rem;cursor:pointer;">▼</button>
+              <button type="button" id="iso-pan-right" style="background:rgba(15,23,42,0.92);color:#cbd5e1;border:1px solid rgba(148,163,184,0.28);border-radius:4px;padding:2px 5px;font-size:0.6rem;cursor:pointer;">▶</button>
+              <button type="button" id="iso-fullscreen-btn" title="Alternar Ecrã Inteiro" style="background:rgba(15,23,42,0.92);color:#4ef2a1;border:1px solid rgba(78,242,161,0.42);border-radius:4px;padding:2px 6px;font-size:0.62rem;font-weight:700;cursor:pointer;">⛶</button>
+            </div>
           </div>
+          <span id="oz-xcom-turn-pill" class="oz-xcom-turn-badge"></span>
+          <button type="button" id="oz-top-collapse-btn" class="oz-xcom-collapse-btn" title="Recolher / Expandir">▾</button>
         </div>
-        <div id="iso-squad-strip" style="pointer-events:auto;display:flex;flex-wrap:wrap;gap:5px;max-width:50%;justify-content:flex-end;"></div>
+        <div id="oz-xcom-squad-bar"></div>
       `;
 
       const zoomOutBtn = topHud.querySelector("#iso-zoom-out");
@@ -3572,6 +3906,7 @@ function _renderBattleInner(b) {
       const panRightBtn = topHud.querySelector("#iso-pan-right");
       const panUpBtn = topHud.querySelector("#iso-pan-up");
       const panDownBtn = topHud.querySelector("#iso-pan-down");
+      const collapseBtn = topHud.querySelector("#oz-top-collapse-btn");
 
       if (zoomOutBtn) zoomOutBtn.addEventListener("click", (ev) => { ev.stopPropagation(); setBattleZoom(-0.22); });
       if (zoomInBtn) zoomInBtn.addEventListener("click", (ev) => { ev.stopPropagation(); setBattleZoom(0.22); });
@@ -3590,38 +3925,66 @@ function _renderBattleInner(b) {
       if (panDownBtn) panDownBtn.addEventListener("click", (ev) => { ev.stopPropagation(); nudgePan(0, -40); });
       const fsIsoBtn = topHud.querySelector("#iso-fullscreen-btn");
       if (fsIsoBtn) fsIsoBtn.addEventListener("click", (ev) => { ev.stopPropagation(); toggleGameFullscreen(); });
+      if (collapseBtn) {
+        collapseBtn.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          b.topHudCollapsed = !b.topHudCollapsed;
+          renderBattle();
+        });
+      }
     }
 
     const hudTitleEl = document.getElementById("iso-hud-title");
     const hudSubEl = document.getElementById("iso-hud-sub");
     const hudZoomEl = document.getElementById("iso-zoom-reset");
-    if (hudTitleEl) hudTitleEl.textContent = `${formatMissionNumber(b.mission.number)}. ${b.mission.title.toUpperCase()}`;
-    if (hudSubEl) hudSubEl.textContent = selUForHud ? `${selUForHud.name.split(" ")[0]}: ${selUForHud.hp}HP · ${selUForHud.ap}PA · ${selUForHud.ammo}M` : `ALVO: ${tgtText}`;
-    if (hudZoomEl) hudZoomEl.textContent = `${curZoomPct}%`;
+    const turnPillEl = document.getElementById("oz-xcom-turn-pill");
+    const camControlsEl = document.getElementById("oz-xcom-cam-controls");
+    const collapseBtnEl = document.getElementById("oz-top-collapse-btn");
 
-    const squadBar = document.getElementById("iso-squad-strip");
+    if (hudTitleEl) hudTitleEl.textContent = `${formatMissionNumber(b.mission.number)}. ${b.mission.title.toUpperCase()}`;
+    if (hudSubEl) hudSubEl.textContent = isCollapsed ? `OBJ: ${b.mission.objective}` : `OBJETIVO: ${b.mission.objective}`;
+    if (hudZoomEl) hudZoomEl.textContent = `${curZoomPct}%`;
+    if (turnPillEl) {
+      turnPillEl.textContent = opStatus;
+      turnPillEl.classList.toggle("enemy-phase", b.phase !== "player");
+    }
+    if (camControlsEl) {
+      camControlsEl.style.display = isCollapsed ? "none" : "flex";
+    }
+    if (collapseBtnEl) {
+      collapseBtnEl.textContent = isCollapsed ? "▸" : "▾";
+    }
+
+    const squadBar = document.getElementById("oz-xcom-squad-bar");
     if (squadBar) {
       const aliveUnits = b.units.filter((u) => u.hp > 0);
       const squadSig = aliveUnits
-        .map((u) => `${u.id}:${u.ap}:${b.selectedUnitId === u.id ? 1 : 0}`)
+        .map((u) => `${u.id}:${u.hp}:${u.ap}:${b.selectedUnitId === u.id ? 1 : 0}`)
         .join("|") + `|${b.phase}`;
       if (squadBar.dataset.ozSig !== squadSig) {
         squadBar.dataset.ozSig = squadSig;
         squadBar.innerHTML = "";
         aliveUnits.forEach((u) => {
           const isAct = b.selectedUnitId === u.id;
+          const hpPct = Math.max(0, Math.min(100, Math.round((u.hp / Math.max(1, u.maxHp)) * 100)));
+          const hpCol = hpPct > 50 ? "#4ef2a1" : hpPct > 25 ? "#fbbf24" : "#f87171";
           const chip = document.createElement("button");
           chip.type = "button";
-          chip.textContent = `${u.name.split(" ")[0]} · ${u.ap}PA`;
-          chip.style.cssText = `
-            font-size:0.64em;
-            font-weight:bold;
-            padding:4px 7px;
-            border-radius:999px;
-            border:1px solid ${isAct ? "#4ef2a1" : u.ap > 0 ? "rgba(125,211,252,0.55)" : "rgba(148,163,184,0.25)"};
-            background:${isAct ? "rgba(78,242,161,0.28)" : "rgba(7,14,22,0.82)"};
-            color:${isAct ? "#ecfdf5" : "#e2e8f0"};
-            cursor:pointer;
+          chip.className = `oz-squad-op-btn ${isAct ? "selected-op" : ""} ${u.ap > 0 ? "has-ap" : ""}`;
+          let pipsHtml = "";
+          for (let p = 0; p < (u.maxAp || 2); p++) {
+            pipsHtml += `<span class="oz-ap-pip ${p < u.ap ? "active" : ""}"></span>`;
+          }
+          chip.innerHTML = `
+            ${getUnitVisualBadge(u, false)}
+            <span class="oz-squad-op-meta">
+              <span class="oz-squad-op-name">${u.name.split(" ")[0]}</span>
+              <span class="oz-squad-op-stats">
+                <span class="oz-mini-hp-track"><span class="oz-mini-hp-fill" style="width:${hpPct}%;background:${hpCol};"></span></span>
+                <span>${u.hp}</span>
+                <span class="oz-ap-pips">${pipsHtml}</span>
+              </span>
+            </span>
           `;
           chip.addEventListener("click", (ev) => {
             ev.stopPropagation();
@@ -3629,12 +3992,63 @@ function _renderBattleInner(b) {
             b.selectedUnitId = isAct ? null : u.id;
             b.mode = "normal";
             b.ordersMinimized = false;
-            addBattleLog(isAct ? `Ordens de ${u.name} recolhidas.` : `Operacional selecionado: ${u.name}.`);
+            if (!isAct) centerCameraOnUnit(u);
+            addBattleLog(isAct ? `Ordens de ${u.name} recolhidas.` : `Operacional selecionado: ${u.name} (${u.ap} PA).`);
             renderBattle();
           });
           squadBar.appendChild(chip);
         });
       }
+    }
+
+    // Painel de Combate Contextual quando existe inimigo selecionado / apontado
+    let combatCard = document.getElementById("oz-xcom-combat-card");
+    if (!combatCard) {
+      combatCard = document.createElement("div");
+      combatCard.id = "oz-xcom-combat-card";
+      stageParent.appendChild(combatCard);
+    }
+    if (selEForHud && (b.mode === "fire" || selUForHud)) {
+      combatCard.style.display = "block";
+      const eHpPct = Math.max(0, Math.min(100, Math.round((selEForHud.hp / Math.max(1, selEForHud.maxHp)) * 100)));
+      const cov = getTileCoverAt(b, selEForHud.x, selEForHud.y);
+      const covLabel = cov === 2 ? "ALTA (FULL)" : cov === 1 ? "BAIXA (HALF)" : "EXPOSTO";
+      const losLabel = selUForHud ? "LIVRE / VISÍVEL" : "SEM ATIRADOR";
+      const chance = selUForHud ? calculateHitChance(selUForHud, selEForHud, b) : null;
+      const estDmg = selUForHud ? estimateUnitDamage(selUForHud, selEForHud) : null;
+      const hitClass = chance === null ? "" : chance >= 70 ? "hit-high" : chance >= 45 ? "hit-mid" : "hit-low";
+
+      combatCard.innerHTML = `
+        <div class="oz-combat-header">
+          <span class="oz-combat-name">${selEForHud.name}</span>
+          <span style="font-size:0.56rem;color:#fca5a5;font-family:monospace;">${selEForHud.archetypeId.toUpperCase()}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.62rem;font-family:monospace;">
+          <span>HP</span>
+          <span>${selEForHud.hp}/${selEForHud.maxHp}</span>
+        </div>
+        <div class="oz-combat-hp-bar"><div class="oz-combat-hp-fill" style="width:${eHpPct}%;"></div></div>
+        <div class="oz-combat-metrics">
+          <div>
+            <span class="oz-combat-metric-lbl">PRECISÃO</span>
+            <span class="oz-combat-metric-val ${hitClass}">${chance !== null ? `${chance}%` : "--%"}</span>
+          </div>
+          <div>
+            <span class="oz-combat-metric-lbl">DANO EST.</span>
+            <span class="oz-combat-metric-val">${estDmg !== null ? `~${estDmg}` : "--"}</span>
+          </div>
+          <div>
+            <span class="oz-combat-metric-lbl">COBERTURA</span>
+            <span class="oz-combat-metric-val">${covLabel}</span>
+          </div>
+          <div>
+            <span class="oz-combat-metric-lbl">LINHA VISÃO</span>
+            <span class="oz-combat-metric-val">${losLabel}</span>
+          </div>
+        </div>
+      `;
+    } else {
+      combatCard.style.display = "none";
     }
 
     const existingBottomHud = document.getElementById("iso-bottom-hud");
@@ -3939,9 +4353,20 @@ function _renderBattleInner(b) {
   const unitAmmoEl = document.getElementById("unit-ammo");
   const hitChanceEl = document.getElementById("hit-chance");
 
+  const battleSideEl = document.querySelector("#tactical .battle-side");
+  let selDock = document.getElementById("oz-xcom-selected-dock");
+  if (battleSideEl && !selDock) {
+    selDock = document.createElement("div");
+    selDock.id = "oz-xcom-selected-dock";
+    const actionRowEl = document.getElementById("oz-bottom-actions");
+    if (actionRowEl) battleSideEl.insertBefore(selDock, actionRowEl);
+    else battleSideEl.appendChild(selDock);
+  }
+
   if (selUnit) {
     const maxMove = getUnitMoveRange(selUnit);
-    const postureName = selUnit.crouched ? "AGACHADO" : "DE PÉ (CORRER)";
+    const postureName = selUnit.crouched ? "AGACHADO" : "DE PÉ";
+    const equipSummary = `FRAG:${selUnit.frags ?? 0} · FUMO:${selUnit.smokes ?? 0} · KIT:${selUnit.medkits ?? 0}`;
     setText("selected-unit", `${selUnit.name} (${selUnit.role}) · ${postureName}`);
     if (unitHpEl && unitApEl && unitAmmoEl) {
       unitHpEl.textContent = `${selUnit.hp}/${selUnit.maxHp} HP`;
@@ -3949,6 +4374,68 @@ function _renderBattleInner(b) {
       unitAmmoEl.textContent = `${selUnit.ammo}/${selUnit.maxAmmo} MUN`;
     } else {
       setText("unit-hp", `${selUnit.hp}/${selUnit.maxHp} HP · ${selUnit.ap}/${selUnit.maxAp} PA · ${selUnit.ammo}/${selUnit.maxAmmo} MUN`);
+    }
+
+    if (selDock) {
+      selDock.style.display = "flex";
+      const canAct = b.phase === "player" && selUnit.ap >= 1;
+      selDock.innerHTML = `
+        <div class="oz-sel-top-row">
+          <div class="oz-sel-identity">
+            ${getUnitVisualBadge(selUnit, false)}
+            <div>
+              <div class="oz-sel-name">${selUnit.name}</div>
+              <div class="oz-sel-role">${selUnit.role.toUpperCase()} · ${postureName} · ${equipSummary}</div>
+            </div>
+          </div>
+          <div class="oz-sel-vitals">
+            <span><b>${selUnit.hp}</b>/${selUnit.maxHp} HP</span>
+            <span><b>${selUnit.ap}</b>/${selUnit.maxAp} PA</span>
+            <span><b>${selUnit.ammo}</b>/${selUnit.maxAmmo} MUN</span>
+          </div>
+        </div>
+        <div class="oz-sel-actions-grid">
+          <button type="button" id="oz-dock-move" class="oz-tactical-act-btn primary-move" ${!canAct ? "disabled" : ""}>➤ MOVER (${maxMove})</button>
+          <button type="button" id="oz-dock-fire" class="oz-tactical-act-btn primary-fire" ${(!canAct || selUnit.ammo <= 0 || !selEnemy) ? "disabled" : ""}>⌖ DISPARAR</button>
+          <button type="button" id="oz-dock-reload" class="oz-tactical-act-btn" ${(!canAct || selUnit.ammo >= selUnit.maxAmmo) ? "disabled" : ""}>↻ RECARREGAR</button>
+          <button type="button" id="oz-dock-cover" class="oz-tactical-act-btn" ${!canAct ? "disabled" : ""}>🛡 ${selUnit.crouched ? "LEVANTAR" : "COBERTURA"}</button>
+          <button type="button" id="oz-dock-overwatch" class="oz-tactical-act-btn" ${(!canAct || selUnit.ammo <= 0) ? "disabled" : ""}>👁 VIGILÂNCIA</button>
+          <button type="button" id="oz-dock-frag" class="oz-tactical-act-btn" ${(!canAct || (selUnit.frags ?? 0) <= 0) ? "disabled" : ""}>💣 FRAG (${selUnit.frags ?? 0})</button>
+          <button type="button" id="oz-dock-smoke" class="oz-tactical-act-btn" ${(!canAct || (selUnit.smokes ?? 0) <= 0) ? "disabled" : ""}>☁ FUMO (${selUnit.smokes ?? 0})</button>
+          <button type="button" id="oz-dock-medkit" class="oz-tactical-act-btn" ${(!canAct || (selUnit.medkits ?? 0) <= 0 || selUnit.hp >= selUnit.maxHp) ? "disabled" : ""}>✚ KIT (${selUnit.medkits ?? 0})</button>
+        </div>
+      `;
+
+      const bindDock = (id, fn) => {
+        const el = selDock.querySelector(`#${id}`);
+        if (el) el.addEventListener("click", (ev) => { ev.stopPropagation(); fn(); });
+      };
+      bindDock("oz-dock-move", () => { hideFloatingOrdersNow(); toggleMoveModeSelectedUnit(); });
+      bindDock("oz-dock-fire", () => {
+        if (!selEnemy) {
+          addBattleLog("Seleciona um inimigo no campo para apontar e disparar.");
+          return;
+        }
+        fireAtTarget();
+      });
+      bindDock("oz-dock-reload", () => reloadSelectedUnit());
+      bindDock("oz-dock-cover", () => toggleCrouchSelectedUnit());
+      bindDock("oz-dock-overwatch", () => overwatchSelectedUnit());
+      bindDock("oz-dock-frag", () => {
+        b.mode = "frag";
+        b.ordersMinimized = true;
+        hideFloatingOrdersNow();
+        addBattleLog("Modo GRANADA FRAG: toca na área do campo onde queres lançar.");
+        renderBattle();
+      });
+      bindDock("oz-dock-smoke", () => {
+        b.mode = "smoke";
+        b.ordersMinimized = true;
+        hideFloatingOrdersNow();
+        addBattleLog("Modo GRANADA FUMO: toca na área do campo onde queres lançar.");
+        renderBattle();
+      });
+      bindDock("oz-dock-medkit", () => useMedkitSelectedUnit());
     }
   } else {
     setText("selected-unit", "SEM OPERACIONAL");
@@ -3958,6 +4445,9 @@ function _renderBattleInner(b) {
       unitAmmoEl.textContent = "0 MUN";
     } else {
       setText("unit-hp", "0 HP · 0 PA · 0 MUN");
+    }
+    if (selDock) {
+      selDock.style.display = "none";
     }
   }
 
