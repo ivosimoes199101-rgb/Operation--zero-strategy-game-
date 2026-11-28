@@ -621,10 +621,10 @@ function setTacticalViewportLock(active) {
         display: none !important;
       }
 
-      /* === FASE 3 — HUD MILITAR CINEMATOGRÁFICA 2.5D (XCOM 2) === */
+      /* === FASE 5 — CAMPO DE BATALHA PROTAGONISTA & HUD MILITAR CINEMATOGRÁFICO (XCOM 2) === */
       #tactical.active {
-        --hud-bg: rgba(8, 15, 24, 0.84);
-        --hud-bg-solid: rgba(7, 13, 21, 0.96);
+        --hud-bg: rgba(7, 13, 21, 0.78);
+        --hud-bg-solid: rgba(6, 11, 18, 0.90);
         --hud-border: rgba(148, 163, 184, 0.24);
         --hud-ally: #4ef2a1;
         --hud-enemy: #f87171;
@@ -635,47 +635,47 @@ function setTacticalViewportLock(active) {
       }
       #tactical.active button {
         touch-action: manipulation !important;
-        -webkit-tap-highlight-color: rgba(78, 242, 161, 0.22) !important;
-        transition: transform 120ms ease, background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease !important;
+        -webkit-tap-highlight-color: rgba(78, 242, 161, 0.24) !important;
+        transition: transform 110ms ease, background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, opacity 150ms ease !important;
       }
       #tactical.active button:active:not(:disabled) {
-        transform: scale(0.96) !important;
+        transform: scale(0.95) !important;
       }
 
-      /* Painel Superior Discreto — Informações da Missão e Turno */
+      /* Topo Compacto: Missão/Câmara + Barra Horizontal de Soldados */
       #oz-xcom-top-bar {
         position: absolute !important;
         top: max(6px, env(safe-area-inset-top)) !important;
         left: max(8px, env(safe-area-inset-left)) !important;
         right: max(8px, env(safe-area-inset-right)) !important;
-        z-index: 24 !important;
+        z-index: 25 !important;
         display: flex !important;
-        flex-wrap: wrap !important;
-        align-items: center !important;
-        justify-content: space-between !important;
-        gap: 6px !important;
+        flex-direction: column !important;
+        gap: 5px !important;
         pointer-events: none !important;
       }
       .oz-xcom-mission-pill {
         pointer-events: auto !important;
         display: flex !important;
         align-items: center !important;
-        gap: 8px !important;
-        background: linear-gradient(90deg, rgba(8, 16, 26, 0.90) 0%, rgba(12, 24, 37, 0.80) 100%) !important;
-        border: 1px solid rgba(78, 242, 161, 0.34) !important;
+        justify-content: space-between !important;
+        gap: 6px !important;
+        background: linear-gradient(90deg, rgba(7, 14, 23, 0.86) 0%, rgba(11, 22, 34, 0.76) 100%) !important;
+        border: 1px solid rgba(78, 242, 161, 0.28) !important;
         border-left: 3px solid #4ef2a1 !important;
         border-radius: 6px !important;
-        padding: 5px 9px !important;
-        backdrop-filter: blur(6px) !important;
-        max-width: min(62vw, 480px) !important;
-        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45) !important;
+        padding: 4px 8px !important;
+        backdrop-filter: blur(8px) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
+        max-width: 100% !important;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.42) !important;
       }
       .oz-xcom-mission-meta {
         min-width: 0 !important;
         flex: 1 1 auto !important;
       }
       .oz-xcom-mission-title {
-        font-size: clamp(0.68rem, 2.1vw, 0.8rem) !important;
+        font-size: clamp(0.66rem, 2vw, 0.78rem) !important;
         font-weight: 800 !important;
         letter-spacing: 0.06em !important;
         color: #4ef2a1 !important;
@@ -684,7 +684,7 @@ function setTacticalViewportLock(active) {
         text-overflow: ellipsis !important;
       }
       .oz-xcom-mission-obj {
-        font-size: clamp(0.6rem, 1.85vw, 0.7rem) !important;
+        font-size: clamp(0.58rem, 1.75vw, 0.68rem) !important;
         color: #cbd5e1 !important;
         white-space: nowrap !important;
         overflow: hidden !important;
@@ -693,12 +693,12 @@ function setTacticalViewportLock(active) {
       }
       .oz-xcom-turn-badge {
         flex-shrink: 0 !important;
-        background: rgba(15, 23, 42, 0.92) !important;
-        border: 1px solid rgba(148, 163, 184, 0.32) !important;
+        background: rgba(15, 23, 42, 0.88) !important;
+        border: 1px solid rgba(148, 163, 184, 0.3) !important;
         border-radius: 4px !important;
         padding: 3px 6px !important;
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
-        font-size: clamp(0.58rem, 1.75vw, 0.68rem) !important;
+        font-size: clamp(0.56rem, 1.7vw, 0.66rem) !important;
         font-weight: 700 !important;
         color: #f8fafc !important;
         text-transform: uppercase !important;
@@ -708,55 +708,72 @@ function setTacticalViewportLock(active) {
         color: #fca5a5 !important;
       }
       .oz-xcom-collapse-btn {
-        background: rgba(15, 23, 42, 0.88) !important;
+        background: rgba(15, 23, 42, 0.86) !important;
         color: #cbd5e1 !important;
         border: 1px solid rgba(148, 163, 184, 0.28) !important;
         border-radius: 4px !important;
-        min-width: 26px !important;
-        min-height: 26px !important;
+        min-width: 28px !important;
+        min-height: 28px !important;
         padding: 0 5px !important;
         font-size: 0.72rem !important;
         font-weight: 700 !important;
         cursor: pointer !important;
       }
 
-      /* Painel da Equipa — Seleção Direta, Saúde, PA e Destaque de Unidade Ativa */
+      /* Barra Horizontal de Soldados com Scroll Horizontal e Sem Corte de Nomes */
       #oz-xcom-squad-bar {
         pointer-events: auto !important;
         display: flex !important;
+        flex-direction: row !important;
         align-items: center !important;
-        gap: 4px !important;
+        gap: 5px !important;
         overflow-x: auto !important;
+        overflow-y: hidden !important;
+        -webkit-overflow-scrolling: touch !important;
         scrollbar-width: none !important;
         max-width: 100% !important;
-        padding-bottom: 2px !important;
+        padding: 2px 1px !important;
       }
       #oz-xcom-squad-bar::-webkit-scrollbar {
         display: none !important;
       }
       .oz-squad-op-btn {
-        display: flex !important;
+        flex: 0 0 auto !important;
+        display: inline-flex !important;
         align-items: center !important;
-        gap: 5px !important;
-        min-height: 38px !important;
-        padding: 4px 7px !important;
+        gap: 6px !important;
+        min-height: 40px !important;
+        padding: 4px 8px !important;
         border-radius: 6px !important;
-        background: rgba(9, 16, 25, 0.82) !important;
+        background: rgba(8, 15, 24, 0.78) !important;
+        backdrop-filter: blur(8px) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
         border: 1px solid rgba(148, 163, 184, 0.24) !important;
         color: #cbd5e1 !important;
         cursor: pointer !important;
-        opacity: 0.82 !important;
-        flex-shrink: 0 !important;
+        opacity: 0.86 !important;
+        white-space: nowrap !important;
       }
       .oz-squad-op-btn.has-ap {
-        border-color: rgba(78, 242, 161, 0.35) !important;
+        border-color: rgba(78, 242, 161, 0.34) !important;
       }
       .oz-squad-op-btn.selected-op {
         opacity: 1 !important;
-        background: linear-gradient(180deg, rgba(20, 48, 38, 0.95) 0%, rgba(10, 24, 20, 0.96) 100%) !important;
+        background: linear-gradient(180deg, rgba(16, 48, 37, 0.92) 0%, rgba(8, 21, 17, 0.94) 100%) !important;
         border-color: #4ef2a1 !important;
-        box-shadow: 0 0 0 1px rgba(78, 242, 161, 0.45), 0 6px 14px rgba(0, 0, 0, 0.55) !important;
+        box-shadow: 0 0 0 1px rgba(78, 242, 161, 0.45), 0 6px 14px rgba(0, 0, 0, 0.52) !important;
         color: #ecfdf5 !important;
+      }
+      .oz-squad-op-sel-tag {
+        width: 6px !important;
+        height: 18px !important;
+        border-radius: 3px !important;
+        background: rgba(148, 163, 184, 0.18) !important;
+        flex-shrink: 0 !important;
+      }
+      .oz-squad-op-btn.selected-op .oz-squad-op-sel-tag {
+        background: #4ef2a1 !important;
+        box-shadow: 0 0 6px rgba(78, 242, 161, 0.75) !important;
       }
       .oz-squad-op-meta {
         display: flex !important;
@@ -765,10 +782,12 @@ function setTacticalViewportLock(active) {
         line-height: 1.08 !important;
       }
       .oz-squad-op-name {
-        font-size: clamp(0.62rem, 1.9vw, 0.72rem) !important;
+        font-size: clamp(0.64rem, 1.9vw, 0.74rem) !important;
         font-weight: 800 !important;
-        letter-spacing: 0.04em !important;
+        letter-spacing: 0.03em !important;
         white-space: nowrap !important;
+        overflow: visible !important;
+        text-overflow: unset !important;
       }
       .oz-squad-op-stats {
         display: flex !important;
@@ -776,19 +795,20 @@ function setTacticalViewportLock(active) {
         gap: 4px !important;
         margin-top: 2px !important;
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
-        font-size: 0.56rem !important;
+        font-size: 0.58rem !important;
+        white-space: nowrap !important;
       }
       .oz-mini-hp-track {
-        width: 28px !important;
+        width: 26px !important;
         height: 4px !important;
-        background: rgba(15, 23, 42, 0.95) !important;
+        background: rgba(15, 23, 42, 0.92) !important;
         border-radius: 2px !important;
         overflow: hidden !important;
         border: 1px solid rgba(255, 255, 255, 0.14) !important;
       }
       .oz-mini-hp-fill {
         height: 100% !important;
-        transition: width 180ms ease !important;
+        transition: width 160ms ease !important;
       }
       .oz-ap-pips {
         display: inline-flex !important;
@@ -805,20 +825,21 @@ function setTacticalViewportLock(active) {
         box-shadow: 0 0 5px rgba(78, 242, 161, 0.65) !important;
       }
 
-      /* Painel de Combate Contextual (Inimigo Selecionado / Apontado) */
+      /* Cartão Contextual de Alvo Inimigo (Sem Sobreposição com Barra Superior ou Dock) */
       #oz-xcom-combat-card {
         position: absolute !important;
-        top: 86px !important;
+        top: max(92px, calc(env(safe-area-inset-top) + 86px)) !important;
         right: max(8px, env(safe-area-inset-right)) !important;
         z-index: 23 !important;
-        width: min(215px, 56vw) !important;
-        background: rgba(18, 9, 12, 0.90) !important;
-        border: 1px solid rgba(248, 113, 113, 0.55) !important;
+        width: min(210px, 52vw) !important;
+        background: rgba(18, 9, 12, 0.84) !important;
+        border: 1px solid rgba(248, 113, 113, 0.52) !important;
         border-left: 3px solid #f87171 !important;
         border-radius: 7px !important;
-        padding: 7px 9px !important;
-        backdrop-filter: blur(6px) !important;
-        box-shadow: 0 8px 22px rgba(0, 0, 0, 0.62) !important;
+        padding: 6px 8px !important;
+        backdrop-filter: blur(8px) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55) !important;
         color: #f8fafc !important;
         pointer-events: auto !important;
       }
@@ -828,8 +849,8 @@ function setTacticalViewportLock(active) {
         align-items: center !important;
         gap: 6px !important;
         border-bottom: 1px solid rgba(248, 113, 113, 0.24) !important;
-        padding-bottom: 4px !important;
-        margin-bottom: 5px !important;
+        padding-bottom: 3px !important;
+        margin-bottom: 4px !important;
       }
       .oz-combat-name {
         font-size: 0.72rem !important;
@@ -843,10 +864,10 @@ function setTacticalViewportLock(active) {
       .oz-combat-hp-bar {
         width: 100% !important;
         height: 5px !important;
-        background: rgba(15, 23, 42, 0.92) !important;
+        background: rgba(15, 23, 42, 0.9) !important;
         border-radius: 2px !important;
         overflow: hidden !important;
-        margin: 3px 0 5px 0 !important;
+        margin: 2px 0 4px 0 !important;
       }
       .oz-combat-hp-fill {
         height: 100% !important;
@@ -855,109 +876,140 @@ function setTacticalViewportLock(active) {
       .oz-combat-metrics {
         display: grid !important;
         grid-template-columns: 1fr 1fr !important;
-        gap: 4px 6px !important;
+        gap: 3px 6px !important;
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
-        font-size: 0.62rem !important;
+        font-size: 0.6rem !important;
       }
       .oz-combat-metric-lbl {
         color: #94a3b8 !important;
-        font-size: 0.55rem !important;
+        font-size: 0.54rem !important;
         display: block !important;
       }
       .oz-combat-metric-val {
         color: #f8fafc !important;
         font-weight: 700 !important;
       }
-      .oz-combat-metric-val.hit-high {
-        color: #4ef2a1 !important;
-      }
-      .oz-combat-metric-val.hit-mid {
-        color: #fbbf24 !important;
-      }
-      .oz-combat-metric-val.hit-low {
-        color: #f87171 !important;
-      }
+      .oz-combat-metric-val.hit-high { color: #4ef2a1 !important; }
+      .oz-combat-metric-val.hit-mid { color: #fbbf24 !important; }
+      .oz-combat-metric-val.hit-low { color: #f87171 !important; }
 
-      /* Painel Inferior Compacto do Soldado Selecionado + Ações Táteis */
+      /* Dock Inferior Contextual Compacto + 8 Ações em 2 Linhas (4x2) */
       #oz-xcom-selected-dock {
-        grid-column: 1 / -1 !important;
+        pointer-events: auto !important;
         display: flex !important;
         flex-direction: column !important;
-        gap: 6px !important;
-        background: rgba(10, 18, 29, 0.94) !important;
-        border: 1px solid rgba(78, 242, 161, 0.36) !important;
+        gap: 4px !important;
+        background: rgba(7, 13, 21, 0.84) !important;
+        backdrop-filter: blur(10px) !important;
+        -webkit-backdrop-filter: blur(10px) !important;
+        border: 1px solid rgba(78, 242, 161, 0.32) !important;
         border-left: 3px solid #4ef2a1 !important;
         border-radius: 8px !important;
-        padding: 7px 9px !important;
+        padding: 5px 7px !important;
+      }
+      .oz-xcom-selected-dock.enemy-context {
+        border-color: rgba(248, 113, 113, 0.45) !important;
+        border-left-color: #f87171 !important;
+      }
+      .oz-xcom-selected-dock.general-context {
+        border-color: rgba(148, 163, 184, 0.28) !important;
+        border-left-color: #38bdf8 !important;
       }
       .oz-sel-top-row {
         display: flex !important;
         align-items: center !important;
         justify-content: space-between !important;
-        gap: 8px !important;
-        flex-wrap: wrap !important;
+        gap: 6px !important;
+        flex-wrap: nowrap !important;
       }
       .oz-sel-identity {
         display: flex !important;
         align-items: center !important;
-        gap: 7px !important;
+        gap: 6px !important;
         min-width: 0 !important;
+        flex: 1 1 auto !important;
       }
       .oz-sel-name {
-        font-size: clamp(0.76rem, 2.4vw, 0.9rem) !important;
+        font-size: clamp(0.72rem, 2.2vw, 0.86rem) !important;
         font-weight: 800 !important;
         color: #ecfdf5 !important;
-        letter-spacing: 0.04em !important;
+        letter-spacing: 0.03em !important;
         white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
       }
       .oz-sel-role {
-        font-size: 0.64rem !important;
-        color: #4ef2a1 !important;
+        font-size: 0.6rem !important;
+        color: #94a3b8 !important;
         font-weight: 700 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
       }
       .oz-sel-vitals {
         display: flex !important;
         align-items: center !important;
-        gap: 10px !important;
+        gap: 7px !important;
+        flex-shrink: 0 !important;
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
-        font-size: clamp(0.66rem, 2vw, 0.76rem) !important;
+        font-size: clamp(0.62rem, 1.85vw, 0.72rem) !important;
         color: #e2e8f0 !important;
+        white-space: nowrap !important;
       }
       .oz-sel-actions-grid {
         display: grid !important;
-        grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)) !important;
-        gap: 5px !important;
+        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+        gap: 4px !important;
         width: 100% !important;
       }
       .oz-tactical-act-btn {
-        min-height: 40px !important;
-        padding: 5px 6px !important;
+        min-height: 42px !important;
+        padding: 3px 4px !important;
         border-radius: 6px !important;
-        border: 1px solid rgba(148, 163, 184, 0.32) !important;
-        background: rgba(17, 27, 40, 0.94) !important;
+        border: 1px solid rgba(148, 163, 184, 0.28) !important;
+        background: rgba(14, 24, 36, 0.88) !important;
         color: #f1f5f9 !important;
-        font-size: clamp(0.62rem, 1.9vw, 0.72rem) !important;
-        font-weight: 700 !important;
-        letter-spacing: 0.03em !important;
-        display: inline-flex !important;
+        font-size: clamp(0.58rem, 1.75vw, 0.68rem) !important;
+        font-weight: 800 !important;
+        letter-spacing: 0.02em !important;
+        display: flex !important;
+        flex-direction: column !important;
         align-items: center !important;
         justify-content: center !important;
-        gap: 4px !important;
+        gap: 2px !important;
         cursor: pointer !important;
         white-space: nowrap !important;
+        position: relative !important;
+      }
+      .oz-tactical-act-btn .oz-act-ico {
+        font-size: 1rem !important;
+        line-height: 1 !important;
+      }
+      .oz-tactical-act-btn .oz-act-qty {
+        position: absolute !important;
+        top: 2px !important;
+        right: 4px !important;
+        font-size: 0.54rem !important;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+        color: #4ef2a1 !important;
       }
       .oz-tactical-act-btn.primary-fire {
         background: rgba(220, 38, 38, 0.24) !important;
-        border-color: rgba(248, 113, 113, 0.65) !important;
+        border-color: rgba(248, 113, 113, 0.62) !important;
         color: #fecaca !important;
       }
       .oz-tactical-act-btn.primary-move {
         background: rgba(16, 185, 129, 0.22) !important;
-        border-color: rgba(78, 242, 161, 0.65) !important;
+        border-color: rgba(78, 242, 161, 0.62) !important;
         color: #d1fae5 !important;
       }
+      .oz-tactical-act-btn.is-active {
+        border-color: #4ef2a1 !important;
+        background: rgba(78, 242, 161, 0.26) !important;
+        box-shadow: 0 0 8px rgba(78, 242, 161, 0.35) !important;
+      }
       .oz-tactical-act-btn:disabled {
-        opacity: 0.38 !important;
+        opacity: 0.36 !important;
         cursor: not-allowed !important;
       }
 
@@ -982,7 +1034,7 @@ function setTacticalViewportLock(active) {
       body.tactical-locked #tactical,
       body.tactical-locked #tactical.active,
       #tactical.active {
-        position: relative !important;
+        position: fixed !important;
         inset: 0 !important;
         width: 100vw !important;
         height: 100vh !important;
@@ -991,9 +1043,7 @@ function setTacticalViewportLock(active) {
         max-height: 100dvh !important;
         overflow: hidden !important;
         overscroll-behavior: none !important;
-        display: flex !important;
-        flex-direction: column !important;
-        justify-content: stretch !important;
+        display: block !important;
         padding: 0 !important;
         margin: 0 !important;
         background: #060b11 !important;
@@ -1027,111 +1077,73 @@ function setTacticalViewportLock(active) {
         display: none !important;
       }
       #tactical.active .battle-main {
-        flex: 1 1 auto !important;
+        position: absolute !important;
+        inset: 0 !important;
         width: 100% !important;
         height: 100% !important;
-        min-height: 0 !important;
         margin: 0 !important;
         padding: 0 !important;
-        display: flex !important;
-        flex-direction: column !important;
         overflow: hidden !important;
-        position: relative !important;
       }
       #tactical.active #oz-iso-stage {
-        flex: 1 1 100% !important;
+        position: absolute !important;
+        inset: 0 !important;
         width: 100% !important;
         height: 100% !important;
-        min-height: 0 !important;
         margin: 0 !important;
         padding: 0 !important;
         border: none !important;
         border-radius: 0 !important;
       }
       #tactical.active #iso-battle-canvas {
+        position: absolute !important;
+        inset: 0 !important;
         width: 100% !important;
         height: 100% !important;
         display: block !important;
       }
       #tactical.active .battle-side {
-        display: grid !important;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+        position: absolute !important;
+        left: max(6px, env(safe-area-inset-left)) !important;
+        right: max(6px, env(safe-area-inset-right)) !important;
+        bottom: max(6px, env(safe-area-inset-bottom)) !important;
+        z-index: 25 !important;
+        display: flex !important;
+        flex-direction: column !important;
         gap: 4px !important;
-        padding: 4px max(6px, env(safe-area-inset-right)) max(5px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left)) !important;
-        background: linear-gradient(180deg, rgba(11, 20, 30, 0.94) 0%, rgba(7, 13, 21, 0.98) 100%) !important;
-        border-top: 1px solid rgba(78, 242, 161, 0.34) !important;
-        flex: 0 0 auto !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        overflow: hidden !important;
-        z-index: 20 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        background: transparent !important;
+        border: none !important;
+        pointer-events: none !important;
       }
       #tactical.active #battle-log {
+        pointer-events: auto !important;
         display: block !important;
-        grid-column: 1 / -1 !important;
-        background: rgba(10, 18, 27, 0.88) !important;
+        background: rgba(7, 13, 21, 0.80) !important;
+        backdrop-filter: blur(8px) !important;
         border: 1px solid rgba(148, 163, 184, 0.2) !important;
         border-left: 3px solid #4ef2a1 !important;
         border-radius: 6px !important;
-        padding: 4px 8px !important;
+        padding: 3px 8px !important;
         margin: 0 !important;
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
-        font-size: clamp(0.7rem, 2.2vw, 0.82rem) !important;
+        font-size: clamp(0.64rem, 1.9vw, 0.76rem) !important;
         line-height: 1.2 !important;
         color: #e2e8f0 !important;
-        min-height: 1.5em !important;
-        max-height: 2.5em !important;
+        max-height: 2.3em !important;
         overflow-y: auto !important;
         word-break: break-word !important;
       }
       #tactical.active .battle-side .side-panel {
-        background: rgba(11, 18, 27, 0.97) !important;
-        border: 1px solid rgba(148, 163, 184, 0.26) !important;
-        border-radius: 7px !important;
-        padding: 6px 9px !important;
-        margin: 0 !important;
-        min-width: 0 !important;
-        max-width: 100% !important;
-        overflow: hidden !important;
-        font-size: 0 !important;
-        line-height: 1.22 !important;
-      }
-      #tactical.active .battle-side .side-panel:nth-of-type(3) {
         display: none !important;
       }
-      #tactical.active #selected-unit,
-      #tactical.active #target-info {
-        font-size: clamp(0.75rem, 2.5vw, 0.9rem) !important;
-        font-weight: 800 !important;
-        line-height: 1.2 !important;
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        display: block !important;
-        margin-bottom: 3px !important;
-      }
-      #tactical.active #unit-hp,
-      #tactical.active #unit-ap,
-      #tactical.active #unit-ammo,
-      #tactical.active #hit-chance {
-        font-size: clamp(0.68rem, 2.2vw, 0.8rem) !important;
-        line-height: 1.22 !important;
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        display: inline !important;
-      }
-      #tactical.active #unit-ap::before,
-      #tactical.active #unit-ammo::before {
-        content: " · " !important;
-        color: rgba(148, 163, 184, 0.65) !important;
-      }
       #tactical.active #oz-bottom-actions {
-        grid-column: 1 / -1 !important;
+        pointer-events: auto !important;
         display: grid !important;
         grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr) !important;
-        gap: 8px !important;
-        margin-top: 2px !important;
+        gap: 6px !important;
+        margin: 0 !important;
         min-width: 0 !important;
       }
       #tactical.active #end-turn {
@@ -1139,25 +1151,26 @@ function setTacticalViewportLock(active) {
         color: #071108 !important;
         border: none !important;
         border-radius: 7px !important;
-        padding: clamp(9px, 2.2vh, 12px) 12px !important;
-        font-size: clamp(0.8rem, 2.6vw, 0.95rem) !important;
+        min-height: 40px !important;
+        padding: 7px 10px !important;
+        font-size: clamp(0.74rem, 2.2vw, 0.88rem) !important;
         font-weight: 800 !important;
-        letter-spacing: 0.5px !important;
+        letter-spacing: 0.4px !important;
         white-space: nowrap !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
         cursor: pointer !important;
       }
       #tactical.active #retreat {
-        background: #17202a !important;
+        background: rgba(16, 24, 36, 0.88) !important;
         color: #e2e8f0 !important;
         border: 1px solid rgba(148, 163, 184, 0.32) !important;
         border-radius: 7px !important;
-        padding: clamp(9px, 2.2vh, 12px) 10px !important;
-        font-size: clamp(0.76rem, 2.4vw, 0.88rem) !important;
+        min-height: 40px !important;
+        padding: 7px 10px !important;
+        font-size: clamp(0.7rem, 2vw, 0.82rem) !important;
         font-weight: 700 !important;
-        line-height: 1.15 !important;
-        letter-spacing: 0.4px !important;
+        letter-spacing: 0.3px !important;
         cursor: pointer !important;
       }
       #tactical.active #battle-grid {
@@ -1169,17 +1182,14 @@ function setTacticalViewportLock(active) {
       /* === LAYOUT DESKTOP / ECRÃS LARGOS (>= 900px) === */
       @media (min-width: 900px) {
         #tactical.active .battle-side {
-          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(240px, 0.95fr) !important;
-          align-items: center !important;
-          padding: 8px 16px 10px 16px !important;
+          left: 16px !important;
+          right: 16px !important;
+          bottom: 12px !important;
+          max-width: 780px !important;
+          margin: 0 auto !important;
         }
-        #tactical.active #battle-log {
-          grid-column: 1 / -1 !important;
-          max-height: 2.8em !important;
-        }
-        #tactical.active #oz-bottom-actions {
-          grid-column: auto !important;
-          margin-top: 0 !important;
+        #tactical.active .oz-sel-actions-grid {
+          grid-template-columns: repeat(8, minmax(0, 1fr)) !important;
         }
       }
     `;
@@ -2103,8 +2113,9 @@ function getIsoMetrics(canvas, ignoreBattlePan = false) {
 
   const boardPixelH = span * tileH * 0.5;
   const baseOriginX = w * 0.5 + (GRID_H - GRID_W) * (tileW * 0.25);
-  const topOffset = isLandscape ? 24 : 30;
-  const baseOriginY = Math.max(topOffset, Math.round((h - boardPixelH) * 0.5));
+  const topOffset = isLandscape ? 26 : 56;
+  const availH = Math.max(140, h - (isLandscape ? 110 : 195));
+  const baseOriginY = Math.max(topOffset, Math.round(topOffset + Math.max(0, (availH - boardPixelH) * 0.32)));
 
   const panX = (!ignoreBattlePan && b && typeof b.panX === "number") ? b.panX : 0;
   const panY = (!ignoreBattlePan && b && typeof b.panY === "number") ? b.panY : 0;
@@ -2397,48 +2408,55 @@ function drawIsoTerrainColumn(ctx, sx, sy, w, h, elev, surfaceType, gx, gy, canM
 
   drawIsoDiamond(ctx, sx, sy, w + 2.2, h + 1.4, baseFill, null, 0);
 
-  // Texturas e detalhes de terreno integrados ao solo
+  // Texturas e detalhes realistas de terreno, estradas e vegetação
   if (surfaceType === "asphalt_road") {
-    // Grão e fissuras discretas de asfalto
-    if (hash % 4 === 0) {
-      ctx.strokeStyle = "rgba(15, 23, 42, 0.45)";
-      ctx.lineWidth = 1.1;
-      ctx.beginPath();
-      ctx.moveTo(sx - hw * 0.4, sy);
-      ctx.lineTo(sx + hw * 0.2, sy + hh * 0.35);
-      ctx.stroke();
-    }
+    ctx.strokeStyle = "rgba(15, 23, 42, 0.5)";
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    ctx.moveTo(sx - hw * 0.45, sy - hh * 0.1);
+    ctx.lineTo(sx + hw * 0.25, sy + hh * 0.35);
+    ctx.stroke();
     if ((gy === 5 || gy === 6) && gx % 2 === 0) {
-      ctx.strokeStyle = "rgba(226, 232, 240, 0.36)";
+      ctx.strokeStyle = "rgba(250, 204, 21, 0.45)";
       ctx.lineWidth = 1.6;
       ctx.beginPath();
-      ctx.moveTo(sx - hw * 0.32, sy - hh * 0.25);
-      ctx.lineTo(sx + hw * 0.32, sy + hh * 0.25);
+      ctx.moveTo(sx - hw * 0.34, sy - hh * 0.24);
+      ctx.lineTo(sx + hw * 0.34, sy + hh * 0.24);
       ctx.stroke();
     }
+  } else if (surfaceType === "dirt_road" || surfaceType === "dirt_path") {
+    ctx.strokeStyle = "rgba(38, 26, 15, 0.38)";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(sx - hw * 0.5, sy - hh * 0.18);
+    ctx.lineTo(sx + hw * 0.45, sy + hh * 0.28);
+    ctx.moveTo(sx - hw * 0.35, sy + hh * 0.12);
+    ctx.lineTo(sx + hw * 0.5, sy - hh * 0.12);
+    ctx.stroke();
   } else if (surfaceType === "concrete_sidewalk") {
-    // Juntas de laje de passeio
-    ctx.strokeStyle = "rgba(15, 23, 42, 0.28)";
+    ctx.strokeStyle = "rgba(15, 23, 42, 0.34)";
     ctx.lineWidth = 1.0;
     ctx.beginPath();
-    ctx.moveTo(sx - hw * 0.5, sy - hh * 0.5);
-    ctx.lineTo(sx + hw * 0.5, sy + hh * 0.5);
+    ctx.moveTo(sx - hw * 0.55, sy - hh * 0.55);
+    ctx.lineTo(sx + hw * 0.55, sy + hh * 0.55);
     ctx.stroke();
   } else if (surfaceType === "forest_ground" || surfaceType === "tactical_earth") {
-    if (hash < 7) {
-      ctx.strokeStyle = surfaceType === "forest_ground" ? "rgba(116, 178, 86, 0.42)" : "rgba(148, 163, 132, 0.3)";
+    if (hash < 10) {
+      ctx.strokeStyle = surfaceType === "forest_ground" ? "rgba(122, 188, 92, 0.48)" : "rgba(156, 172, 138, 0.34)";
       ctx.lineWidth = 1.25;
       ctx.beginPath();
-      ctx.moveTo(sx - 4, sy + 1);
-      ctx.lineTo(sx - 6, sy - 3.5);
-      ctx.moveTo(sx + 1.5, sy + 2);
-      ctx.lineTo(sx + 3, sy - 3.5);
+      ctx.moveTo(sx - 4.5, sy + 1.5);
+      ctx.lineTo(sx - 6.5, sy - 4.2);
+      ctx.moveTo(sx - 1.5, sy + 2);
+      ctx.lineTo(sx - 1.0, sy - 4.8);
+      ctx.moveTo(sx + 2.0, sy + 1.8);
+      ctx.lineTo(sx + 4.2, sy - 3.8);
       ctx.stroke();
     }
   } else if (hash % 5 === 0) {
-    ctx.fillStyle = "rgba(168, 162, 158, 0.24)";
+    ctx.fillStyle = "rgba(168, 162, 158, 0.28)";
     ctx.beginPath();
-    ctx.arc(sx + 3, sy + 1, 1.6, 0, Math.PI * 2);
+    ctx.arc(sx + 3, sy + 1, 1.8, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -2497,25 +2515,39 @@ function drawIsoCoverBlock(ctx, sx, sy, w, h, wallH, tileType, isForestMission =
   ctx.fill();
   ctx.restore();
 
-  // Árvores com folhagem detalhada em floresta ou vegetação militar
+  // Árvores naturais com raízes, tronco sombreado e copa assimétrica em camadas
   if (isBuilding && isForestMission) {
-    ctx.fillStyle = "#4b3828";
-    ctx.fillRect(sx - chw * 0.18, sy - effWallH * 0.65, chw * 0.36, effWallH * 0.65);
-
-    ctx.fillStyle = "#183322";
+    ctx.save();
+    ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
     ctx.beginPath();
-    ctx.arc(sx + 2, topY + 3, cw * 0.42, 0, Math.PI * 2);
+    ctx.ellipse(sx, sy + ch * 0.08, cw * 0.48, ch * 0.38, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = "#244c32";
+    ctx.fillStyle = "#3e2d1f";
     ctx.beginPath();
-    ctx.arc(sx - 3, topY - 2, cw * 0.35, 0, Math.PI * 2);
+    ctx.moveTo(sx - chw * 0.26, sy + chh * 0.12);
+    ctx.lineTo(sx - chw * 0.14, topY + effWallH * 0.28);
+    ctx.lineTo(sx + chw * 0.14, topY + effWallH * 0.28);
+    ctx.lineTo(sx + chw * 0.26, sy + chh * 0.12);
+    ctx.closePath();
     ctx.fill();
 
-    ctx.fillStyle = "#366b47";
-    ctx.beginPath();
-    ctx.arc(sx - 5, topY - 6, cw * 0.22, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillStyle = "#281c13";
+    ctx.fillRect(sx, topY + effWallH * 0.28, chw * 0.14, sy - (topY + effWallH * 0.28));
+
+    const clusters = [
+      { dx: cw * 0.12, dy: topY + 4, r: cw * 0.38, col: "#142c1d" },
+      { dx: -cw * 0.12, dy: topY + 2, r: cw * 0.36, col: "#1d3f29" },
+      { dx: cw * 0.06, dy: topY - 5, r: cw * 0.30, col: "#295738" },
+      { dx: -cw * 0.10, dy: topY - 8, r: cw * 0.22, col: "#3c754d" }
+    ];
+    clusters.forEach((c) => {
+      ctx.fillStyle = c.col;
+      ctx.beginPath();
+      ctx.arc(sx + c.dx, c.dy, c.r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.restore();
     return;
   }
 
@@ -3564,6 +3596,10 @@ function renderFloatingUnitOrders(battle, selUnit, canvas, m) {
     }
   }
 
+  if (pop) {
+    pop.style.setProperty("display", "none", "important");
+  }
+  return;
   const targetingModes = ["move", "fire", "frag", "smoke"];
   if (!battle || battle.phase !== "player" || targetingModes.includes(battle.mode) || battle.ordersMinimized || !selUnit || !canvas || !m) {
     pop.style.setProperty("display", "none", "important");
@@ -3976,11 +4012,19 @@ function _renderBattleInner(b) {
       collapseBtnEl.textContent = isCollapsed ? "▸" : "▾";
     }
 
+    // Sanitizar seleções mortas ou inválidas antes de renderizar
+    if (b.selectedUnitId && !b.units.some((u) => u.id === b.selectedUnitId && u.hp > 0)) {
+      b.selectedUnitId = null;
+    }
+    if (b.selectedTargetId && !b.enemies.some((e) => e.id === b.selectedTargetId && e.hp > 0)) {
+      b.selectedTargetId = null;
+    }
+
     const squadBar = document.getElementById("oz-xcom-squad-bar");
     if (squadBar) {
       const aliveUnits = b.units.filter((u) => u.hp > 0);
       const squadSig = aliveUnits
-        .map((u) => `${u.id}:${u.hp}:${u.ap}:${b.selectedUnitId === u.id ? 1 : 0}`)
+        .map((u) => `${u.id}:${u.hp}:${u.maxHp}:${u.ap}:${u.maxAp}:${u.ammo}:${b.selectedUnitId === u.id ? 1 : 0}`)
         .join("|") + `|${b.phase}`;
       if (squadBar.dataset.ozSig !== squadSig) {
         squadBar.dataset.ozSig = squadSig;
@@ -3997,12 +4041,14 @@ function _renderBattleInner(b) {
             pipsHtml += `<span class="oz-ap-pip ${p < u.ap ? "active" : ""}"></span>`;
           }
           chip.innerHTML = `
+            <span class="oz-squad-op-sel-tag" aria-hidden="true"></span>
             ${getUnitVisualBadge(u, false)}
             <span class="oz-squad-op-meta">
-              <span class="oz-squad-op-name">${u.name.split(" ")[0]}</span>
+              <span class="oz-squad-op-name">${u.name}</span>
               <span class="oz-squad-op-stats">
                 <span class="oz-mini-hp-track"><span class="oz-mini-hp-fill" style="width:${hpPct}%;background:${hpCol};"></span></span>
-                <span>${u.hp}</span>
+                <span>HP ${u.hp}/${u.maxHp}</span>
+                <span>PA ${u.ap}/${u.maxAp}</span>
                 <span class="oz-ap-pips">${pipsHtml}</span>
               </span>
             </span>
@@ -4014,7 +4060,7 @@ function _renderBattleInner(b) {
             b.mode = "normal";
             b.ordersMinimized = false;
             if (!isAct) centerCameraOnUnit(u);
-            addBattleLog(isAct ? `Ordens de ${u.name} recolhidas.` : `Operacional selecionado: ${u.name} (${u.ap} PA).`);
+            addBattleLog(isAct ? `Ordens de ${u.name} recolhidas.` : `Operacional selecionado: ${u.name} (${u.hp}/${u.maxHp} HP · ${u.ap}/${u.maxAp} PA).`);
             renderBattle();
           });
           squadBar.appendChild(chip);
@@ -4022,31 +4068,33 @@ function _renderBattleInner(b) {
       }
     }
 
-    // Painel de Combate Contextual quando existe inimigo selecionado / apontado
+    // Cartão de Alvo Inimigo: apenas quando existe alvo vivo selecionado
     let combatCard = document.getElementById("oz-xcom-combat-card");
     if (!combatCard) {
       combatCard = document.createElement("div");
       combatCard.id = "oz-xcom-combat-card";
       stageParent.appendChild(combatCard);
     }
-    if (selEForHud && (b.mode === "fire" || selUForHud)) {
+    const activeTargetEnemy = getSelectedEnemy();
+    const activeShooterUnit = getSelectedUnit();
+    if (activeTargetEnemy) {
       combatCard.style.display = "block";
-      const eHpPct = Math.max(0, Math.min(100, Math.round((selEForHud.hp / Math.max(1, selEForHud.maxHp)) * 100)));
-      const cov = getTileCoverAt(b, selEForHud.x, selEForHud.y);
-      const covLabel = cov === 2 ? "ALTA (FULL)" : cov === 1 ? "BAIXA (HALF)" : "EXPOSTO";
-      const losLabel = selUForHud ? "LIVRE / VISÍVEL" : "SEM ATIRADOR";
-      const chance = selUForHud ? calculateHitChance(selUForHud, selEForHud, b) : null;
-      const estDmg = selUForHud ? estimateUnitDamage(selUForHud, selEForHud) : null;
+      const eHpPct = Math.max(0, Math.min(100, Math.round((activeTargetEnemy.hp / Math.max(1, activeTargetEnemy.maxHp)) * 100)));
+      const cov = getTileCoverAt(b, activeTargetEnemy.x, activeTargetEnemy.y);
+      const covLabel = cov === 2 ? "ALTA" : cov === 1 ? "BAIXA" : "EXPOSTO";
+      const canFireNow = Boolean(activeShooterUnit && activeShooterUnit.hp > 0 && activeShooterUnit.ap >= 1 && activeShooterUnit.ammo > 0);
+      const chance = canFireNow ? calculateHitChance(activeShooterUnit, activeTargetEnemy, b) : null;
+      const estDmg = canFireNow ? estimateUnitDamage(activeShooterUnit, activeTargetEnemy) : null;
       const hitClass = chance === null ? "" : chance >= 70 ? "hit-high" : chance >= 45 ? "hit-mid" : "hit-low";
 
       combatCard.innerHTML = `
         <div class="oz-combat-header">
-          <span class="oz-combat-name">${selEForHud.name}</span>
-          <span style="font-size:0.56rem;color:#fca5a5;font-family:monospace;">${selEForHud.archetypeId.toUpperCase()}</span>
+          <span class="oz-combat-name">${activeTargetEnemy.name}</span>
+          <span style="font-size:0.54rem;color:#fca5a5;font-family:monospace;">${activeTargetEnemy.archetypeId.toUpperCase()}</span>
         </div>
-        <div style="display:flex;justify-content:space-between;font-size:0.62rem;font-family:monospace;">
+        <div style="display:flex;justify-content:space-between;font-size:0.6rem;font-family:monospace;">
           <span>HP</span>
-          <span>${selEForHud.hp}/${selEForHud.maxHp}</span>
+          <span>${activeTargetEnemy.hp}/${activeTargetEnemy.maxHp}</span>
         </div>
         <div class="oz-combat-hp-bar"><div class="oz-combat-hp-fill" style="width:${eHpPct}%;"></div></div>
         <div class="oz-combat-metrics">
@@ -4063,8 +4111,8 @@ function _renderBattleInner(b) {
             <span class="oz-combat-metric-val">${covLabel}</span>
           </div>
           <div>
-            <span class="oz-combat-metric-lbl">LINHA VISÃO</span>
-            <span class="oz-combat-metric-val">${losLabel}</span>
+            <span class="oz-combat-metric-lbl">ATIRADOR</span>
+            <span class="oz-combat-metric-val">${activeShooterUnit ? activeShooterUnit.name.split(" ")[0] : "NENHUM"}</span>
           </div>
         </div>
       `;
@@ -4387,43 +4435,79 @@ function _renderBattleInner(b) {
   if (selUnit) {
     const maxMove = getUnitMoveRange(selUnit);
     const postureName = selUnit.crouched ? "AGACHADO" : "DE PÉ";
-    const equipSummary = `FRAG:${selUnit.frags ?? 0} · FUMO:${selUnit.smokes ?? 0} · KIT:${selUnit.medkits ?? 0}`;
-    setText("selected-unit", `${selUnit.name} (${selUnit.role}) · ${postureName}`);
+    const fragsQty = selUnit.frags ?? 0;
+    const smokesQty = selUnit.smokes ?? 0;
+    const medkitsQty = selUnit.medkits ?? 0;
+    setText("selected-unit", `${selUnit.name} · ${selUnit.role}`);
     if (unitHpEl && unitApEl && unitAmmoEl) {
       unitHpEl.textContent = `${selUnit.hp}/${selUnit.maxHp} HP`;
-      unitApEl.textContent = `${selUnit.ap}/${selUnit.maxAp} PA · MOV ${maxMove}`;
+      unitApEl.textContent = `${selUnit.ap}/${selUnit.maxAp} PA`;
       unitAmmoEl.textContent = `${selUnit.ammo}/${selUnit.maxAmmo} MUN`;
-    } else {
-      setText("unit-hp", `${selUnit.hp}/${selUnit.maxHp} HP · ${selUnit.ap}/${selUnit.maxAp} PA · ${selUnit.ammo}/${selUnit.maxAmmo} MUN`);
     }
 
     if (selDock) {
       selDock.style.display = "flex";
+      selDock.className = "unit-context";
       const canAct = b.phase === "player" && selUnit.ap >= 1;
+      const canFire = canAct && selUnit.ammo > 0 && Boolean(selEnemy);
+      const canReload = canAct && selUnit.ammo < selUnit.maxAmmo;
+      const canOverwatch = canAct && selUnit.ammo > 0;
+      const canFrag = canAct && fragsQty > 0;
+      const canSmoke = canAct && smokesQty > 0;
+      const canMedkit = canAct && medkitsQty > 0 && selUnit.hp < selUnit.maxHp;
+
       selDock.innerHTML = `
         <div class="oz-sel-top-row">
           <div class="oz-sel-identity">
             ${getUnitVisualBadge(selUnit, false)}
-            <div>
+            <div style="min-width:0;">
               <div class="oz-sel-name">${selUnit.name}</div>
-              <div class="oz-sel-role">${selUnit.role.toUpperCase()} · ${postureName} · ${equipSummary}</div>
+              <div class="oz-sel-role">${selUnit.role.toUpperCase()} · ${postureName} · ALC ${maxMove}</div>
             </div>
           </div>
           <div class="oz-sel-vitals">
-            <span><b>${selUnit.hp}</b>/${selUnit.maxHp} HP</span>
-            <span><b>${selUnit.ap}</b>/${selUnit.maxAp} PA</span>
-            <span><b>${selUnit.ammo}</b>/${selUnit.maxAmmo} MUN</span>
+            <span>HP <b>${selUnit.hp}</b>/${selUnit.maxHp}</span>
+            <span>PA <b>${selUnit.ap}</b>/${selUnit.maxAp}</span>
+            <span>MUN <b>${selUnit.ammo}</b>/${selUnit.maxAmmo}</span>
           </div>
         </div>
         <div class="oz-sel-actions-grid">
-          <button type="button" id="oz-dock-move" class="oz-tactical-act-btn primary-move" ${!canAct ? "disabled" : ""}>➤ MOVER (${maxMove})</button>
-          <button type="button" id="oz-dock-fire" class="oz-tactical-act-btn primary-fire" ${(!canAct || selUnit.ammo <= 0 || !selEnemy) ? "disabled" : ""}>⌖ DISPARAR</button>
-          <button type="button" id="oz-dock-reload" class="oz-tactical-act-btn" ${(!canAct || selUnit.ammo >= selUnit.maxAmmo) ? "disabled" : ""}>↻ RECARREGAR</button>
-          <button type="button" id="oz-dock-cover" class="oz-tactical-act-btn" ${!canAct ? "disabled" : ""}>🛡 ${selUnit.crouched ? "LEVANTAR" : "COBERTURA"}</button>
-          <button type="button" id="oz-dock-overwatch" class="oz-tactical-act-btn" ${(!canAct || selUnit.ammo <= 0) ? "disabled" : ""}>👁 VIGILÂNCIA</button>
-          <button type="button" id="oz-dock-frag" class="oz-tactical-act-btn" ${(!canAct || (selUnit.frags ?? 0) <= 0) ? "disabled" : ""}>💣 FRAG (${selUnit.frags ?? 0})</button>
-          <button type="button" id="oz-dock-smoke" class="oz-tactical-act-btn" ${(!canAct || (selUnit.smokes ?? 0) <= 0) ? "disabled" : ""}>☁ FUMO (${selUnit.smokes ?? 0})</button>
-          <button type="button" id="oz-dock-medkit" class="oz-tactical-act-btn" ${(!canAct || (selUnit.medkits ?? 0) <= 0 || selUnit.hp >= selUnit.maxHp) ? "disabled" : ""}>✚ KIT (${selUnit.medkits ?? 0})</button>
+          <button type="button" id="oz-dock-move" class="oz-tactical-act-btn primary-move ${b.mode === "move" ? "is-active" : ""}" ${!canAct ? "disabled" : ""}>
+            <span class="oz-act-ico">➤</span>
+            <span>MOVER</span>
+          </button>
+          <button type="button" id="oz-dock-fire" class="oz-tactical-act-btn primary-fire ${b.mode === "fire" ? "is-active" : ""}" ${!canFire ? "disabled" : ""}>
+            <span class="oz-act-ico">⌖</span>
+            <span>DISPARAR</span>
+          </button>
+          <button type="button" id="oz-dock-reload" class="oz-tactical-act-btn" ${!canReload ? "disabled" : ""}>
+            <span class="oz-act-ico">↻</span>
+            <span>RECARREGAR</span>
+            <span class="oz-act-qty">${selUnit.ammo}/${selUnit.maxAmmo}</span>
+          </button>
+          <button type="button" id="oz-dock-cover" class="oz-tactical-act-btn ${selUnit.crouched ? "is-active" : ""}" ${!canAct ? "disabled" : ""}>
+            <span class="oz-act-ico">🛡</span>
+            <span>COBERTURA</span>
+          </button>
+          <button type="button" id="oz-dock-overwatch" class="oz-tactical-act-btn ${selUnit.overwatch ? "is-active" : ""}" ${!canOverwatch ? "disabled" : ""}>
+            <span class="oz-act-ico">👁</span>
+            <span>VIGILÂNCIA</span>
+          </button>
+          <button type="button" id="oz-dock-frag" class="oz-tactical-act-btn ${b.mode === "frag" ? "is-active" : ""}" ${!canFrag ? "disabled" : ""}>
+            <span class="oz-act-ico">💣</span>
+            <span>GRANADA</span>
+            <span class="oz-act-qty">×${fragsQty}</span>
+          </button>
+          <button type="button" id="oz-dock-smoke" class="oz-tactical-act-btn ${b.mode === "smoke" ? "is-active" : ""}" ${!canSmoke ? "disabled" : ""}>
+            <span class="oz-act-ico">☁</span>
+            <span>FUMO</span>
+            <span class="oz-act-qty">×${smokesQty}</span>
+          </button>
+          <button type="button" id="oz-dock-medkit" class="oz-tactical-act-btn" ${!canMedkit ? "disabled" : ""}>
+            <span class="oz-act-ico">✚</span>
+            <span>KIT MÉDICO</span>
+            <span class="oz-act-qty">×${medkitsQty}</span>
+          </button>
         </div>
       `;
 
@@ -4458,17 +4542,49 @@ function _renderBattleInner(b) {
       });
       bindDock("oz-dock-medkit", () => useMedkitSelectedUnit());
     }
-  } else {
-    setText("selected-unit", "SEM OPERACIONAL");
-    if (unitHpEl && unitApEl && unitAmmoEl) {
-      unitHpEl.textContent = "0 HP";
-      unitApEl.textContent = "0 PA";
-      unitAmmoEl.textContent = "0 MUN";
-    } else {
-      setText("unit-hp", "0 HP · 0 PA · 0 MUN");
-    }
+  } else if (selEnemy) {
+    const cover = getTileCoverAt(b, selEnemy.x, selEnemy.y);
+    const coverText = cover === 2 ? "COB. PESADA" : cover === 1 ? "MEIA COB." : "SEM COB.";
+    setText("selected-unit", "ALVO HOSTIL");
     if (selDock) {
-      selDock.style.display = "none";
+      selDock.style.display = "flex";
+      selDock.className = "enemy-context";
+      selDock.innerHTML = `
+        <div class="oz-sel-top-row">
+          <div class="oz-sel-identity">
+            ${getUnitVisualBadge(selEnemy, true)}
+            <div style="min-width:0;">
+              <div class="oz-sel-name" style="color:#fca5a5;">${selEnemy.name}</div>
+              <div class="oz-sel-role">${selEnemy.archetypeId.toUpperCase()} · ${coverText}</div>
+            </div>
+          </div>
+          <div class="oz-sel-vitals">
+            <span>HP <b>${selEnemy.hp}</b>/${selEnemy.maxHp}</span>
+          </div>
+        </div>
+      `;
+    }
+  } else {
+    const aliveAllies = b.units.filter((u) => u.hp > 0).length;
+    const aliveEnemies = b.enemies.filter((e) => e.hp > 0).length;
+    setText("selected-unit", "COMANDO TÁTICO");
+    if (selDock) {
+      selDock.style.display = "flex";
+      selDock.className = "general-context";
+      selDock.innerHTML = `
+        <div class="oz-sel-top-row">
+          <div class="oz-sel-identity">
+            <div style="min-width:0;">
+              <div class="oz-sel-name" style="color:#7dd3fc;">TURNO ${b.turn} · ${b.phase === "player" ? "FASE DA UNIDADE ZERO" : "FASE HOSTIL"}</div>
+              <div class="oz-sel-role">${b.mission.objective}</div>
+            </div>
+          </div>
+          <div class="oz-sel-vitals">
+            <span>ALIADOS <b>${aliveAllies}</b></span>
+            <span>HOSTIS <b>${aliveEnemies}</b></span>
+          </div>
+        </div>
+      `;
     }
   }
 
@@ -4477,26 +4593,16 @@ function _renderBattleInner(b) {
     const cover = getTileCoverAt(b, selEnemy.x, selEnemy.y);
     const coverText = cover === 2 ? "COB. PESADA" : cover === 1 ? "MEIA COB." : "SEM COB.";
     const estDmg = estimateUnitDamage(selUnit, selEnemy);
-    setText("target-info", `${selEnemy.name} (${selEnemy.hp} HP · ${coverText})`);
-    const chanceStr = `CHANCE: ${chance}% · DANO EST.: ~${estDmg}`;
-    if (hitChanceEl) {
-      hitChanceEl.textContent = chanceStr;
-    } else {
-      setText("target-info", `${selEnemy.name} (${selEnemy.hp} HP · ${coverText}) · ${chanceStr}`);
-    }
+    setText("target-info", `${selEnemy.name} (${selEnemy.hp}/${selEnemy.maxHp} HP · ${coverText})`);
+    if (hitChanceEl) hitChanceEl.textContent = `PRECISÃO: ${chance}% · DANO EST.: ~${estDmg}`;
   } else if (selEnemy) {
     const cover = getTileCoverAt(b, selEnemy.x, selEnemy.y);
     const coverText = cover === 2 ? "COB. PESADA" : cover === 1 ? "MEIA COB." : "SEM COB.";
-    setText("target-info", `${selEnemy.name} (${selEnemy.hp} HP · ${coverText})`);
-    const chanceStr = "CHANCE: --% · DANO EST.: --";
-    if (hitChanceEl) {
-      hitChanceEl.textContent = chanceStr;
-    } else {
-      setText("target-info", `${selEnemy.name} (${selEnemy.hp} HP · ${coverText}) · ${chanceStr}`);
-    }
+    setText("target-info", `${selEnemy.name} (${selEnemy.hp}/${selEnemy.maxHp} HP · ${coverText})`);
+    if (hitChanceEl) hitChanceEl.textContent = "PRECISÃO: --% · DANO EST.: --";
   } else {
-    setText("target-info", "NENHUM ALVO");
-    if (hitChanceEl) hitChanceEl.textContent = "CHANCE: --% · DANO EST.: --";
+    setText("target-info", "SEM ALVO SELECIONADO");
+    if (hitChanceEl) hitChanceEl.textContent = "PRECISÃO: --% · DANO EST.: --";
   }
 
   const logEl = document.getElementById("battle-log");
