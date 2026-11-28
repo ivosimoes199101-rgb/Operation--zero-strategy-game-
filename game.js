@@ -1646,8 +1646,11 @@ function createMissionElevation(missionIndex, grid) {
 
 function getTileElevation(battle, gx, gy) {
   if (!battle || !battle.elevation) return 0;
-  if (gy < 0 || gy >= GRID_H || gx < 0 || gx >= GRID_W) return 0;
-  return battle.elevation[gy][gx] || 0;
+  const ix = Math.floor(gx);
+  const iy = Math.floor(gy);
+  if (Number.isNaN(ix) || Number.isNaN(iy) || iy < 0 || iy >= GRID_H || ix < 0 || ix >= GRID_W) return 0;
+  const row = battle.elevation[iy];
+  return row ? (row[ix] || 0) : 0;
 }
 
 function getTileCoverAt(battle, x, y) {
