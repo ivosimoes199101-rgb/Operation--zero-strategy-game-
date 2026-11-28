@@ -2292,128 +2292,478 @@ function drawIsoCoverBlock(ctx, sx, sy, w, h, wallH, tileType, isForestMission =
   }
 }
 
-function drawIsoSoldierSprite(ctx, sx, sy, w, h, unit, isSelected, coverLevel = 0, animState = null) {
-  // Sombra projetada suave estilo XCOM 2
+function getSoldierVisualProfile(unit) {
+  const profiles = {
+    "op-01": {
+      uniform: "#2f3d2e",
+      vest: "#4b5563",
+      armor: "#374151",
+      helmet: "#3f4e3c",
+      visor: "#38bdf8",
+      pack: "#273026",
+      accent: "#4ef2a1",
+      weaponType: "rifle",
+      helmetType: "tactical",
+      bulk: 1.02,
+      lean: 0.04
+    },
+    "op-02": {
+      uniform: "#273544",
+      vest: "#334155",
+      armor: "#475569",
+      helmet: "#2c3e50",
+      visor: "#7dd3fc",
+      pack: "#1e293b",
+      accent: "#38bdf8",
+      weaponType: "sniper",
+      helmetType: "recon",
+      bulk: 0.96,
+      lean: 0.02
+    },
+    "op-03": {
+      uniform: "#273e3c",
+      vest: "#e2e8f0",
+      armor: "#0f766e",
+      helmet: "#f1f5f9",
+      visor: "#2dd4bf",
+      pack: "#1e3a38",
+      accent: "#2dd4bf",
+      weaponType: "rifle",
+      helmetType: "medic",
+      bulk: 1.0,
+      lean: 0.03
+    },
+    "op-04": {
+      uniform: "#3b322c",
+      vest: "#57534e",
+      armor: "#7c2d12",
+      helmet: "#44403c",
+      visor: "#fb923c",
+      pack: "#292524",
+      accent: "#fb923c",
+      weaponType: "rifle",
+      helmetType: "heavy",
+      bulk: 1.08,
+      lean: 0.06
+    },
+    "op-05": {
+      uniform: "#3a3628",
+      vest: "#52525b",
+      armor: "#713f12",
+      helmet: "#3f3f46",
+      visor: "#facc15",
+      pack: "#27272a",
+      accent: "#facc15",
+      weaponType: "heavy",
+      helmetType: "heavy",
+      bulk: 1.16,
+      lean: 0.07
+    },
+    "op-06": {
+      uniform: "#292538",
+      vest: "#3b0764",
+      armor: "#581c87",
+      helmet: "#1e1b2e",
+      visor: "#c084fc",
+      pack: "#181524",
+      accent: "#c084fc",
+      weaponType: "pistol",
+      helmetType: "recon",
+      bulk: 0.95,
+      lean: 0.05
+    },
+    "op-07": {
+      uniform: "#2d3b27",
+      vest: "#3f6212",
+      armor: "#4d7c0f",
+      helmet: "#2a3824",
+      visor: "#bef264",
+      pack: "#1e291b",
+      accent: "#a3e635",
+      weaponType: "rifle",
+      helmetType: "recon",
+      bulk: 0.97,
+      lean: 0.05
+    },
+    "op-08": {
+      uniform: "#243b3a",
+      vest: "#cbd5e1",
+      armor: "#115e59",
+      helmet: "#e2e8f0",
+      visor: "#5eead4",
+      pack: "#1a2f2e",
+      accent: "#2dd4bf",
+      weaponType: "pistol",
+      helmetType: "medic",
+      bulk: 0.98,
+      lean: 0.02
+    },
+    "op-09": {
+      uniform: "#283444",
+      vest: "#475569",
+      armor: "#1d4ed8",
+      helmet: "#334155",
+      visor: "#60a5fa",
+      pack: "#1e293b",
+      accent: "#60a5fa",
+      weaponType: "rifle",
+      helmetType: "tactical",
+      bulk: 1.03,
+      lean: 0.04
+    },
+    "op-10": {
+      uniform: "#28323e",
+      vest: "#334155",
+      armor: "#3b82f6",
+      helmet: "#1e293b",
+      visor: "#93c5fd",
+      pack: "#17202a",
+      accent: "#38bdf8",
+      weaponType: "sniper",
+      helmetType: "recon",
+      bulk: 0.95,
+      lean: 0.02
+    },
+    "op-11": {
+      uniform: "#383529",
+      vest: "#4b5563",
+      armor: "#854d0e",
+      helmet: "#374151",
+      visor: "#fde047",
+      pack: "#26251d",
+      accent: "#facc15",
+      weaponType: "heavy",
+      helmetType: "heavy",
+      bulk: 1.14,
+      lean: 0.06
+    },
+    "op-12": {
+      uniform: "#2d263d",
+      vest: "#4c1d95",
+      armor: "#6d28d9",
+      helmet: "#231d33",
+      visor: "#d8b4fe",
+      pack: "#191526",
+      accent: "#c084fc",
+      weaponType: "rifle",
+      helmetType: "recon",
+      bulk: 0.96,
+      lean: 0.04
+    }
+  };
+
+  if (unit && profiles[unit.id]) return profiles[unit.id];
+
+  const roleDefaults = {
+    "Atirador de Elite": { weaponType: "sniper", helmetType: "recon", uniform: "#273544", vest: "#334155", armor: "#475569", helmet: "#2c3e50", visor: "#7dd3fc", pack: "#1e293b", accent: "#38bdf8", bulk: 0.96, lean: 0.02 },
+    "Pesado": { weaponType: "heavy", helmetType: "heavy", uniform: "#3a3628", vest: "#52525b", armor: "#713f12", helmet: "#3f3f46", visor: "#facc15", pack: "#27272a", accent: "#facc15", bulk: 1.15, lean: 0.06 },
+    "Médico": { weaponType: "pistol", helmetType: "medic", uniform: "#273e3c", vest: "#e2e8f0", armor: "#0f766e", helmet: "#f1f5f9", visor: "#2dd4bf", pack: "#1e3a38", accent: "#2dd4bf", bulk: 0.99, lean: 0.03 },
+    "Demolições": { weaponType: "rifle", helmetType: "heavy", uniform: "#3b322c", vest: "#57534e", armor: "#7c2d12", helmet: "#44403c", visor: "#fb923c", pack: "#292524", accent: "#fb923c", bulk: 1.07, lean: 0.05 },
+    "Comando": { weaponType: "pistol", helmetType: "recon", uniform: "#292538", vest: "#3b0764", armor: "#581c87", helmet: "#1e1b2e", visor: "#c084fc", pack: "#181524", accent: "#c084fc", bulk: 0.96, lean: 0.05 }
+  };
+  return roleDefaults[unit?.role] || {
+    weaponType: "rifle",
+    helmetType: "tactical",
+    uniform: "#2f3d2e",
+    vest: "#4b5563",
+    armor: "#374151",
+    helmet: "#3f4e3c",
+    visor: "#38bdf8",
+    pack: "#273026",
+    accent: "#4ef2a1",
+    bulk: 1.0,
+    lean: 0.04
+  };
+}
+
+function drawDetailedWeapon(ctx, sx, shoulderY, dirX, scaleU, weaponType, isAiming, recoil) {
+  const kick = recoil * 4.6 * scaleU;
+  const baseX = sx + dirX * (2.2 * scaleU) - dirX * kick;
+  const baseY = shoulderY + (isAiming ? 2.4 * scaleU : 5.4 * scaleU);
+  const angle = isAiming ? -0.14 * dirX : 0.24 * dirX;
+
   ctx.save();
-  ctx.beginPath();
-  ctx.ellipse(sx + w * 0.14, sy + h * 0.1, w * 0.36, h * 0.26, -0.25, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(0, 0, 0, 0.52)";
-  ctx.fill();
+  ctx.translate(baseX, baseY);
+  ctx.rotate(angle);
+
+  if (weaponType === "sniper") {
+    const len = 21 * scaleU;
+    // Coronha e cano longo de precisão
+    ctx.strokeStyle = "#0f172a";
+    ctx.lineWidth = 3.2 * scaleU;
+    ctx.beginPath();
+    ctx.moveTo(-4 * scaleU, 1.5 * scaleU);
+    ctx.lineTo(len, -1.2 * scaleU);
+    ctx.stroke();
+
+    ctx.strokeStyle = "#cbd5e1";
+    ctx.lineWidth = 1.6 * scaleU;
+    ctx.beginPath();
+    ctx.moveTo(-2 * scaleU, 1.0 * scaleU);
+    ctx.lineTo(len - 1 * scaleU, -1.1 * scaleU);
+    ctx.stroke();
+
+    // Mira telescópica
+    ctx.fillStyle = "#1e293b";
+    ctx.strokeStyle = "#94a3b8";
+    ctx.lineWidth = 0.9;
+    ctx.fillRect(2.5 * scaleU, -4.4 * scaleU, 7.5 * scaleU, 2.4 * scaleU);
+    ctx.strokeRect(2.5 * scaleU, -4.4 * scaleU, 7.5 * scaleU, 2.4 * scaleU);
+  } else if (weaponType === "heavy") {
+    const len = 17.5 * scaleU;
+    // Metralhadora pesada / suporte
+    ctx.fillStyle = "#1e293b";
+    ctx.strokeStyle = "#94a3b8";
+    ctx.lineWidth = 1.1;
+    ctx.fillRect(-2 * scaleU, -2.2 * scaleU, len * 0.78, 5.2 * scaleU);
+    ctx.strokeRect(-2 * scaleU, -2.2 * scaleU, len * 0.78, 5.2 * scaleU);
+
+    // Cano duplo/reforçado e tambor/caixa de munições
+    ctx.strokeStyle = "#e2e8f0";
+    ctx.lineWidth = 2.3 * scaleU;
+    ctx.beginPath();
+    ctx.moveTo(4 * scaleU, -0.4 * scaleU);
+    ctx.lineTo(len, -0.4 * scaleU);
+    ctx.stroke();
+
+    ctx.fillStyle = "#334155";
+    ctx.fillRect(1.5 * scaleU, 2.8 * scaleU, 4.4 * scaleU, 4.2 * scaleU);
+  } else if (weaponType === "pistol") {
+    const len = 8.5 * scaleU;
+    ctx.strokeStyle = "#0f172a";
+    ctx.lineWidth = 3.2 * scaleU;
+    ctx.beginPath();
+    ctx.moveTo(-1 * scaleU, 0.8 * scaleU);
+    ctx.lineTo(len, -0.4 * scaleU);
+    ctx.stroke();
+
+    ctx.strokeStyle = "#e2e8f0";
+    ctx.lineWidth = 1.5 * scaleU;
+    ctx.beginPath();
+    ctx.moveTo(0, 0.5 * scaleU);
+    ctx.lineTo(len - 0.5 * scaleU, -0.3 * scaleU);
+    ctx.stroke();
+  } else {
+    // Espingarda de assalto com carregador curvo e mira superior
+    const len = 15 * scaleU;
+    ctx.strokeStyle = "#0f172a";
+    ctx.lineWidth = 3.6 * scaleU;
+    ctx.beginPath();
+    ctx.moveTo(-2.5 * scaleU, 1.2 * scaleU);
+    ctx.lineTo(len, -0.8 * scaleU);
+    ctx.stroke();
+
+    ctx.strokeStyle = "#e2e8f0";
+    ctx.lineWidth = 1.7 * scaleU;
+    ctx.beginPath();
+    ctx.moveTo(-1 * scaleU, 0.8 * scaleU);
+    ctx.lineTo(len - 0.8 * scaleU, -0.7 * scaleU);
+    ctx.stroke();
+
+    // Carregador
+    ctx.fillStyle = "#475569";
+    ctx.fillRect(4.2 * scaleU, 1.2 * scaleU, 2.4 * scaleU, 4.2 * scaleU);
+
+    // Mira holográfica
+    ctx.fillStyle = "#38bdf8";
+    ctx.fillRect(3.2 * scaleU, -3.2 * scaleU, 3.2 * scaleU, 1.6 * scaleU);
+  }
+
   ctx.restore();
+}
 
-  if (isSelected) {
-    drawTacticalCornerBrackets(ctx, sx, sy, w * 0.98, h * 0.98, "#4ef2a1", 2.0);
-  }
-  if (coverLevel > 0 && (isSelected || animState?.isMoving || animState?.isFiring)) {
-    drawCoverShieldBadge(ctx, sx + w * 0.30, sy - 7, coverLevel, isSelected);
-  }
-
+function drawIsoSoldierSprite(ctx, sx, sy, w, h, unit, isSelected, coverLevel = 0, animState = null) {
+  const prof = getSoldierVisualProfile(unit);
+  const isDown = unit.hp <= 0;
   const dirX = animState?.dirX >= 0 ? 1 : -1;
   const stridePhase = animState?.stridePhase || 0;
   const isMoving = Boolean(animState?.isMoving);
+  const isFiring = Boolean(animState?.isFiring);
   const recoil = animState?.recoil || 0;
+  const nowSec = performance.now() * 0.001;
+  const breath = (!isMoving && !isFiring && !isDown) ? Math.sin(nowSec * 2.4 + (unit.x + unit.y)) * 1.15 : 0;
 
-  const crouchOffset = unit.crouched ? 5.2 : 0;
-  const bobOffset = isMoving ? Math.abs(Math.sin(stridePhase)) * (unit.crouched ? 1.8 : 3.2) : 0;
-  const scaleU = Math.max(1.05, w / 36);
-  const bodyH = Math.round(21 * scaleU);
-  const headR = Math.max(4.6, 5.2 * scaleU);
+  // Sombra projetada suave + sombra de contacto sob as botas
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(sx + w * 0.16, sy + h * 0.10, w * 0.38 * prof.bulk, h * 0.26, -0.24, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0, 0, 0, 0.42)";
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.ellipse(sx, sy + h * 0.02, w * 0.26 * prof.bulk, h * 0.16, 0, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0, 0, 0, 0.62)";
+  ctx.fill();
+  ctx.restore();
+
+  if (isSelected && !isDown) {
+    drawTacticalCornerBrackets(ctx, sx, sy, w * 0.98, h * 0.98, prof.accent || "#4ef2a1", 2.0);
+  }
+  if (coverLevel > 0 && !isDown && (isSelected || isMoving || isFiring || unit.crouched || unit.hunker)) {
+    drawCoverShieldBadge(ctx, sx + w * 0.30, sy - 7, coverLevel, isSelected);
+  }
+
+  const crouchOffset = (unit.crouched || unit.hunker) ? 5.6 : 0;
+  const sprintTilt = isMoving ? (unit.crouched ? 0.06 : 0.14) * dirX : prof.lean * dirX;
+  const bobOffset = isMoving ? Math.abs(Math.sin(stridePhase)) * (unit.crouched ? 1.9 : 3.6) : 0;
+  const scaleU = Math.max(1.06, w / 36) * prof.bulk;
+  const bodyH = Math.round(22 * scaleU);
+  const headR = Math.max(4.6, 5.1 * scaleU);
   const footY = sy - 1;
-  const hipY = footY - bodyH * 0.38 + crouchOffset * 0.55 - bobOffset * 0.4;
-  const shoulderY = footY - bodyH * 0.88 + crouchOffset - bobOffset;
-  const headY = shoulderY - headR - 1.4;
+  const hipY = footY - bodyH * 0.40 + crouchOffset * 0.55 - bobOffset * 0.35;
+  const shoulderY = footY - bodyH * 0.88 + crouchOffset - bobOffset + breath;
+  const headY = shoulderY - headR - 1.5;
 
-  const roleArmorCol = {
-    "Fuzileiro": "#1f4d36",
-    "Atirador de Elite": "#1e3a5f",
-    "Médico": "#184e4a",
-    "Demolições": "#6b321b",
-    "Pesado": "#5a461e",
-    "Comando": "#3d295c",
-    "Reconhecimento": "#344e24",
-    "Engenheiro": "#223b5e"
-  }[unit.role] || "#263645";
+  if (isDown) {
+    // Animação de queda quando eliminado
+    ctx.save();
+    ctx.translate(sx, sy - 2);
+    ctx.rotate(dirX * 1.25);
+    ctx.fillStyle = prof.uniform;
+    ctx.strokeStyle = "#94a3b8";
+    ctx.lineWidth = 1.2;
+    ctx.fillRect(-10 * scaleU, -3 * scaleU, 20 * scaleU, 6 * scaleU);
+    ctx.strokeRect(-10 * scaleU, -3 * scaleU, 20 * scaleU, 6 * scaleU);
+    ctx.beginPath();
+    ctx.arc(12 * scaleU, 0, headR * 0.9, 0, Math.PI * 2);
+    ctx.fillStyle = prof.helmet;
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
 
-  const swing = isMoving ? Math.sin(stridePhase) * 5.5 * scaleU : 0;
+  ctx.save();
+  // Inclinação subtil do corpo na corrida/avanço
+  ctx.translate(sx, hipY);
+  ctx.rotate(sprintTilt);
+  ctx.translate(-sx, -hipY);
 
-  // Mochila / equipamento dorsal
-  const packX = sx - dirX * (6.5 * scaleU);
-  ctx.fillStyle = "#1e293b";
+  const swing = isMoving ? Math.sin(stridePhase) * 5.8 * scaleU : 0;
+
+  // 1. Mochila militar e arma secundária/reserva às costas
+  const packX = sx - dirX * (6.8 * scaleU);
+  ctx.fillStyle = prof.pack;
   ctx.strokeStyle = "#64748b";
   ctx.lineWidth = 1.1;
-  ctx.fillRect(packX - 2.5 * scaleU, shoulderY + 1, 5 * scaleU, bodyH * 0.46);
-  ctx.strokeRect(packX - 2.5 * scaleU, shoulderY + 1, 5 * scaleU, bodyH * 0.46);
-
-  // Pernas articuladas (caminhada / corrida)
-  ctx.strokeStyle = isSelected ? "#d1fae5" : "#94a3b8";
-  ctx.lineWidth = 3.1 * scaleU;
-  ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.moveTo(sx - 2.4 * scaleU, hipY);
-  ctx.lineTo(sx - 3.6 * scaleU + swing, footY);
-  ctx.moveTo(sx + 2.4 * scaleU, hipY);
-  ctx.lineTo(sx + 3.6 * scaleU - swing, footY);
+  ctx.roundRect ? ctx.roundRect(packX - 2.8 * scaleU, shoulderY + 0.5, 5.6 * scaleU, bodyH * 0.48, 2) : ctx.rect(packX - 2.8 * scaleU, shoulderY + 0.5, 5.6 * scaleU, bodyH * 0.48);
+  ctx.fill();
   ctx.stroke();
 
-  // Tronco / Colete tático com detalhes de placa e cinto
-  ctx.fillStyle = isSelected ? "#236b48" : roleArmorCol;
-  ctx.strokeStyle = isSelected ? "#86efac" : "#cbd5e1";
-  ctx.lineWidth = 1.25;
-  const rw = 13 * scaleU;
-  const rh = bodyH * 0.55;
+  // Silhueta de arma transportada às costas quando não em modo de tiro
+  if (!isFiring) {
+    ctx.strokeStyle = "#475569";
+    ctx.lineWidth = 2.0 * scaleU;
+    ctx.beginPath();
+    ctx.moveTo(packX - dirX * 1.5 * scaleU, shoulderY - 2.5 * scaleU);
+    ctx.lineTo(packX + dirX * 2.5 * scaleU, shoulderY + bodyH * 0.52);
+    ctx.stroke();
+  }
+
+  // 2. Pernas articuladas + joelheiras + botas militares
+  const leftFootX = sx - 2.6 * scaleU + swing;
+  const leftFootY = footY - Math.max(0, Math.cos(stridePhase)) * (isMoving ? 2.4 * scaleU : 0);
+  const rightFootX = sx + 2.8 * scaleU - swing;
+  const rightFootY = footY - Math.max(0, -Math.cos(stridePhase)) * (isMoving ? 2.4 * scaleU : 0);
+
+  ctx.strokeStyle = prof.uniform;
+  ctx.lineWidth = 3.5 * scaleU;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(sx - 2.2 * scaleU, hipY);
+  ctx.lineTo(leftFootX, leftFootY);
+  ctx.moveTo(sx + 2.2 * scaleU, hipY);
+  ctx.lineTo(rightFootX, rightFootY);
+  ctx.stroke();
+
+  // Joelheiras táticas
+  ctx.fillStyle = prof.armor;
+  ctx.fillRect(leftFootX - 1.6 * scaleU, (hipY + leftFootY) * 0.5 - 1.2 * scaleU, 3.2 * scaleU, 2.4 * scaleU);
+  ctx.fillRect(rightFootX - 1.6 * scaleU, (hipY + rightFootY) * 0.5 - 1.2 * scaleU, 3.2 * scaleU, 2.4 * scaleU);
+
+  // Botas militares em contacto com o solo
+  ctx.fillStyle = "#1e293b";
+  ctx.strokeStyle = "#94a3b8";
+  ctx.lineWidth = 0.9;
+  ctx.fillRect(leftFootX - 2.2 * scaleU, leftFootY - 2.5 * scaleU, 4.6 * scaleU, 2.8 * scaleU);
+  ctx.fillRect(rightFootX - 2.2 * scaleU, rightFootY - 2.5 * scaleU, 4.6 * scaleU, 2.8 * scaleU);
+
+  // 3. Tronco, colete balístico, placas de armadura e bolsas de equipamento
+  const rw = 13.8 * scaleU;
+  const rh = bodyH * 0.56;
   const rx = sx - rw * 0.5;
   const ry = shoulderY;
+
+  ctx.fillStyle = isSelected ? prof.armor : prof.vest;
+  ctx.strokeStyle = isSelected ? (prof.accent || "#86efac") : "#cbd5e1";
+  ctx.lineWidth = 1.25;
   ctx.beginPath();
   ctx.roundRect ? ctx.roundRect(rx, ry, rw, rh, 3) : ctx.rect(rx, ry, rw, rh);
   ctx.fill();
   ctx.stroke();
 
-  // Cinto tático / coldre
+  // Placa balística frontal e ombreiras de armadura
+  ctx.fillStyle = prof.armor;
+  ctx.fillRect(rx + 2.2 * scaleU, ry + 1.5 * scaleU, rw - 4.4 * scaleU, rh * 0.54);
+
+  // Cinto tático e bolsas de munição/equipamento
   ctx.strokeStyle = "#eab308";
   ctx.lineWidth = 1.3;
   ctx.beginPath();
-  ctx.moveTo(rx + 1.5, ry + rh * 0.78);
-  ctx.lineTo(rx + rw - 1.5, ry + rh * 0.78);
+  ctx.moveTo(rx + 1.2, ry + rh * 0.80);
+  ctx.lineTo(rx + rw - 1.2, ry + rh * 0.80);
   ctx.stroke();
 
-  // Capacete + viseira
+  ctx.fillStyle = "#64748b";
+  ctx.fillRect(rx + 1.8 * scaleU, ry + rh * 0.66, 2.8 * scaleU, 3.2 * scaleU);
+  ctx.fillRect(rx + rw - 4.6 * scaleU, ry + rh * 0.66, 2.8 * scaleU, 3.2 * scaleU);
+
+  // 4. Cabeça, capacete diferenciado por perfil e viseira tática
   ctx.beginPath();
   ctx.arc(sx, headY, headR, 0, Math.PI * 2);
-  ctx.fillStyle = isSelected ? "#4ef2a1" : "#cbd5e1";
+  ctx.fillStyle = isSelected ? (prof.helmet || "#cbd5e1") : prof.helmet;
   ctx.fill();
-  ctx.strokeStyle = "#0f172a";
-  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = isSelected ? (prof.accent || "#4ef2a1") : "#0f172a";
+  ctx.lineWidth = 1.25;
   ctx.stroke();
 
-  // Viseira iluminada orientada pela direção
-  ctx.fillStyle = "#38bdf8";
-  const visorW = headR * 0.92;
-  const visorX = dirX >= 0 ? sx - 0.5 * scaleU : sx - visorW + 0.5 * scaleU;
+  if (prof.helmetType === "heavy") {
+    // Proteção lateral reforçada no capacete pesado
+    ctx.strokeStyle = "#94a3b8";
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(sx, headY, headR + 0.8, Math.PI * 0.15, Math.PI * 0.85);
+    ctx.stroke();
+  } else if (prof.helmetType === "medic") {
+    // Emblema discreto de apoio médico no capacete
+    ctx.fillStyle = "#ef4444";
+    ctx.fillRect(sx - 1.6 * scaleU, headY - headR * 0.72, 3.2 * scaleU, 1.3 * scaleU);
+  }
+
+  // Viseira ótica orientada
+  ctx.fillStyle = prof.visor;
+  const visorW = headR * 0.94;
+  const visorX = dirX >= 0 ? sx - 0.4 * scaleU : sx - visorW + 0.4 * scaleU;
   ctx.fillRect(visorX, headY - 1.6 * scaleU, visorW, 2.5 * scaleU);
 
-  // Arma principal com recuo ao disparar
-  const gunKick = recoil * 4.2 * scaleU;
-  const gunStartX = sx + dirX * (1.5 * scaleU) - dirX * gunKick;
-  const gunStartY = shoulderY + 4.8 * scaleU;
-  const gunEndX = gunStartX + dirX * (13.5 * scaleU);
-  const gunEndY = gunStartY - 2.2 * scaleU;
+  // 5. Braços articulados + arma militar (espingarda, precisão, pesado ou pistola)
+  const armSwing = isMoving ? -swing * 0.65 : 0;
+  const isAiming = Boolean(isFiring || unit.overwatch);
 
-  ctx.strokeStyle = "#0f172a";
-  ctx.lineWidth = 3.8 * scaleU;
+  // Braço de apoio
+  ctx.strokeStyle = prof.uniform;
+  ctx.lineWidth = 2.8 * scaleU;
   ctx.beginPath();
-  ctx.moveTo(gunStartX, gunStartY);
-  ctx.lineTo(gunEndX, gunEndY);
+  ctx.moveTo(sx - dirX * 2.5 * scaleU, shoulderY + 3.2 * scaleU);
+  ctx.lineTo(sx + dirX * (isAiming ? 6.5 * scaleU : 3.5 * scaleU + armSwing), shoulderY + (isAiming ? 4.2 * scaleU : 8.5 * scaleU));
   ctx.stroke();
 
-  ctx.strokeStyle = "#e2e8f0";
-  ctx.lineWidth = 1.8 * scaleU;
-  ctx.beginPath();
-  ctx.moveTo(gunStartX, gunStartY);
-  ctx.lineTo(gunEndX, gunEndY);
-  ctx.stroke();
+  drawDetailedWeapon(ctx, sx, shoulderY, dirX, scaleU, prof.weaponType, isAiming, recoil);
 
-  // Evitar sobreposição de nomes e barras de vida: mostrar apenas quando selecionado ou em combate ativo
-  if (isSelected || animState?.isFiring) {
+  ctx.restore();
+
+  // Indicador compacto apenas quando selecionado ou em combate ativo
+  if ((isSelected || isFiring) && !isDown) {
     const barW = Math.max(28, Math.round(30 * scaleU));
     const barH = 4.2;
     const barX = sx - barW * 0.5;
