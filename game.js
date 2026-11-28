@@ -2624,25 +2624,37 @@ function renderFloatingUnitOrders(battle, selUnit, canvas, m) {
     </div>
   `;
 
+  const popSig = `${selUnit.id}:${selUnit.ap}:${selUnit.crouched}:${selUnit.ammo}:${selUnit.frags}:${selUnit.smokes}:${selUnit.medkits}:${tab}`;
+  const contentChanged = pop.dataset.ozPopSig !== popSig;
+  if (contentChanged) {
+    pop.dataset.ozPopSig = popSig;
+  }
+
   pop.style.setProperty("display", "block", "important");
   pop.style.bottom = "auto";
   pop.style.right = "auto";
   pop.style.maxWidth = "255px";
   pop.style.left = "0px";
   pop.style.top = "0px";
-  const popRect = pop.getBoundingClientRect();
 
-  let left = unitIso.sx - popRect.width / 2;
-  left = Math.max(6, Math.min(parentRect.width - popRect.width - 6, left));
+  if (contentChanged || !pop.dataset.ozPopW) {
+    const r0 = pop.getBoundingClientRect();
+    pop.dataset.ozPopW = String(Math.round(r0.width || 210));
+    pop.dataset.ozPopH = String(Math.round(r0.height || 92));
+  }
+  const popW = Number(pop.dataset.ozPopW) || 210;
+  const popH = Number(pop.dataset.ozPopH) || 92;
 
-  let top = unitIso.sy - popRect.height - 26;
+  let left = unitIso.sx - popW / 2;
+  left = Math.max(6, Math.min(parentRect.width - popW - 6, left));
+
+  let top = unitIso.sy - popH - 26;
   if (top < 6) {
     top = unitIso.sy + 18;
   }
-  top = Math.max(6, Math.min(parentRect.height - popRect.height - 6, top));
+  top = Math.max(6, Math.min(parentRect.height - popH - 6, top));
 
-  pop.style.left = `${Math.round(left)}px`;
-  pop.style.top = `${Math.round(top)}px`;
+  pop.style.transform = `translate3d(${Math.round(left)}px, ${Math.round(top)}px, 0)`;
 
   const closeBtn = pop.querySelector("#close-floating-orders");
   if (closeBtn) {
@@ -2919,33 +2931,40 @@ function _renderBattleInner(b) {
 
     const squadBar = document.getElementById("iso-squad-strip");
     if (squadBar) {
-      squadBar.innerHTML = "";
-      b.units.filter((u) => u.hp > 0).forEach((u) => {
-        const isAct = b.selectedUnitId === u.id;
-        const chip = document.createElement("button");
-        chip.type = "button";
-        chip.textContent = `${u.name.split(" ")[0]} · ${u.ap}PA`;
-        chip.style.cssText = `
-          font-size:0.64em;
-          font-weight:bold;
-          padding:4px 7px;
-          border-radius:999px;
-          border:1px solid ${isAct ? "#4ef2a1" : u.ap > 0 ? "rgba(125,211,252,0.55)" : "rgba(148,163,184,0.25)"};
-          background:${isAct ? "rgba(78,242,161,0.28)" : "rgba(7,14,22,0.82)"};
-          color:${isAct ? "#ecfdf5" : "#e2e8f0"};
-          cursor:pointer;
-        `;
-        chip.addEventListener("click", (ev) => {
-          ev.stopPropagation();
-          if (b.phase !== "player") return;
-          b.selectedUnitId = isAct ? null : u.id;
-          b.mode = "normal";
-          b.ordersMinimized = false;
-          addBattleLog(isAct ? `Ordens de ${u.name} recolhidas.` : `Operacional selecionado: ${u.name}.`);
-          renderBattle();
+      const aliveUnits = b.units.filter((u) => u.hp > 0);
+      const squadSig = aliveUnits
+        .map((u) => `${u.id}:${u.ap}:${b.selectedUnitId === u.id ? 1 : 0}`)
+        .join("|") + `|${b.phase}`;
+      if (squadBar.dataset.ozSig !== squadSig) {
+        squadBar.dataset.ozSig = squadSig;
+        squadBar.innerHTML = "";
+        aliveUnits.forEach((u) => {
+          const isAct = b.selectedUnitId === u.id;
+          const chip = document.createElement("button");
+          chip.type = "button";
+          chip.textContent = `${u.name.split(" ")[0]} · ${u.ap}PA`;
+          chip.style.cssText = `
+            font-size:0.64em;
+            font-weight:bold;
+            padding:4px 7px;
+            border-radius:999px;
+            border:1px solid ${isAct ? "#4ef2a1" : u.ap > 0 ? "rgba(125,211,252,0.55)" : "rgba(148,163,184,0.25)"};
+            background:${isAct ? "rgba(78,242,161,0.28)" : "rgba(7,14,22,0.82)"};
+            color:${isAct ? "#ecfdf5" : "#e2e8f0"};
+            cursor:pointer;
+          `;
+          chip.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            if (b.phase !== "player") return;
+            b.selectedUnitId = isAct ? null : u.id;
+            b.mode = "normal";
+            b.ordersMinimized = false;
+            addBattleLog(isAct ? `Ordens de ${u.name} recolhidas.` : `Operacional selecionado: ${u.name}.`);
+            renderBattle();
+          });
+          squadBar.appendChild(chip);
         });
-        squadBar.appendChild(chip);
-      });
+      }
     }
 
     const existingBottomHud = document.getElementById("iso-bottom-hud");
