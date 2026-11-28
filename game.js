@@ -1440,12 +1440,12 @@ function startMission(mission, missionIndex = 0) {
     phase: "player",
     mode: "normal",
     camera: missionIndex === 0 ? { x: 0, y: 3 } : { x: 2, y: 2 },
-    zoom: 1.56,
-    targetZoom: 1.56,
-    panX: 135,
-    panY: -36,
-    targetPanX: 135,
-    targetPanY: -36,
+    zoom: 1.72,
+    targetZoom: 1.72,
+    panX: 155,
+    panY: -44,
+    targetPanX: 155,
+    targetPanY: -44,
     hoveredEnemyId: null,
     grid: createMissionMap(missionIndex),
     elevation: null,
@@ -1658,8 +1658,8 @@ function addBattleLog(msg) {
 // --- GEOMETRIA ISOMÉTRICA XCOM (2:1) ---
 
 function getBattleZoom(battle) {
-  if (!battle || typeof battle.zoom !== "number" || Number.isNaN(battle.zoom)) return 1.56;
-  return Math.max(1.05, Math.min(3.0, battle.zoom));
+  if (!battle || typeof battle.zoom !== "number" || Number.isNaN(battle.zoom)) return 1.72;
+  return Math.max(1.18, Math.min(3.2, battle.zoom));
 }
 
 function clampBattlePan(battle, m) {
@@ -1729,9 +1729,15 @@ function setBattleZoom(deltaOrFactor, anchorPx = null, anchorPy = null) {
 function resetBattleView() {
   const b = state.battle;
   if (!b) return;
-  b.targetZoom = 1.56;
-  b.targetPanX = 120;
-  b.targetPanY = -28;
+  const sel = getSelectedUnit();
+  if (sel) {
+    b.targetZoom = 1.76;
+    centerCameraOnUnit(sel);
+    return;
+  }
+  b.targetZoom = 1.72;
+  b.targetPanX = 155;
+  b.targetPanY = -44;
   ensureSmoothCameraLoop();
 }
 
@@ -1745,14 +1751,16 @@ function getIsoMetrics(canvas, ignoreBattlePan = false) {
 
   const span = GRID_W + GRID_H;
   const isLandscape = w > h;
-  const maxTileWByWidth = Math.floor((w * 2.65) / span);
-  const maxTileWByHeight = Math.floor((h * 5.1) / span);
-  const upperCap = isLandscape ? 142 : 118;
-  const baseTileW = Math.max(32, Math.min(upperCap, Math.min(maxTileWByWidth, maxTileWByHeight)));
-  const tileW = Math.max(28, baseTileW * zoom);
-  // Perspetiva 2.5D mais cinematográfica estilo XCOM 2 (menos vista aérea)
-  const tileH = Math.max(12, tileW * 0.42);
-  const wallH = Math.max(10, tileH * 0.9);
+  // Escala ampliada e adaptada ao ecrã vertical (portrait) para focar o campo de batalha próximo
+  const portraitBoost = isLandscape ? 1.0 : 1.18;
+  const maxTileWByWidth = Math.floor((w * 2.95 * portraitBoost) / span);
+  const maxTileWByHeight = Math.floor((h * 5.65) / span);
+  const upperCap = isLandscape ? 156 : 136;
+  const baseTileW = Math.max(36, Math.min(upperCap, Math.min(maxTileWByWidth, maxTileWByHeight)));
+  const tileW = Math.max(32, baseTileW * zoom);
+  // Perspetiva isométrica 2.5D cinematográfica estilo XCOM 2
+  const tileH = Math.max(13, tileW * 0.40);
+  const wallH = Math.max(12, tileH * 1.05);
 
   const boardPixelH = span * tileH * 0.5;
   const baseOriginX = w * 0.5 + (GRID_H - GRID_W) * (tileW * 0.25);
@@ -1978,22 +1986,22 @@ function drawTacticalCornerBrackets(ctx, sx, sy, w, h, color, lw = 1.6) {
 function drawContinuousTerrainBackdrop(ctx, battle, m) {
   const hw = m.tileW * 0.5;
   const hh = m.tileH * 0.5;
-  const pad = 4;
+  const pad = 7;
   const pN = worldToIso(-pad, -pad, battle, m, 0);
   const pE = worldToIso(GRID_W + pad, -pad, battle, m, 0);
   const pS = worldToIso(GRID_W + pad, GRID_H + pad, battle, m, 0);
   const pW = worldToIso(-pad, GRID_H + pad, battle, m, 0);
 
   const isForest = battle && battle.missionIndex === 0;
-  const grad = ctx.createLinearGradient(pN.sx, pN.sy, pS.sx, pS.sy);
+  const grad = ctx.createLinearGradient(pN.sx, pN.sy - 40, pS.sx, pS.sy + 40);
   if (isForest) {
-    grad.addColorStop(0, "#1c2d21");
-    grad.addColorStop(0.5, "#233424");
-    grad.addColorStop(1, "#18241b");
+    grad.addColorStop(0, "#16261b");
+    grad.addColorStop(0.55, "#1f3223");
+    grad.addColorStop(1, "#121d15");
   } else {
-    grad.addColorStop(0, "#1d252e");
-    grad.addColorStop(0.5, "#242d37");
-    grad.addColorStop(1, "#171e26");
+    grad.addColorStop(0, "#171f28");
+    grad.addColorStop(0.55, "#212b36");
+    grad.addColorStop(1, "#11171f");
   }
 
   ctx.beginPath();
@@ -2009,9 +2017,10 @@ function drawContinuousTerrainBackdrop(ctx, battle, m) {
 function drawIsoTerrainColumn(ctx, sx, sy, w, h, elev, surfaceType, gx, gy, canMoveHere, isMoveMode, smokeHere, coverAtMoveTile) {
   const hw = w * 0.5;
   const hh = h * 0.5;
-  const stepPx = Math.max(6, Math.round(h * 0.42));
+  const stepPx = Math.max(7, Math.round(h * 0.48));
+  const hash = ((gx * 73 + gy * 37 + (gx ^ gy) * 13) % 29);
 
-  // Taludes/rampas naturais APENAS onde há mudança de altura (sem paredes de tabuleiro)
+  // Taludes/rampas naturais com sombreamento direcional onde há elevação
   if (elev > 0) {
     const depthPx = elev * stepPx;
     ctx.beginPath();
@@ -2020,7 +2029,7 @@ function drawIsoTerrainColumn(ctx, sx, sy, w, h, elev, surfaceType, gx, gy, canM
     ctx.lineTo(sx, sy + hh + depthPx);
     ctx.lineTo(sx - hw, sy + depthPx);
     ctx.closePath();
-    ctx.fillStyle = surfaceType === "rock_ridge" ? "#3b3a36" : "#2e353b";
+    ctx.fillStyle = surfaceType === "rock_ridge" ? "#3b3833" : "#2d353a";
     ctx.fill();
 
     ctx.beginPath();
@@ -2029,53 +2038,75 @@ function drawIsoTerrainColumn(ctx, sx, sy, w, h, elev, surfaceType, gx, gy, canM
     ctx.lineTo(sx, sy + hh + depthPx);
     ctx.lineTo(sx + hw, sy + depthPx);
     ctx.closePath();
-    ctx.fillStyle = surfaceType === "rock_ridge" ? "#292825" : "#21272c";
+    ctx.fillStyle = surfaceType === "rock_ridge" ? "#24221f" : "#1d2327";
     ctx.fill();
   }
 
-  // Superfície contínua sem contorno de grelha (overlap ligeiro +1.5px elimina frestas)
+  // Paleta de materiais militares coerentes com variação natural (sem contornos de grelha)
   const palette = {
-    forest_ground: ["#253928", "#293e2c"],
-    dirt_road: ["#4a3c2c", "#514231"],
-    dirt_path: ["#3f3528", "#463b2d"],
-    rock_ridge: ["#3d4247", "#454a50"],
-    asphalt_road: ["#262b33", "#2b3039"],
-    concrete_sidewalk: ["#464e59", "#4d5662"],
-    industrial_yard: ["#2f363f", "#353d47"],
-    tactical_earth: ["#2b332d", "#313a33"]
+    forest_ground: ["#243827", "#29402c", "#213324"],
+    dirt_road: ["#4b3c2b", "#534330", "#443627"],
+    dirt_path: ["#3d3427", "#443a2c", "#372f23"],
+    rock_ridge: ["#3d4248", "#464c52", "#35393e"],
+    asphalt_road: ["#22272f", "#272d36", "#1e232a"],
+    concrete_sidewalk: ["#4a535e", "#525c68", "#424a54"],
+    industrial_yard: ["#2e353e", "#353d47", "#282e36"],
+    tactical_earth: ["#2b332c", "#313a32", "#262d27"]
   };
   const pair = palette[surfaceType] || palette.tactical_earth;
-  const baseFill = ((gx + gy) % 2 === 0) ? pair[0] : pair[1];
+  const baseFill = pair[hash % pair.length];
 
-  // Sem stroke na exploração normal -> grelha 100% invisível!
-  drawIsoDiamond(ctx, sx, sy, w + 1.8, h + 1.1, baseFill, null, 0);
+  drawIsoDiamond(ctx, sx, sy, w + 2.2, h + 1.4, baseFill, null, 0);
 
-  // Detalhes orgânicos / urbanos integrados no solo
-  const hash = ((gx * 73 + gy * 37) % 17);
-  if (surfaceType === "asphalt_road" && gy === 5 && gx % 2 === 0) {
-    // Marcação rodoviária tracejada na estrada
-    ctx.strokeStyle = "rgba(226, 232, 240, 0.34)";
-    ctx.lineWidth = 1.6;
+  // Texturas e detalhes de terreno integrados ao solo
+  if (surfaceType === "asphalt_road") {
+    // Grão e fissuras discretas de asfalto
+    if (hash % 4 === 0) {
+      ctx.strokeStyle = "rgba(15, 23, 42, 0.45)";
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.moveTo(sx - hw * 0.4, sy);
+      ctx.lineTo(sx + hw * 0.2, sy + hh * 0.35);
+      ctx.stroke();
+    }
+    if ((gy === 5 || gy === 6) && gx % 2 === 0) {
+      ctx.strokeStyle = "rgba(226, 232, 240, 0.36)";
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(sx - hw * 0.32, sy - hh * 0.25);
+      ctx.lineTo(sx + hw * 0.32, sy + hh * 0.25);
+      ctx.stroke();
+    }
+  } else if (surfaceType === "concrete_sidewalk") {
+    // Juntas de laje de passeio
+    ctx.strokeStyle = "rgba(15, 23, 42, 0.28)";
+    ctx.lineWidth = 1.0;
     ctx.beginPath();
-    ctx.moveTo(sx - hw * 0.35, sy - hh * 0.35);
-    ctx.lineTo(sx + hw * 0.35, sy + hh * 0.35);
+    ctx.moveTo(sx - hw * 0.5, sy - hh * 0.5);
+    ctx.lineTo(sx + hw * 0.5, sy + hh * 0.5);
     ctx.stroke();
-  } else if (surfaceType === "forest_ground" && hash < 5) {
-    // Tufos de relva / vegetação rasteira
-    ctx.strokeStyle = "rgba(101, 163, 78, 0.45)";
-    ctx.lineWidth = 1.2;
+  } else if (surfaceType === "forest_ground" || surfaceType === "tactical_earth") {
+    if (hash < 7) {
+      ctx.strokeStyle = surfaceType === "forest_ground" ? "rgba(116, 178, 86, 0.42)" : "rgba(148, 163, 132, 0.3)";
+      ctx.lineWidth = 1.25;
+      ctx.beginPath();
+      ctx.moveTo(sx - 4, sy + 1);
+      ctx.lineTo(sx - 6, sy - 3.5);
+      ctx.moveTo(sx + 1.5, sy + 2);
+      ctx.lineTo(sx + 3, sy - 3.5);
+      ctx.stroke();
+    }
+  } else if (hash % 5 === 0) {
+    ctx.fillStyle = "rgba(168, 162, 158, 0.24)";
     ctx.beginPath();
-    ctx.moveTo(sx - 3, sy + 1);
-    ctx.lineTo(sx - 5, sy - 3);
-    ctx.moveTo(sx + 1, sy + 2);
-    ctx.lineTo(sx + 2, sy - 3);
-    ctx.stroke();
-  } else if ((surfaceType === "dirt_road" || surfaceType === "tactical_earth") && hash === 3) {
-    // Pequenas pedras / textura de terra
-    ctx.fillStyle = "rgba(168, 162, 158, 0.25)";
-    ctx.beginPath();
-    ctx.arc(sx + 3, sy + 1, 1.5, 0, Math.PI * 2);
+    ctx.arc(sx + 3, sy + 1, 1.6, 0, Math.PI * 2);
     ctx.fill();
+  }
+
+  // Perspetiva atmosférica e iluminação direcional suave do topo-esquerdo para baixo-direito
+  const lightAlpha = Math.max(0, 0.06 - (gx + gy) * 0.0022);
+  if (lightAlpha > 0) {
+    drawIsoDiamond(ctx, sx, sy, w + 1.4, h + 1.0, `rgba(226, 240, 255, ${lightAlpha.toFixed(4)})`, null, 0);
   }
 
   // Fumo tático
@@ -2083,14 +2114,13 @@ function drawIsoTerrainColumn(ctx, sx, sy, w, h, elev, surfaceType, gx, gy, canM
     drawIsoDiamond(ctx, sx, sy, w * 0.96, h * 0.96, "rgba(203, 213, 225, 0.38)", "rgba(241, 245, 249, 0.55)", 1.0);
   }
 
-  // GRELHA INVISÍVEL: mostrar indicadores APENAS quando uma unidade está selecionada / em movimento
+  // Grelha oculta durante combate normal; posições de movimento apenas quando selecionado e em modo mover
   if (canMoveHere) {
     const moveFill = isMoveMode ? "rgba(56, 189, 248, 0.24)" : "rgba(78, 242, 161, 0.14)";
-    const moveStroke = isMoveMode ? "rgba(125, 211, 252, 0.85)" : "rgba(78, 242, 161, 0.55)";
+    const moveStroke = isMoveMode ? "rgba(125, 211, 252, 0.88)" : "rgba(78, 242, 161, 0.55)";
     drawIsoDiamond(ctx, sx, sy, w * 0.92, h * 0.92, moveFill, null, 0);
-    drawTacticalCornerBrackets(ctx, sx, sy, w, h, moveStroke, isMoveMode ? 1.7 : 1.2);
+    drawTacticalCornerBrackets(ctx, sx, sy, w, h, moveStroke, isMoveMode ? 1.8 : 1.2);
 
-    // Indicador discreto de cobertura na posição de destino
     if (coverAtMoveTile > 0) {
       drawCoverShieldBadge(ctx, sx, sy - 2, coverAtMoveTile, isMoveMode);
     }
@@ -2098,84 +2128,111 @@ function drawIsoTerrainColumn(ctx, sx, sy, w, h, elev, surfaceType, gx, gy, canM
 }
 
 function drawIsoBoardSkirt(ctx, battle, m) {
-  // Substituído por terreno contínuo envolvente sem aspeto de tabuleiro flutuante
   drawContinuousTerrainBackdrop(ctx, battle, m);
 }
 
-function drawIsoCoverBlock(ctx, sx, sy, w, h, wallH, tileType, isForestMission = false) {
-  // tileType:
-  // 1 = Cobertura baixa (barreira de betão / tronco / mureta)
-  // 2 = Cobertura alta (contentor militar / muro blindado)
-  // 3 = Edifício / ruína / rochedo alto
-  // 4 = Caixotes militares / obstáculos de suprimentos
+function drawIsoCoverBlock(ctx, sx, sy, w, h, wallH, tileType, isForestMission = false, gx = 0, gy = 0) {
   const isBuilding = tileType === 3;
   const isContainerOrWall = tileType === 2;
   const isCrate = tileType === 4;
+  const variant = ((gx * 19 + gy * 31) % 3);
 
-  const scale = isBuilding ? 0.92 : isContainerOrWall ? 0.84 : isCrate ? 0.68 : 0.78;
+  const scale = isBuilding ? 0.96 : isContainerOrWall ? 0.88 : isCrate ? 0.72 : 0.82;
   const cw = w * scale;
   const ch = h * scale;
   const chw = cw * 0.5;
   const chh = ch * 0.5;
-  const effWallH = isBuilding ? wallH * 1.45 : isContainerOrWall ? wallH * 1.05 : wallH * 0.55;
+  const effWallH = isBuilding ? wallH * 1.75 : isContainerOrWall ? wallH * 1.15 : wallH * 0.62;
   const topY = sy - effWallH;
 
-  // Sombra ambiental integrada no chão
+  // Sombra projetada alongada + sombra de contacto junto à base
   ctx.save();
   ctx.beginPath();
-  ctx.ellipse(sx + w * 0.14, sy + h * 0.12, cw * 0.58, ch * 0.54, -0.25, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(0, 0, 0, 0.46)";
+  ctx.ellipse(sx + w * 0.24, sy + h * 0.18, cw * 0.72, ch * 0.64, -0.22, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0, 0, 0, 0.36)";
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.ellipse(sx, sy + h * 0.04, cw * 0.54, ch * 0.44, 0, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0, 0, 0, 0.54)";
   ctx.fill();
   ctx.restore();
 
-  // Árvores / rochedos naturais na missão de floresta para estrutura alta
+  // Árvores com folhagem detalhada em floresta ou vegetação militar
   if (isBuilding && isForestMission) {
-    // Base rochosa + copa de árvore militar densa
-    ctx.fillStyle = "#3f3f46";
+    ctx.fillStyle = "#4b3828";
+    ctx.fillRect(sx - chw * 0.18, sy - effWallH * 0.65, chw * 0.36, effWallH * 0.65);
+
+    ctx.fillStyle = "#183322";
     ctx.beginPath();
-    ctx.ellipse(sx, sy - 2, cw * 0.42, ch * 0.45, 0, 0, Math.PI * 2);
+    ctx.arc(sx + 2, topY + 3, cw * 0.42, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = "#1e3a29";
+    ctx.fillStyle = "#244c32";
     ctx.beginPath();
-    ctx.arc(sx, topY + 2, cw * 0.38, 0, Math.PI * 2);
+    ctx.arc(sx - 3, topY - 2, cw * 0.35, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = "#2d5239";
+    ctx.fillStyle = "#366b47";
     ctx.beginPath();
-    ctx.arc(sx - 4, topY - 2, cw * 0.28, 0, Math.PI * 2);
+    ctx.arc(sx - 5, topY - 6, cw * 0.22, 0, Math.PI * 2);
     ctx.fill();
+    return;
+  }
+
+  // Veículo militar destruído / ruína em algumas células de cobertura alta
+  if (isContainerOrWall && variant === 2 && !isForestMission) {
+    ctx.save();
+    ctx.fillStyle = "#2a3129";
+    ctx.strokeStyle = "#525d50";
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    ctx.moveTo(sx - chw * 0.9, topY + chh * 0.3);
+    ctx.lineTo(sx + chw * 0.85, topY - chh * 0.2);
+    ctx.lineTo(sx + chw * 0.95, sy + chh * 0.4);
+    ctx.lineTo(sx - chw * 0.8, sy + chh * 0.85);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Rodas/lagartas danificadas com sombra de contacto
+    ctx.fillStyle = "#11161c";
+    ctx.fillRect(sx - chw * 0.65, sy + chh * 0.15, chw * 0.36, chh * 0.55);
+    ctx.fillRect(sx + chw * 0.25, sy + chh * 0.05, chw * 0.36, chh * 0.55);
+
+    // Destroço / fumo leve
+    ctx.fillStyle = "rgba(251, 146, 60, 0.28)";
+    ctx.beginPath();
+    ctx.arc(sx, topY + 2, chw * 0.25, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
     return;
   }
 
   let leftCol, rightCol, topCol, borderCol;
   if (isBuilding) {
-    // Edifício / Ruína de betão armado
-    leftCol = "#475569";
-    rightCol = "#334155";
-    topCol = "#64748b";
+    leftCol = "#4b596b";
+    rightCol = "#2f3946";
+    topCol = "#6b7c93";
     borderCol = "#94a3b8";
   } else if (isContainerOrWall) {
-    // Contentor militar verde-oliva / muro blindado (Cobertura Alta)
-    leftCol = "#3f523a";
-    rightCol = "#2b3928";
-    topCol = "#52694b";
-    borderCol = "#84a97c";
+    leftCol = "#41553c";
+    rightCol = "#293726";
+    topCol = "#587250";
+    borderCol = "#89ae7f";
   } else if (isCrate) {
-    // Caixotes militares de abastecimento (Cobertura Baixa)
-    leftCol = "#7c5832";
-    rightCol = "#593e22";
-    topCol = "#9a6f40";
+    leftCol = "#7d5832";
+    rightCol = "#553b20";
+    topCol = "#9e7142";
     borderCol = "#d6a874";
   } else {
-    // Barreira baixa de betão / sacos de areia (Cobertura Baixa)
-    leftCol = "#57534e";
-    rightCol = "#44403c";
-    topCol = "#78716c";
+    leftCol = "#59544e";
+    rightCol = "#3d3935";
+    topCol = "#7a746d";
     borderCol = "#a8a29e";
   }
 
-  // Face esquerda
+  // Face esquerda iluminada
   ctx.beginPath();
   ctx.moveTo(sx - chw, topY);
   ctx.lineTo(sx, topY + chh);
@@ -2185,10 +2242,10 @@ function drawIsoCoverBlock(ctx, sx, sy, w, h, wallH, tileType, isForestMission =
   ctx.fillStyle = leftCol;
   ctx.fill();
   ctx.strokeStyle = borderCol;
-  ctx.lineWidth = 0.9;
+  ctx.lineWidth = 1.0;
   ctx.stroke();
 
-  // Face direita
+  // Face direita sombreada
   ctx.beginPath();
   ctx.moveTo(sx + chw, topY);
   ctx.lineTo(sx, topY + chh);
@@ -2200,36 +2257,38 @@ function drawIsoCoverBlock(ctx, sx, sy, w, h, wallH, tileType, isForestMission =
   ctx.stroke();
 
   if (isBuilding) {
-    // Janelas partidas / painéis de edifício
-    ctx.fillStyle = "rgba(15, 23, 42, 0.72)";
-    ctx.fillRect(sx - chw * 0.68, topY + effWallH * 0.28, chw * 0.34, 4);
-    ctx.fillRect(sx - chw * 0.68, topY + effWallH * 0.60, chw * 0.34, 4);
-    ctx.fillRect(sx + chw * 0.28, topY + effWallH * 0.28, chw * 0.34, 4);
+    // Espessura de parede e ruína parcial no topo + janelas/aberturas
+    const rim = Math.max(2.5, chw * 0.16);
+    ctx.fillStyle = "rgba(15, 23, 42, 0.78)";
+    ctx.fillRect(sx - chw * 0.72, topY + effWallH * 0.25, chw * 0.34, Math.max(3, effWallH * 0.16));
+    ctx.fillRect(sx - chw * 0.72, topY + effWallH * 0.56, chw * 0.34, Math.max(3, effWallH * 0.16));
+    ctx.fillRect(sx + chw * 0.32, topY + effWallH * 0.25, chw * 0.34, Math.max(3, effWallH * 0.16));
+
+    // Topo com espessura de parede e recorte de ruína
+    drawIsoDiamond(ctx, sx, topY, cw, ch, topCol, borderCol, 1.1);
+    drawIsoDiamond(ctx, sx + (variant === 1 ? 2 : 0), topY + 1, Math.max(6, cw - rim * 2.4), Math.max(4, ch - rim * 2.4), "#2b333d", "rgba(148,163,184,0.45)", 0.8);
   } else if (isContainerOrWall) {
-    // Nervuras verticais de contentor militar
-    ctx.strokeStyle = "rgba(20, 28, 18, 0.45)";
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(15, 23, 15, 0.48)";
+    ctx.lineWidth = 1.0;
     for (let k = 0.25; k <= 0.75; k += 0.25) {
       ctx.beginPath();
       ctx.moveTo(sx - chw * k, topY + chh * (1 - k));
       ctx.lineTo(sx - chw * k, sy + chh * (1 - k));
       ctx.stroke();
     }
+    drawIsoDiamond(ctx, sx, topY, cw, ch, topCol, borderCol, 1.0);
   } else if (isCrate) {
-    // Cintas metálicas do caixote
-    ctx.strokeStyle = "rgba(253, 224, 71, 0.55)";
-    ctx.lineWidth = 1.1;
+    ctx.strokeStyle = "rgba(250, 204, 21, 0.58)";
+    ctx.lineWidth = 1.15;
     ctx.beginPath();
     ctx.moveTo(sx - chw * 0.85, topY + effWallH * 0.3);
     ctx.lineTo(sx - chw * 0.15, sy - effWallH * 0.25);
     ctx.stroke();
-  }
-
-  // Topo isométrico integrado
-  drawIsoDiamond(ctx, sx, topY, cw, ch, topCol, borderCol, 1.0);
-
-  if (isBuilding) {
-    drawIsoDiamond(ctx, sx, topY, cw * 0.68, ch * 0.68, "#334155", "rgba(148,163,184,0.5)", 0.8);
+    drawIsoDiamond(ctx, sx, topY, cw, ch, topCol, borderCol, 1.0);
+  } else {
+    // Muro/barreira com espessura visível no topo
+    drawIsoDiamond(ctx, sx, topY, cw, ch, topCol, borderCol, 1.0);
+    drawIsoDiamond(ctx, sx, topY + 1, cw * 0.76, ch * 0.76, "rgba(30, 41, 59, 0.35)", null, 0);
   }
 }
 
@@ -3359,7 +3418,7 @@ function _renderBattleInner(b) {
         const enemyHere = b.enemies.find((e) => e.x === gx && e.y === gy && e.hp > 0);
 
         if (tileType === 1 || tileType === 2 || tileType === 3 || tileType === 4) {
-          drawIsoCoverBlock(ctx, sx, sy, m.tileW, m.tileH, m.wallH, tileType, isForestMission);
+          drawIsoCoverBlock(ctx, sx, sy, m.tileW, m.tileH, m.wallH, tileType, isForestMission, gx, gy);
         }
 
         const hostageSpriteHere = (b.hostages || []).find((h) => !h.rescued && h.x === gx && h.y === gy);
@@ -3625,6 +3684,7 @@ function handleCellClick(x, y) {
       b.ordersMinimized = false;
       b.orderTab = "mov";
       unitHere.overwatch = false;
+      centerCameraOnUnit(unitHere);
       addBattleLog(`Operacional selecionado: ${unitHere.name} (${unitHere.crouched ? "Agachado/Cauteloso: 2" : "Em pé/Correr: 4"}).`);
     }
     renderBattle();
