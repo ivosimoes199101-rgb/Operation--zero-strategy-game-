@@ -2409,8 +2409,7 @@ function ensureIsoCanvasStage(gridEl) {
       startClientY = ev.clientY;
       lastClientX = ev.clientX;
       lastClientY = ev.clientY;
-      try { canvas.setPointerCapture(ev.pointerId); } catch (_) {}
-    });
+          });
 
     canvas.addEventListener("pointermove", (ev) => {
       if (!state.battle) return;
@@ -2791,14 +2790,22 @@ function getUnitVisualBadge(entity, isEnemy) {
   `;
 }
 
+let __ozRenderQueued = false;
 function renderBattle() {
   const b = state.battle;
   if (!b) return;
-  try {
-    _renderBattleInner(b);
-  } catch (err) {
-    addBattleLog("Aviso de renderização tática: " + (err && err.message ? err.message : "erro"));
-  }
+  if (__ozRenderQueued) return;
+  __ozRenderQueued = true;
+  requestAnimationFrame(() => {
+    __ozRenderQueued = false;
+    const cur = state.battle;
+    if (!cur) return;
+    try {
+      _renderBattleInner(cur);
+    } catch (err) {
+      addBattleLog("Aviso de renderização tática: " + (err && err.message ? err.message : "erro"));
+    }
+  });
 }
 
 function _renderBattleInner(b) {
@@ -2953,16 +2960,20 @@ function _renderBattleInner(b) {
   if (canvas) {
     const m = getIsoMetrics(canvas);
     isoMetrics = m;
-    const dpr = window.devicePixelRatio || 1;
-    if (canvas.width !== Math.round(m.w * dpr) || canvas.height !== Math.round(m.h * dpr)) {
-      canvas.width = Math.round(m.w * dpr);
-      canvas.height = Math.round(m.h * dpr);
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const rw = Math.round(m.w);
+    const rh = Math.round(m.h);
+    const targetW = Math.round(rw * dpr);
+    const targetH = Math.round(rh * dpr);
+    if (Math.abs(canvas.width - targetW) > 1 || Math.abs(canvas.height - targetH) > 1) {
+      canvas.width = targetW;
+      canvas.height = targetH;
     }
 
     const ctx = canvas.getContext("2d");
     ctx.save();
     ctx.scale(dpr, dpr);
-    ctx.clearRect(0, 0, m.w, m.h);
+    ctx.clearRect(0, 0, rw, rh);
 
     ctx.fillStyle = "rgba(78, 242, 161, 0.82)";
     ctx.font = "bold 9px monospace";
